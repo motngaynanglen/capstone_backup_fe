@@ -51,7 +51,7 @@ export default function OpsDashboardView({ role }) {
                   Hàng đợi SX
                 </Button>
                 <Button onClick={() => navigate("/staff/shop-orders")}>
-                  Đơn shop & GHN
+                  Đơn shop & vận chuyển
                 </Button>
               </>
             )}
@@ -90,7 +90,7 @@ export default function OpsDashboardView({ role }) {
           </Col>
           <Col xs={24} sm={12} md={6}>
             <Card>
-              <Statistic title="Sẵn sàng GHN" value={counts.ordersReadyGhn ?? 0} />
+              <Statistic title="Sẵn sàng giao" value={counts.ordersReadyShipment ?? counts.ordersReadyGhn ?? 0} />
             </Card>
           </Col>
         </Row>
@@ -99,7 +99,7 @@ export default function OpsDashboardView({ role }) {
           <Space wrap>
             <Tag>Phân công thiết kế ≤ {sla.mf2AssignHours ?? 4}h</Tag>
             <Tag>Production stale &gt; {sla.productionStaleHours ?? 48}h</Tag>
-            <Tag>GHN sau FINISHED &gt; {sla.ghnAfterFinishedHours ?? 24}h</Tag>
+            <Tag>Vận chuyển sau FINISHED &gt; {sla.shippingAfterFinishedHours ?? sla.ghnAfterFinishedHours ?? 24}h</Tag>
           </Space>
         </Card>
 

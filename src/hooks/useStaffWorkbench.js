@@ -39,13 +39,19 @@ function mapWorkbenchPayload(res) {
     sla: {
       mf2AssignHours: pick(sla, 'mf2AssignHours', 'Mf2AssignHours') ?? 4,
       productionStaleHours: pick(sla, 'productionStaleHours', 'ProductionStaleHours') ?? 48,
-      ghnAfterFinishedHours: pick(sla, 'ghnAfterFinishedHours', 'GhnAfterFinishedHours') ?? 24,
+      shippingAfterFinishedHours:
+        pick(sla, 'shippingAfterFinishedHours', 'ShippingAfterFinishedHours')
+        ?? pick(sla, 'ghnAfterFinishedHours', 'GhnAfterFinishedHours')
+        ?? 24,
     },
     counts: {
       productionQueueCount: pick(counts, 'productionQueueCount', 'ProductionQueueCount') ?? 0,
       mf2Submitted: pick(counts, 'mf2Submitted', 'Mf2Submitted') ?? 0,
       mf2Pending: pick(counts, 'mf2Pending', 'Mf2Pending') ?? 0,
-      ordersReadyGhn: pick(counts, 'ordersReadyGhn', 'OrdersReadyGhn') ?? 0,
+      ordersReadyShipment:
+        pick(counts, 'ordersReadyShipment', 'OrdersReadyShipment')
+        ?? pick(counts, 'ordersReadyGhn', 'OrdersReadyGhn')
+        ?? 0,
     },
     health: {
       critical: pick(health, 'critical', 'Critical') ?? 0,

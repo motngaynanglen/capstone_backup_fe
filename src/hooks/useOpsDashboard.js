@@ -87,14 +87,15 @@ export function useOpsDashboard(role = 'manager') {
       const orderStatusCounts = countByStatus(orders, 'orderStatus');
       const mf2StatusCounts = countByStatus(mf2List, 'status');
 
-      const ordersReadyGhn = orders.filter(
-        (o) => o.orderStatus === 'FINISHED' && !o.shipment?.carrierOrderCode,
+      const ordersReadyShipment = orders.filter(
+        (o) => o.orderStatus === 'FINISHED' && !o.shipment?.id && !o.shipment?.trackingNumber,
       );
-      const ordersNeedGhn = ordersReadyGhn;
+      const ordersNeedShipment = ordersReadyShipment;
       const ordersNoCarrier = orders.filter(
         (o) =>
           o.orderStatus === 'FINISHED' &&
-          !o.shipment?.carrierOrderCode,
+          !o.shipment?.id &&
+          !o.shipment?.trackingNumber,
       );
 
       const productionList =
@@ -133,15 +134,19 @@ export function useOpsDashboard(role = 'manager') {
         .slice(0, 5);
 
       const shipmentsPending = shipments.filter(
-        (s) => !s.carrierOrderCode && s.carrier === 'GHN',
+        (s) => ['PREPARING', 'READY_FOR_PICKUP'].includes(
+          (s.shipmentStatus || s.status || '').toUpperCase(),
+        ),
       );
 
       setMetrics({
         orders,
         orderStatusCounts,
         ordersAttention: orders.filter((o) => ORDER_ATTENTION.includes(o.orderStatus)).length,
-        ordersNeedGhn: ordersNeedGhn.length,
-        ordersReadyGhn: ordersReadyGhn.length,
+        ordersNeedShipment: ordersNeedShipment.length,
+        ordersReadyShipment: ordersReadyShipment.length,
+        ordersNeedGhn: ordersNeedShipment.length,
+        ordersReadyGhn: ordersReadyShipment.length,
         ordersNoCarrier: ordersNoCarrier.length,
         productionQueueCount,
         productionStaleOrders,

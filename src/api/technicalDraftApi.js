@@ -1,9 +1,24 @@
 import axiosInstance from './axiosInstance';
 
 const technicalDraftApi = {
-  // Lấy danh sách draft đã confirmed của customer đang login (Kho đồ)
+  // Lấy danh sách draft của customer đang login (BE mới: /my-drafts)
   getMyConfirmed: async () => {
-    const response = await axiosInstance.get('/api/technical-draft/my-confirmed');
+    const response = await axiosInstance.get('/api/technical-draft/my-drafts');
+    return response.data;
+  },
+
+  getMyDrafts: async (params = {}) => {
+    const response = await axiosInstance.get('/api/technical-draft/my-drafts', { params });
+    return response.data;
+  },
+
+  getByVersion: async (versionId) => {
+    const response = await axiosInstance.get(`/api/technical-draft/version/${versionId}`);
+    return response.data;
+  },
+
+  getByDesignWork: async (designWorkId) => {
+    const response = await axiosInstance.get(`/api/technical-draft/design-work/${designWorkId}`);
     return response.data;
   },
 
@@ -21,7 +36,7 @@ const technicalDraftApi = {
 
   // Cập nhật draft (staff, chỉ khi chưa confirmed)
   update: async (id, data) => {
-    const response = await axiosInstance.put(`/api/technical-draft/${id}/update`, data);
+    const response = await axiosInstance.patch(`/api/technical-draft/${id}/update`, data);
     return response.data;
   },
 

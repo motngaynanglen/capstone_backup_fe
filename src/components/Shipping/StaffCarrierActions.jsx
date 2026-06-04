@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Card,
   Spin,
@@ -13,13 +13,22 @@ import {
   message,
   Divider,
 } from 'antd';
-import { ReloadOutlined, TruckOutlined, LinkOutlined } from '@ant-design/icons';
-import { getShipmentByOrderApi, createCarrierShipmentApi } from '../../api/shipmentApi';
-import { updateOrderStatusApi } from '../../api/orderApi';
+import { CheckCircleOutlined, LinkOutlined, ReloadOutlined, SendOutlined, TruckOutlined } from '@ant-design/icons';
+import {
+  getShipmentByOrderApi,
+  createCarrierShipmentApi,
+  markShipmentReadyApi,
+  markShipmentInTransitApi,
+  confirmShipmentDeliveredApi,
+} from '../../api/shipmentApi';
+import { completeOrderApi } from '../../api/orderApi';
 import { shipmentStatusMap, normStatus } from '../../utils/staffOrderConstants';
 import GhnLocationPicker from './GhnLocationPicker';
 
 const { Text } = Typography;
+
+// TODO: GHN temporarily hidden until BE shipping quote/carrier endpoints are restored.
+const ENABLE_GHN_SHIPPING = false;
 
 function pick(obj, ...keys) {
   if (!obj) return undefined;
@@ -33,6 +42,13 @@ function hasGhnCodes(addr) {
   const districtId = pick(addr, 'ghnDistrictId', 'GhnDistrictId');
   const wardCode = pick(addr, 'ghnWardCode', 'GhnWardCode');
   return Boolean(districtId > 0 && String(wardCode || '').trim());
+}
+
+function toWeightGrams(value) {
+  if (value === undefined || value === null) return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const parsed = Number.parseFloat(String(value).replace(/[^\d.]/g, ''));
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function apiErrorMessage(e, fallback) {
@@ -95,14 +111,32 @@ export default function StaffCarrierActions({
     load();
   }, [load]);
 
+  const totalEstimatedWeight = useMemo(() => {
+    if (!Array.isArray(orderItems)) return 0;
+    return orderItems.reduce((sum, item) => {
+      const weight = toWeightGrams(
+        pick(item, 'estimatedWeightPerUnit', 'EstimatedWeightPerUnit', 'weight', 'Weight'),
+      );
+      const qty = Number(pick(item, 'quantityOrdered', 'QuantityOrdered', 'quantity', 'Quantity')) || 1;
+      return sum + weight * qty;
+    }, 0);
+  }, [orderItems]);
+
+  useEffect(() => {
+    if (totalEstimatedWeight > 0) {
+      setWeightGrams(Math.max(100, Math.round(totalEstimatedWeight)));
+    }
+  }, [totalEstimatedWeight]);
+
   const shipment = pick(payload, 'shipment', 'Shipment') || payload;
   const shippingAddress = pick(shipment, 'shippingAddress', 'ShippingAddress');
   const addressHasGhn = hasGhnCodes(shippingAddress);
   const ghnPatchReady = ghnLocation.districtId > 0 && Boolean(ghnLocation.wardCode?.trim());
   const summary = shipmentSummary || null;
-  const tracking = pick(shipment, 'trackingNumber', 'TrackingNumber', 'trackingNo')
-    ?? pick(summary, 'trackingNumber', 'TrackingNumber', 'trackingNo');
-  const carrier = pick(shipment, 'carrier', 'Carrier') ?? pick(summary, 'carrier', 'Carrier');
+  const tracking = pick(shipment, 'trackingNumber', 'TrackingNumber', 'trackingNo', 'TrackingNo')
+    ?? pick(summary, 'trackingNumber', 'TrackingNumber', 'trackingNo', 'TrackingNo');
+  const carrier = pick(shipment, 'carrierName', 'CarrierName', 'carrier', 'Carrier')
+    ?? pick(summary, 'carrierName', 'CarrierName', 'carrier', 'Carrier');
   const status = normStatus(
     pick(shipment, 'shipmentStatus', 'ShipmentStatus', 'status')
       ?? pick(summary, 'shipmentStatus', 'ShipmentStatus', 'status'),
@@ -110,9 +144,14 @@ export default function StaffCarrierActions({
   const carrierOrderCode =
     pick(shipment, 'carrierOrderCode', 'CarrierOrderCode')
     ?? pick(summary, 'carrierOrderCode', 'CarrierOrderCode');
+  const displayedTrackingCode = carrierOrderCode || tracking;
   const labelUrl = pick(shipment, 'carrierLabelUrl', 'CarrierLabelUrl');
+  const shipmentId = pick(shipment, 'id', 'Id') ?? pick(summary, 'id', 'Id');
   const os = normStatus(orderStatus);
-  const canCreateGhn = os === 'FINISHED' && !carrierOrderCode;
+  const allItemsFinished = Array.isArray(orderItems) && orderItems.length > 0
+    && orderItems.every((item) => normStatus(pick(item, 'fulfillmentStatus', 'FulfillmentStatus')) === 'FINISHED');
+  const canCreateGhn = ENABLE_GHN_SHIPPING && os === 'FINISHED' && !carrierOrderCode;
+  const isCompleted = os === 'COMPLETED';
 
   const handleCreateGhn = async () => {
     setCreating(true);
@@ -139,18 +178,53 @@ export default function StaffCarrierActions({
     }
   };
 
-  const handleShipmentStatus = async (shipmentStatus, orderStatusUpdate) => {
+  const runShipmentAction = async (action, successMessage) => {
+    if (!shipmentId) {
+      message.warning('Chưa có vận đơn để thao tác.');
+      return;
+    }
     setCreating(true);
     try {
-      await updateOrderStatusApi(orderId, {
-        orderStatus: orderStatusUpdate || os,
-        shipmentStatus,
-      });
-      message.success(`Đã cập nhật vận chuyển → ${shipmentStatus}`);
+      await action(shipmentId);
+      message.success(successMessage);
       await load();
       onUpdated?.();
     } catch (e) {
-      message.error(e?.response?.data?.message || 'Cập nhật vận chuyển thất bại');
+      message.error(apiErrorMessage(e, 'Cập nhật vận chuyển thất bại'));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleMarkReady = () => runShipmentAction(
+    (id) => markShipmentReadyApi(id),
+    'Đã xác nhận vận đơn sẵn sàng giao',
+  );
+
+  const handleMarkInTransit = () => runShipmentAction(
+    (id) => markShipmentInTransitApi(id, {
+      carrierName: carrier || 'MANUAL',
+      trackingNumber: tracking || `MANUAL-${String(orderId).slice(0, 8)}`,
+      shippedAt: new Date().toISOString(),
+      estimatedDeliveryTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+    }),
+    'Đã bàn giao cho vận chuyển',
+  );
+
+  const handleConfirmDelivered = () => runShipmentAction(
+    (id) => confirmShipmentDeliveredApi(id),
+    'Đã xác nhận giao thành công',
+  );
+
+  const handleCompleteOrder = async () => {
+    setCreating(true);
+    try {
+      await completeOrderApi(orderId);
+      message.success('Đã hoàn thành đơn hàng');
+      await load();
+      onUpdated?.();
+    } catch (e) {
+      message.error(apiErrorMessage(e, 'Không thể hoàn thành đơn hàng. BE có thể đang chặn theo rule nghiệp vụ.'));
     } finally {
       setCreating(false);
     }
@@ -176,6 +250,17 @@ export default function StaffCarrierActions({
             Tùy chọn — sửa khu vực GHN thủ công:
           </Text>
           <GhnLocationPicker value={ghnLocation} onChange={setGhnLocation} />
+        </div>
+      )}
+      {totalEstimatedWeight > 0 && (
+        <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-3">
+          <Text type="secondary" className="text-xs">Tổng cân nặng ước tính từ sản phẩm:</Text>
+          <div className="text-lg font-bold text-blue-600">
+            {Math.round(totalEstimatedWeight).toLocaleString('vi-VN')}g
+            <span className="text-sm font-normal text-gray-500 ml-2">
+              ({(totalEstimatedWeight / 1000).toFixed(2)} kg)
+            </span>
+          </div>
         </div>
       )}
       <Space wrap align="center">
@@ -206,7 +291,7 @@ export default function StaffCarrierActions({
       title={
         <Space>
           <TruckOutlined />
-          Vận chuyển GHN
+          Vận chuyển
         </Space>
       }
       extra={
@@ -230,16 +315,24 @@ export default function StaffCarrierActions({
       {!loading && error && (
         <Space direction="vertical" style={{ width: '100%' }} size="middle">
           <Alert type="warning" message={error} showIcon />
-          {ghnCreateBlock}
-          {os !== 'FINISHED' && !carrierOrderCode && (
+          {ENABLE_GHN_SHIPPING && ghnCreateBlock}
+          {os !== 'FINISHED' && !shipmentId && (
             <Text type="secondary" style={{ fontSize: 12 }}>
-              Hoàn tất sản xuất và chuyển đơn sang FINISHED trước khi tạo GHN.
+              Hoàn tất sản xuất trước khi xử lý vận chuyển.
             </Text>
           )}
         </Space>
       )}
       {!loading && !error && (
         <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          {isCompleted && (
+            <div style={{ textAlign: 'center', padding: '8px 0' }}>
+              <Tag color="success" style={{ fontSize: 14, padding: '4px 12px' }}>
+                <CheckCircleOutlined /> Đơn hàng đã hoàn thành
+              </Tag>
+            </div>
+          )}
+
           <Descriptions column={1} size="small" bordered>
             <Descriptions.Item label="Trạng thái đơn">
               <Tag>{os || '—'}</Tag>
@@ -252,24 +345,24 @@ export default function StaffCarrierActions({
                 status || '—'
               )}
             </Descriptions.Item>
-            <Descriptions.Item label="Mã vận đơn">{carrierOrderCode || '—'}</Descriptions.Item>
+            <Descriptions.Item label="Mã vận đơn">{displayedTrackingCode || '—'}</Descriptions.Item>
             <Descriptions.Item label="Tracking">{tracking || '—'}</Descriptions.Item>
             <Descriptions.Item label="Số dòng hàng">
               {Array.isArray(orderItems) ? orderItems.length : '—'}
             </Descriptions.Item>
           </Descriptions>
 
-          {!shipment && (
-            <Alert type="info" showIcon message="Chưa có bản ghi vận chuyển gắn với đơn này." />
+          {!shipmentId && (
+            <Alert type="info" showIcon message="Chưa có vận đơn gắn với đơn này." />
           )}
 
-          {ghnCreateBlock}
+          {ENABLE_GHN_SHIPPING && ghnCreateBlock}
 
-          {carrierOrderCode && (
+          {displayedTrackingCode && (
             <Alert
               type="success"
               showIcon
-              message={`Đã có vận đơn ${carrier || 'GHN'}: ${carrierOrderCode}`}
+              message={`Đã có vận đơn ${carrier || 'MANUAL'}: ${displayedTrackingCode}`}
               description={
                 labelUrl ? (
                   <a href={labelUrl} target="_blank" rel="noreferrer">
@@ -280,29 +373,53 @@ export default function StaffCarrierActions({
             />
           )}
 
-          {carrierOrderCode && status === 'READY_FOR_PICKUP' && (
+          {!isCompleted && shipmentId && status === 'PREPARING' && allItemsFinished && (
             <Button
+              type="primary"
+              icon={<CheckCircleOutlined />}
               loading={creating}
-              onClick={() => handleShipmentStatus('IN_TRANSIT', os)}
+              onClick={handleMarkReady}
             >
-              Xác nhận đã bàn giao ship → IN_TRANSIT
+              Xác nhận sẵn sàng giao
             </Button>
           )}
 
-          {status === 'IN_TRANSIT' && (
+          {!isCompleted && shipmentId && status === 'READY_FOR_PICKUP' && (
+            <Button
+              type="primary"
+              icon={<SendOutlined />}
+              loading={creating}
+              onClick={handleMarkInTransit}
+            >
+              Đã bàn giao cho vận chuyển
+            </Button>
+          )}
+
+          {!isCompleted && status === 'IN_TRANSIT' && (
             <Popconfirm
               title="Xác nhận giao thành công?"
-              onConfirm={() => handleShipmentStatus('DELIVERED', 'COMPLETED')}
+              onConfirm={handleConfirmDelivered}
             >
-              <Button type="primary" loading={creating}>
-                Giao thành công → DELIVERED
+              <Button type="primary" icon={<TruckOutlined />} loading={creating}>
+                Xác nhận giao thành công
               </Button>
             </Popconfirm>
           )}
 
-          {os !== 'FINISHED' && !carrierOrderCode && shipment && (
+          {!isCompleted && shipmentId && status === 'DELIVERED' && (
+            <Popconfirm
+              title="Hoàn thành đơn hàng?"
+              onConfirm={handleCompleteOrder}
+            >
+              <Button type="primary" icon={<CheckCircleOutlined />} loading={creating}>
+                Hoàn thành đơn hàng
+              </Button>
+            </Popconfirm>
+          )}
+
+          {os !== 'FINISHED' && !shipmentId && shipment && (
             <Text type="secondary" style={{ fontSize: 12 }}>
-              Hoàn tất sản xuất và chuyển đơn sang FINISHED trước khi tạo GHN.
+              Hoàn tất sản xuất trước khi xử lý vận chuyển.
             </Text>
           )}
         </Space>

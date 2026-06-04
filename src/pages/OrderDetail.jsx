@@ -474,7 +474,9 @@ const OrderDetail = () => {
                   const itemQty = item.quantityOrdered ?? item.quantity ?? 1;
                   const itemImg = item.thumbnailUrl || item.image || item.imageUrl || null;
                   const itemSourceType = item.sourceType || sourceType || 'IN_STOCK';
-                  const itemFulfillment = item.fulfillmentStatus || item.status || 'PENDING';
+                  const itemFulfillment = orderStatus.toUpperCase() === 'CANCELLED'
+                    ? 'CANCELLED'
+                    : (item.fulfillmentStatus || item.status || 'PENDING');
                   const itemMaterial = item.materialName || item.material || '';
 
                   return (

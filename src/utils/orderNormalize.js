@@ -56,7 +56,7 @@ export function resolveCustomerOrderDisplayStatus(
 
   if (customMfg) {
     if (os === 'FINISHED' || ss === 'READY_FOR_PICKUP') {
-      return { key: 'READY_FOR_SHIP', label: 'Sẵn sàng giao (chờ GHN)' };
+      return { key: 'READY_FOR_SHIP', label: 'Sẵn sàng giao' };
     }
     if (shopProcessing) {
       return { key: 'PRODUCTION', label: 'Đang sản xuất / in 3D' };
@@ -162,7 +162,7 @@ export function buildCustomerTrackingSteps(
     steps.push({
       key: 'ready_for_ship',
       label: 'Sẵn sàng giao',
-      description: 'Sản phẩm đã xong — shop sẽ tạo vận đơn GHN.',
+      description: 'Sản phẩm đã xong — shop sẽ xử lý vận chuyển.',
       done: ['IN_TRANSIT', 'DELIVERED'].includes(ss) || os === 'COMPLETED',
       isCurrent: readyForShip,
     });
@@ -230,6 +230,8 @@ function normalizeOrderItem(it) {
     sourceType: it.sourceType ?? it.SourceType,
     quantityOrdered: it.quantityOrdered ?? it.QuantityOrdered,
     unitPrice: it.unitPrice ?? it.UnitPrice,
+    estimatedWeightPerUnit: it.estimatedWeightPerUnit ?? it.EstimatedWeightPerUnit,
+    weight: it.weight ?? it.Weight,
     fulfillmentStatus: it.fulfillmentStatus ?? it.FulfillmentStatus,
     canSubmitFeedback:
       it.canSubmitFeedback !== undefined
@@ -250,10 +252,24 @@ function normalizeOrderItem(it) {
   };
 }
 
+function normalizeShipment(shipment) {
+  if (!shipment) return undefined;
+  return {
+    ...shipment,
+    id: shipment.id ?? shipment.Id,
+    carrier: shipment.carrier ?? shipment.Carrier ?? shipment.carrierName ?? shipment.CarrierName,
+    carrierName: shipment.carrierName ?? shipment.CarrierName ?? shipment.carrier ?? shipment.Carrier,
+    carrierOrderCode: shipment.carrierOrderCode ?? shipment.CarrierOrderCode,
+    trackingNumber: shipment.trackingNumber ?? shipment.TrackingNumber ?? shipment.trackingNo,
+    shipmentStatus: shipment.shipmentStatus ?? shipment.ShipmentStatus ?? shipment.status ?? shipment.Status,
+  };
+}
+
 /** Chuẩn hóa OrderDTO từ BE cho bảng FE. */
 export function normalizeOrderRow(o) {
   if (!o) return null;
   const invoice = o.invoice || o.Invoice;
+  const shipment = normalizeShipment(o.shipment || o.Shipment);
   const paymentMethod = (invoice?.paymentMethod || invoice?.PaymentMethod || '').toUpperCase();
   const isCod = Boolean(invoice?.isCod ?? invoice?.IsCod ?? paymentMethod === 'CASH');
   return {
@@ -266,7 +282,7 @@ export function normalizeOrderRow(o) {
     depositedAt: o.depositedAt,
     completedAt: o.completedAt ?? o.CompletedAt,
     totalItem: o.totalItem ?? o.items?.length ?? o.orderItems?.length ?? 0,
-    shipment: o.shipment || o.Shipment,
+    shipment,
     invoice: invoice
       ? {
           ...invoice,

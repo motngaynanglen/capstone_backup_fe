@@ -18,9 +18,33 @@ export const getShipmentByOrderApi = async (orderId) => {
   return response.data;
 };
 
-// 4. Cập nhật thông tin vận đơn
-export const updateShipmentApi = async (id, payload) => {
-  const response = await axiosInstance.patch(`/api/shipment/${id}/update`, payload);
+export const createShipmentApi = async (payload) => {
+  const response = await axiosInstance.patch('/api/shipment/Add', payload);
+  return response.data;
+};
+
+export const markShipmentReadyApi = async (id) => {
+  const response = await axiosInstance.patch(`/api/shipment/${id}/mark-ready`);
+  return response.data;
+};
+
+export const markShipmentInTransitApi = async (id, payload) => {
+  const response = await axiosInstance.patch(`/api/shipment/${id}/mark-in-transit`, payload);
+  return response.data;
+};
+
+export const confirmShipmentDeliveredApi = async (id) => {
+  const response = await axiosInstance.patch(`/api/shipment/${id}/confirm-delivered`);
+  return response.data;
+};
+
+export const cancelShipmentApi = async (id, payload) => {
+  const response = await axiosInstance.patch(`/api/shipment/${id}/cancel`, payload);
+  return response.data;
+};
+
+export const markShipmentFailedApi = async (id, payload) => {
+  const response = await axiosInstance.patch(`/api/shipment/${id}/mark-failed`, payload);
   return response.data;
 };
 

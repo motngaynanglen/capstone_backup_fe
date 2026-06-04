@@ -408,7 +408,7 @@ const Home = () => {
             icon: <TruckIcon />,
             color: 'bg-emerald-600',
             title: 'Đóng gói & giao nhanh',
-            desc: 'Tích hợp GHN, theo dõi vận đơn trực tuyến sau khi đơn sẵn sàng giao.',
+            desc: 'Theo dõi vận đơn trực tuyến sau khi đơn sẵn sàng giao.',
           },
           {
             icon: <UserIcon />,

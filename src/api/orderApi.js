@@ -30,25 +30,28 @@ export const performTransactionApi = async (payload) => {
   return response.data;
 };
 
-// 6. [Staff/Manager] Cập nhật trạng thái đơn hàng + shipment
-export const updateOrderStatusApi = async (id, payload) => {
-  // payload: { orderStatus, shipmentStatus?, trackingNumber?, note? }
-  const response = await axiosInstance.patch(`/api/order/${id}/status`, payload);
-  return response.data;
-};
-
-/** [Staff] Hàng đợi sản xuất (flow 2/3, pre-order đã TT). */
+/** [Staff] Hàng đợi sản xuất tạm lấy từ Order query vì BE đã bỏ endpoint production-queue. */
 export const getProductionQueueApi = async (payload) => {
-  const response = await axiosInstance.post('/api/order/production-queue', payload);
+  const response = await axiosInstance.post('/api/order/query', {
+    pageNumber: payload?.pageNumber ?? 1,
+    pageSize: payload?.pageSize ?? 200,
+    search: payload?.search,
+    status: 'PROCESSING',
+    sortDescending: true,
+    sortBy: 'created',
+  });
   return response.data;
 };
 
-/** [Staff] Cập nhật FulfillmentStatus dòng hàng (PRINTING → FINISHED). */
-export const updateOrderItemFulfillmentApi = async (orderItemId, payload) => {
-  const response = await axiosInstance.patch(
-    `/api/order/items/${orderItemId}/fulfillment`,
-    payload,
-  );
+/** [Staff] Hoàn tất/đóng gói một dòng hàng theo endpoint BE mới. */
+export const updateOrderItemFulfillmentApi = async (orderItemId) => {
+  const response = await axiosInstance.patch(`/api/order/item/${orderItemId}/finish-package`);
+  return response.data;
+};
+
+/** [Customer/Staff/Manager] Hoàn tất vòng đời đơn hàng. */
+export const completeOrderApi = async (id) => {
+  const response = await axiosInstance.patch(`/api/order/${id}/complete`);
   return response.data;
 };
 

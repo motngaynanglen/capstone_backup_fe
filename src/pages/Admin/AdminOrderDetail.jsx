@@ -179,7 +179,7 @@ const AdminOrderDetail = () => {
         />
       </Card>
 
-      <Card title="Vận chuyển GHN" className="mt-6 shadow-sm rounded-lg border-0">
+      <Card title="Vận chuyển" className="mt-6 shadow-sm rounded-lg border-0">
         <StaffCarrierActions
           orderId={id}
           orderStatus={order.status || order.orderStatus}

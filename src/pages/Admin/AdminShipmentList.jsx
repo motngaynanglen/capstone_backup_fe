@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Tag, Input, Button, Modal, Form, App, Select, Space, Tooltip } from 'antd';
-import { SearchOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons';
-import { queryShipmentsApi, getShipmentDetailApi, updateShipmentApi } from '../../api/shipmentApi';
+import { Card, Table, Tag, Input, Button, Modal, Form, App, Space, Tooltip } from 'antd';
+import { SearchOutlined, EyeOutlined } from '@ant-design/icons';
+import { queryShipmentsApi, getShipmentDetailApi } from '../../api/shipmentApi';
 
 const statusColorMap = {
   PENDING: 'gold',
@@ -80,29 +80,10 @@ const AdminShipmentList = () => {
     }
   };
 
-  const handleOpenEdit = (record) => {
-    setSelectedShipment(record);
-    form.setFieldsValue({
-      trackingNumber: record.trackingNumber,
-      shippingFee: record.shippingFee,
-      carrier: record.carrier,
-      note: record.note,
-    });
-    setEditModal(true);
-  };
-
-  const handleUpdateShipment = async (values) => {
+  const handleUpdateShipment = async () => {
     setSubmitLoading(true);
-    try {
-      await updateShipmentApi(selectedShipment.id, values);
-      message.success('Cập nhật vận đơn thành công!');
-      setEditModal(false);
-      fetchShipments(pagination.current, pagination.pageSize, searchText);
-    } catch (error) {
-      message.error(error.response?.data?.message || 'Có lỗi khi cập nhật.');
-    } finally {
-      setSubmitLoading(false);
-    }
+    message.warning('Cập nhật vận đơn thủ công đang tạm ẩn. Hãy xử lý vận chuyển trong chi tiết đơn hàng.');
+    setSubmitLoading(false);
   };
 
   const columns = [
@@ -156,8 +137,10 @@ const AdminShipmentList = () => {
           <Tooltip title="Xem chi tiết">
             <Button type="text" icon={<EyeOutlined style={{ color: '#667eea' }} />} onClick={() => handleViewDetail(record)} />
           </Tooltip>
-          <Tooltip title="Cập nhật">
-            <Button type="text" icon={<EditOutlined style={{ color: '#f6ad55' }} />} onClick={() => handleOpenEdit(record)} />
+          <Tooltip title="Cập nhật vận chuyển trong chi tiết đơn hàng">
+            <Button type="text" disabled>
+              —
+            </Button>
           </Tooltip>
         </Space>
       )

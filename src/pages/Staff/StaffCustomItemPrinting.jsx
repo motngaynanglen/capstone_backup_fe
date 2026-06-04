@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Button, Spin, message, Tag, Space, Typography, Alert } from 'antd';
-import { ArrowLeftOutlined, PrinterOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { getOrderDetailApi, updateOrderItemFulfillmentApi } from '../../api/orderApi';
 import { fulfillmentStatusMap, normStatus } from '../../utils/staffOrderConstants';
 
@@ -33,12 +33,12 @@ export default function StaffCustomItemPrinting() {
     })();
   }, [orderId, itemId]);
 
-  const updateStatus = async (fulfillmentStatus) => {
+  const finishItem = async () => {
     setBusy(true);
     try {
-      const res = await updateOrderItemFulfillmentApi(itemId, { fulfillmentStatus });
-      message.success(res?.data?.message || `Đã cập nhật → ${fulfillmentStatus}`);
-      setItem((prev) => (prev ? { ...prev, fulfillmentStatus } : prev));
+      const res = await updateOrderItemFulfillmentApi(itemId);
+      message.success(res?.data?.message || 'Đã hoàn tất / đóng gói dòng hàng');
+      setItem((prev) => (prev ? { ...prev, fulfillmentStatus: 'FINISHED' } : prev));
     } catch (e) {
       message.error(e?.response?.data?.message || 'Cập nhật thất bại');
     } finally {
@@ -88,24 +88,14 @@ export default function StaffCustomItemPrinting() {
             </div>
 
             <Space wrap>
-              {fs !== 'PRINTING' && fs !== 'FINISHED' && (
-                <Button
-                  type="primary"
-                  icon={<PrinterOutlined />}
-                  loading={busy}
-                  onClick={() => updateStatus('PRINTING')}
-                >
-                  Bắt đầu in
-                </Button>
-              )}
-              {fs === 'PRINTING' && (
+              {fs !== 'FINISHED' && fs !== 'CANCELLED' && (
                 <Button
                   type="primary"
                   icon={<CheckCircleOutlined />}
                   loading={busy}
-                  onClick={() => updateStatus('FINISHED')}
+                  onClick={finishItem}
                 >
-                  Hoàn thiện in
+                  Hoàn tất / đóng gói
                 </Button>
               )}
               {fs === 'FINISHED' && (
@@ -114,7 +104,7 @@ export default function StaffCustomItemPrinting() {
             </Space>
 
             <Button onClick={() => navigate(`/staff/shop-orders?openOrderId=${orderId}`)}>
-              Mở đơn hàng để giao GHN
+              Mở đơn hàng để xử lý vận chuyển
             </Button>
           </Space>
         </Card>

@@ -40,6 +40,8 @@ const PAYMENT_METHODS = [
   { value: 'VNPAY', label: 'Thanh toán online (PayOS)', description: 'Hỗ trợ QR, thẻ ngân hàng, ví điện tử' },
 ];
 
+// TODO: GHN temporarily hidden until BE shipping quote/carrier endpoints are restored.
+const ENABLE_GHN_SHIPPING = false;
 const DEFAULT_SHIPPING_FEE = 30000;
 
 const formatPrice = (price) =>
@@ -141,8 +143,7 @@ const Checkout = () => {
   const [shippingQuoteReady, setShippingQuoteReady] = useState(false);
 
   const subtotal = cartItems.reduce((s, it) => s + Number(it.price || 0) * Number(it.quantity || 1), 0);
-  /** Đã chọn GHN → dùng đúng phí API (kể cả 0đ). Chưa báo giá → phí mặc định 30k. */
-  const effectiveShippingFee = shippingQuoteReady
+  const effectiveShippingFee = ENABLE_GHN_SHIPPING && shippingQuoteReady
     ? Number(shippingFee) || 0
     : DEFAULT_SHIPPING_FEE;
   const total = subtotal + (cartItems.length > 0 ? effectiveShippingFee : 0);
@@ -154,7 +155,17 @@ const Checkout = () => {
   const existingAddressReady =
     addressMode === 'existing' && selectedAddressId
     && (selectedAddressHasGhn || hasAddressTextForGhn(selectedAddress));
-  const shippingGhnReady = addressMode === 'new' ? newAddressGhnReady : existingAddressReady;
+  const newAddressManualReady =
+    addressMode === 'new'
+    && formData.receiverName.trim()
+    && formData.phone.trim()
+    && formData.addressLine.trim()
+    && formData.ward.trim()
+    && formData.district.trim()
+    && formData.city.trim();
+  const shippingReady = ENABLE_GHN_SHIPPING
+    ? (addressMode === 'new' ? newAddressGhnReady : existingAddressReady)
+    : (addressMode === 'new' ? newAddressManualReady : Boolean(selectedAddressId));
   const collectOnDelivery = false; // Hệ thống không hỗ trợ COD
 
   const handleShippingChange = useCallback((carrier, fee) => {
@@ -241,21 +252,23 @@ const Checkout = () => {
       if (addressMode === 'existing' && selectedAddressId) {
         shippingAddressId = toGuidString(selectedAddressId, 'Địa chỉ giao hàng');
       } else {
-        if (!newAddressGhnReady) {
+        if (ENABLE_GHN_SHIPPING && !newAddressGhnReady) {
           throw new Error('Vui lòng chọn đủ Tỉnh → Quận → Phường theo danh mục GHN.');
         }
         const payload = {
           receiverName: formData.receiverName,
           phone: formData.phone,
           addressLine: formData.addressLine,
-          ward: ghnLocation.wardName,
-          district: ghnLocation.districtName,
-          city: ghnLocation.provinceName,
+          ward: ENABLE_GHN_SHIPPING ? ghnLocation.wardName : formData.ward,
+          district: ENABLE_GHN_SHIPPING ? ghnLocation.districtName : formData.district,
+          city: ENABLE_GHN_SHIPPING ? ghnLocation.provinceName : formData.city,
           province: formData.province,
           isDefault: formData.isDefault,
-          ghnDistrictId: ghnLocation.districtId,
-          ghnWardCode: ghnLocation.wardCode,
         };
+        if (ENABLE_GHN_SHIPPING) {
+          payload.ghnDistrictId = ghnLocation.districtId;
+          payload.ghnWardCode = ghnLocation.wardCode;
+        }
         const res = await shippingAddressApi.add(payload);
         const rawAddrId =
           res?.data?.id ||
@@ -272,7 +285,7 @@ const Checkout = () => {
       const orderPayload = {
         shippingAddressId,
         shippingFee: effectiveShippingFee,
-        shippingCarrier: shippingCarrier || 'MANUAL',
+        shippingCarrier: ENABLE_GHN_SHIPPING ? (shippingCarrier || 'MANUAL') : 'MANUAL',
         note: formData.note || '',
         items: cartItems.map((it) => {
           const base = { sourceType: it.sourceType || 'IN_STOCK', quantity: Number(it.quantity) || 1 };
@@ -466,12 +479,32 @@ const Checkout = () => {
                   <input name="addressLine" type="text" value={formData.addressLine} onChange={handleChange} required={addressMode === 'new'}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm" placeholder="88 Phước Thiện" />
                 </div>
-                <div className="md:col-span-2 p-4 rounded-xl bg-slate-50 border border-slate-200">
-                  <p className="text-xs font-semibold text-slate-600 mb-3 uppercase tracking-wide">
-                    Khu vực giao hàng (GHN) — bắt buộc để tính phí ship
-                  </p>
-                  <GhnLocationPicker value={ghnLocation} onChange={setGhnLocation} />
-                </div>
+                {ENABLE_GHN_SHIPPING ? (
+                  <div className="md:col-span-2 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <p className="text-xs font-semibold text-slate-600 mb-3 uppercase tracking-wide">
+                      Khu vực giao hàng (GHN) — bắt buộc để tính phí ship
+                    </p>
+                    <GhnLocationPicker value={ghnLocation} onChange={setGhnLocation} />
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block mb-1.5 text-sm font-medium text-gray-700">Phường / Xã *</label>
+                      <input name="ward" type="text" value={formData.ward} onChange={handleChange} required={addressMode === 'new'}
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm" placeholder="Phường / Xã" />
+                    </div>
+                    <div>
+                      <label className="block mb-1.5 text-sm font-medium text-gray-700">Quận / Huyện *</label>
+                      <input name="district" type="text" value={formData.district} onChange={handleChange} required={addressMode === 'new'}
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm" placeholder="Quận / Huyện" />
+                    </div>
+                    <div>
+                      <label className="block mb-1.5 text-sm font-medium text-gray-700">Tỉnh / Thành phố *</label>
+                      <input name="city" type="text" value={formData.city} onChange={handleChange} required={addressMode === 'new'}
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm" placeholder="Tỉnh / Thành phố" />
+                    </div>
+                  </>
+                )}
                 <div>
                   <label className="block mb-1.5 text-sm font-medium text-gray-700">Quốc gia</label>
                   <div className="w-full px-4 py-2.5 border border-gray-100 rounded-xl text-sm bg-gray-50 text-gray-600">
@@ -510,7 +543,7 @@ const Checkout = () => {
               <div className="w-1 h-6 bg-indigo-600 rounded-full"></div>
               <h2 className="text-lg font-bold text-gray-900">Vận chuyển</h2>
             </div>
-            {shippingGhnReady ? (
+            {ENABLE_GHN_SHIPPING && shippingReady ? (
               <ShippingCarrierSelect
                 shippingAddressId={addressMode === 'existing' ? quoteAddressId : undefined}
                 ghnToDistrictId={addressMode === 'new' ? ghnLocation.districtId : undefined}
@@ -523,11 +556,12 @@ const Checkout = () => {
                 onChange={handleShippingChange}
               />
             ) : (
-              <p className="text-sm text-gray-500">
-                {addressMode === 'new'
-                  ? 'Chọn đủ Tỉnh → Quận → Phường GHN ở trên để xem phí vận chuyển trước khi đặt hàng.'
-                  : 'Chọn địa chỉ có sẵn để xem phí vận chuyển (hệ thống tự map mã GHN từ Phường/Quận/Tỉnh).'}
-              </p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-gray-900">Giao hàng Nova3D</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  Giao Hàng Nhanh đang được ẩn tạm thời. Phí vận chuyển mặc định là {formatPrice(DEFAULT_SHIPPING_FEE)}.
+                </p>
+              </div>
             )}
           </div>
 
@@ -593,8 +627,8 @@ const Checkout = () => {
               disabled={
                 isSubmitting
                 || (addressMode === 'existing' && !selectedAddressId)
-                || (addressMode === 'new' && (!formData.receiverName || !formData.phone || !formData.addressLine || !newAddressGhnReady || !shippingQuoteReady))
-                || (addressMode === 'existing' && (!shippingGhnReady || !shippingQuoteReady))
+                || (addressMode === 'new' && (!formData.receiverName || !formData.phone || !formData.addressLine || !shippingReady))
+                || (addressMode === 'existing' && !shippingReady)
               }
               className={`w-full py-3.5 rounded-xl font-semibold text-sm transition-colors duration-200 cursor-pointer flex items-center justify-center ${
                 isSubmitting || (addressMode === 'existing' && !selectedAddressId)

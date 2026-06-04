@@ -13,6 +13,11 @@ export const SHIPMENT_STATUSES = [
   { value: 'READY_FOR_PICKUP', label: 'Chờ lấy hàng', color: 'orange' },
   { value: 'IN_TRANSIT', label: 'Đang giao', color: 'blue' },
   { value: 'DELIVERED', label: 'Giao thành công', color: 'green' },
+  { value: 'FAILED', label: 'Giao thất bại', color: 'red' },
+  { value: 'RETURNING', label: 'Đang hoàn hàng', color: 'volcano' },
+  { value: 'RETURNED', label: 'Đã hoàn hàng', color: 'purple' },
+  { value: 'LOST_OR_DAMAGED', label: 'Thất lạc / hư hỏng', color: 'red' },
+  { value: 'CANCELLED', label: 'Đã hủy vận chuyển', color: 'default' },
 ];
 
 export const FULFILLMENT_STATUSES = [
@@ -67,26 +72,34 @@ export function allOrderItemsReadyForShip(items) {
 /** Chuẩn hóa ProductionQueueOrderDto từ BE. */
 export function normalizeProductionQueueOrder(row) {
   if (!row) return null;
-  const lines = (pickApi(row, 'lines', 'Lines') || []).map((l) => ({
+  const rawLines = pickApi(row, 'lines', 'Lines') || pickApi(row, 'items', 'orderItems', 'OrderItems') || [];
+  const shipment = pickApi(row, 'shipment', 'Shipment');
+  const lines = rawLines.map((l) => ({
     orderItemId: pickApi(l, 'orderItemId', 'OrderItemId'),
-    itemName: pickApi(l, 'itemName', 'ItemName') || 'Sản phẩm',
+    itemName: pickApi(l, 'itemName', 'ItemName', 'name', 'Name') || 'Sản phẩm',
     sourceType: pickApi(l, 'sourceType', 'SourceType'),
     fulfillmentStatus: normStatus(pickApi(l, 'fulfillmentStatus', 'FulfillmentStatus')),
     quantityOrdered: pickApi(l, 'quantityOrdered', 'QuantityOrdered') ?? 1,
+    estimatedWeightPerUnit: pickApi(l, 'estimatedWeightPerUnit', 'EstimatedWeightPerUnit'),
+    weight: pickApi(l, 'weight', 'Weight'),
     designWorkId: pickApi(l, 'designWorkId', 'DesignWorkId'),
   }));
+  const activeLines = lines.filter((l) => normStatus(l.fulfillmentStatus) !== 'FINISHED');
 
   return {
-    orderId: pickApi(row, 'orderId', 'OrderId'),
-    orderCode: pickApi(row, 'orderCode', 'OrderCode') || '—',
+    orderId: pickApi(row, 'orderId', 'OrderId', 'id', 'Id'),
+    orderCode: pickApi(row, 'orderCode', 'OrderCode', 'code', 'Code') || '—',
     customerName: pickApi(row, 'customerName', 'CustomerName') || '—',
     orderStatus: normStatus(pickApi(row, 'orderStatus', 'OrderStatus')),
-    shipmentStatus: normStatus(pickApi(row, 'shipmentStatus', 'ShipmentStatus')),
+    shipmentStatus: normStatus(
+      pickApi(row, 'shipmentStatus', 'ShipmentStatus')
+        ?? pickApi(shipment, 'shipmentStatus', 'ShipmentStatus', 'status', 'Status'),
+    ),
     paymentStatus: normStatus(pickApi(row, 'paymentStatus', 'PaymentStatus')),
-    created: pickApi(row, 'created', 'Created'),
-    totalPrice: pickApi(row, 'totalPrice', 'TotalPrice') ?? 0,
-    lines,
+    created: pickApi(row, 'created', 'Created', 'createdAt', 'CreatedAt'),
+    totalPrice: pickApi(row, 'totalPrice', 'TotalPrice', 'totalAmount', 'TotalAmount') ?? 0,
+    lines: activeLines,
     allLinesFinished: Boolean(pickApi(row, 'allLinesFinished', 'AllLinesFinished')),
-    pendingPrintCount: pickApi(row, 'pendingPrintCount', 'PendingPrintCount') ?? 0,
+    pendingPrintCount: pickApi(row, 'pendingPrintCount', 'PendingPrintCount') ?? activeLines.length,
   };
 }

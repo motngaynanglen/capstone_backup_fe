@@ -106,10 +106,10 @@ export default function StaffShopOrders() {
   const stats = {
     processing: orders.filter((o) => normStatus(o.orderStatus) === 'PROCESSING').length,
     finished: orders.filter((o) => normStatus(o.orderStatus) === 'FINISHED').length,
-    readyGhn: orders.filter(
+    needShipment: orders.filter(
       (o) =>
         normStatus(o.orderStatus) === 'FINISHED' &&
-        !o.shipment?.carrierOrderCode,
+        !o.shipment?.id,
     ).length,
   };
 
@@ -117,11 +117,16 @@ export default function StaffShopOrders() {
     {
       title: 'Mã đơn',
       key: 'code',
-      width: 130,
+      width: 140,
+      ellipsis: true,
       render: (_, r) => (
-        <Button type="link" style={{ padding: 0 }} onClick={() => openDetail(r.id)}>
-          <Text strong>{r.code || shortId(r.id)}</Text>
-        </Button>
+        <Tooltip title={r.code || r.id}>
+          <Button type="link" style={{ padding: 0, maxWidth: 120 }} onClick={() => openDetail(r.id)}>
+            <Text strong ellipsis style={{ maxWidth: 112 }} className="font-mono text-xs">
+              {r.code || shortId(r.id)}
+            </Text>
+          </Button>
+        </Tooltip>
       ),
     },
     {
@@ -152,14 +157,14 @@ export default function StaffShopOrders() {
       },
     },
     {
-      title: 'GHN',
-      key: 'ghn',
+      title: 'Vận chuyển',
+      key: 'shipment',
       width: 100,
       render: (_, r) => {
-        const hasGhn = Boolean(r.shipment?.carrierOrderCode);
-        const ready = normStatus(r.orderStatus) === 'FINISHED' && !hasGhn;
-        if (hasGhn) return <Tag color="green">Đã tạo</Tag>;
-        if (ready) return <Tag color="orange" icon={<TruckOutlined />}>Chờ GHN</Tag>;
+        const hasShipment = Boolean(r.shipment?.id);
+        const ready = normStatus(r.orderStatus) === 'FINISHED' && !hasShipment;
+        if (hasShipment) return <Tag color="green">Đã có</Tag>;
+        if (ready) return <Tag color="orange" icon={<TruckOutlined />}>Chờ xử lý</Tag>;
         return <Text type="secondary">—</Text>;
       },
     },
@@ -186,10 +191,10 @@ export default function StaffShopOrders() {
     <div>
       <div style={{ marginBottom: 20 }}>
         <Title level={3} style={{ margin: 0 }}>
-          Đơn shop & GHN
+          Đơn shop & vận chuyển
         </Title>
         <Text type="secondary">
-          Chuyển trạng thái đơn, tạo vận đơn GHN và theo dõi giao hàng.
+          Theo dõi đơn shop và xử lý vận chuyển.
         </Text>
       </div>
 
@@ -207,8 +212,8 @@ export default function StaffShopOrders() {
         <Col xs={24} sm={8}>
           <Card>
             <Statistic
-              title="Chờ tạo GHN (trang này)"
-              value={stats.readyGhn}
+              title="Chưa có vận đơn (trang này)"
+              value={stats.needShipment}
               valueStyle={{ color: '#fa8c16' }}
             />
           </Card>

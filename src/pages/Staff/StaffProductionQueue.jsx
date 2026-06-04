@@ -17,7 +17,6 @@ import {
   ReloadOutlined,
   SearchOutlined,
   EyeOutlined,
-  PrinterOutlined,
   CheckCircleOutlined,
 } from '@ant-design/icons';
 import { getProductionQueueApi, updateOrderItemFulfillmentApi } from '../../api/orderApi';
@@ -33,8 +32,8 @@ const { Title, Text } = Typography;
 
 const FILTER_OPTIONS = [
   { label: 'Tất cả', value: 'ALL' },
-  { label: 'Chờ in', value: 'PENDING' },
-  { label: 'Đang in', value: 'PRINTING' },
+  { label: 'Chờ hoàn tất', value: 'PENDING' },
+  { label: 'Đang xử lý', value: 'PRINTING' },
 ];
 
 function renderFulfillment(status) {
@@ -66,7 +65,14 @@ export default function StaffProductionQueue() {
       });
       const list = (res?.data || [])
         .map(normalizeProductionQueueOrder)
-        .filter(Boolean);
+        .map((order) => {
+          if (!order || filter === 'ALL') return order;
+          return {
+            ...order,
+            lines: (order.lines || []).filter((line) => normStatus(line.fulfillmentStatus) === filter),
+          };
+        })
+        .filter((order) => order && order.lines?.length > 0);
       setOrders(list);
     } catch (e) {
       message.error(e?.response?.data?.message || 'Không tải được hàng đợi sản xuất');
@@ -97,14 +103,14 @@ export default function StaffProductionQueue() {
     setModalOpen(true);
   };
 
-  const quickFulfillment = async (orderItemId, fulfillmentStatus) => {
+  const quickFulfillment = async (orderItemId) => {
     setBusyItemId(orderItemId);
     try {
-      const res = await updateOrderItemFulfillmentApi(orderItemId, { fulfillmentStatus });
+      const res = await updateOrderItemFulfillmentApi(orderItemId);
       const data = res?.data;
-      message.success(data?.message || `Đã cập nhật → ${fulfillmentStatus}`);
+      message.success(data?.message || 'Đã hoàn tất / đóng gói dòng hàng');
       if (data?.allProductionLinesFinished) {
-        message.info('Tất cả dòng đã xong — chuyển đơn sang FINISHED tại «Đơn shop & GHN».');
+        message.info('Tất cả dòng đã xong — đơn sẵn sàng chuyển sang vận chuyển.');
       }
       await load();
     } catch (e) {
@@ -151,30 +157,15 @@ export default function StaffProductionQueue() {
             }
             const busy = busyItemId === line.orderItemId;
             return (
-              <Space size={4}>
-                {fs !== 'PRINTING' && (
-                  <Button
-                    size="small"
-                    type="primary"
-                    icon={<PrinterOutlined />}
-                    loading={busy}
-                    onClick={() => quickFulfillment(line.orderItemId, 'PRINTING')}
-                  >
-                    Bắt đầu in
-                  </Button>
-                )}
-                {fs === 'PRINTING' && (
-                  <Button
-                    size="small"
-                    type="primary"
-                    icon={<CheckCircleOutlined />}
-                    loading={busy}
-                    onClick={() => quickFulfillment(line.orderItemId, 'FINISHED')}
-                  >
-                    In xong
-                  </Button>
-                )}
-              </Space>
+              <Button
+                size="small"
+                type="primary"
+                icon={<CheckCircleOutlined />}
+                loading={busy}
+                onClick={() => quickFulfillment(line.orderItemId)}
+              >
+                Hoàn tất / đóng gói
+              </Button>
             );
           },
         },
@@ -187,10 +178,15 @@ export default function StaffProductionQueue() {
       title: 'Mã đơn',
       dataIndex: 'orderCode',
       width: 140,
+      ellipsis: true,
       render: (code, r) => (
-        <Button type="link" style={{ padding: 0 }} onClick={() => openDetail(r.orderId)}>
-          <Text strong>{code || shortId(r.orderId)}</Text>
-        </Button>
+        <Tooltip title={code || r.orderId}>
+          <Button type="link" style={{ padding: 0, maxWidth: 120 }} onClick={() => openDetail(r.orderId)}>
+            <Text strong ellipsis style={{ maxWidth: 112 }} className="font-mono text-xs">
+              {code || shortId(r.orderId)}
+            </Text>
+          </Button>
+        </Tooltip>
       ),
     },
     {

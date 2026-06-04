@@ -138,7 +138,7 @@ const CustomOrderAIGenerate = () => {
 
           <div className="bg-violet-50 border border-violet-100 rounded-xl p-4 text-sm text-violet-900">
             <p className="font-semibold mb-1">Sau khi có GLB:</p>
-            <p>KTV xem file, báo giá chi tiết (vật liệu, gram, tiền công). Bạn duyệt → thanh toán → in 3D & GHN.</p>
+            <p>KTV xem file, báo giá chi tiết (vật liệu, gram, tiền công). Bạn duyệt → thanh toán → in 3D & giao hàng.</p>
           </div>
 
           <div className="flex gap-4">
@@ -214,7 +214,7 @@ const CustomOrderAIGenerate = () => {
           <li>AI tạo GLB từ ảnh bạn upload.</li>
           <li>KTV tiếp nhận, báo giá từ file GLB (chat nếu cần).</li>
           <li>Bạn duyệt giá → thanh toán online (VNPay hoặc COD).</li>
-          <li>In 3D → giao hàng GHN (theo dõi như flow 2).</li>
+          <li>In 3D → giao hàng (theo dõi như flow 2).</li>
         </ol>
       </div>
     </div>

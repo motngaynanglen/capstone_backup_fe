@@ -155,13 +155,6 @@ const CustomOrderRequestDesign = () => {
           />
         </div>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <p className="text-sm text-blue-800">
-            <strong>Lưu ý:</strong> Đội ngũ thiết kế sẽ xem xét yêu cầu của bạn và tạo mô hình 3D dựa trên hình ảnh và mô tả. 
-            Bạn sẽ nhận được thông báo qua Zalo khi file xem trước sẵn sàng để duyệt.
-          </p>
-        </div>
-
         <div className="flex gap-4">
           <button
             type="submit"

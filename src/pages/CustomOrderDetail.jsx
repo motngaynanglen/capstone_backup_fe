@@ -223,7 +223,7 @@ const CustomOrderDetail = () => {
 
   const headerStatusLabel = showProduction
       ? (order.linkedOrderStatus === 'FINISHED' || order.linkedShipmentStatus === 'READY_FOR_PICKUP'
-      ? (LINKED_ORDER_STATUS_LABEL.READY_FOR_SHIP ?? 'Sẵn sàng giao (chờ GHN)')
+      ? (LINKED_ORDER_STATUS_LABEL.READY_FOR_SHIP ?? 'Sẵn sàng giao')
       : order.linkedShipmentStatus === 'IN_TRANSIT'
         ? 'Đang giao hàng'
         : order.linkedOrderStatus === 'PROCESSING' || order.linkedShipmentStatus === 'PREPARING'
