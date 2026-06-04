@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Modal, Form, Input, Button, App } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined, PhoneOutlined } from '@ant-design/icons';
 import { useAuthModal } from '../../contexts/AuthModalContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { getPostLoginPath } from '../../utils/authRedirect';
+import { getLocationPath, getPostLoginPath } from '../../utils/authRedirect';
 
 const AuthModal = () => {
   const { open, mode, setMode, closeModal } = useAuthModal();
   const { login, register } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
@@ -29,7 +30,7 @@ const AuthModal = () => {
         if (result.success) {
           message.success('Đăng nhập thành công');
           handleClose();
-          navigate(getPostLoginPath(result.user?.role));
+          navigate(getPostLoginPath(result.user?.role, getLocationPath(location.state?.from)));
         } else {
           message.error(result.message || 'Đăng nhập thất bại');
         }

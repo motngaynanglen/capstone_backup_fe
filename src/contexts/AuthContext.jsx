@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-// Import thêm systemLoginApi
 import { loginApi, registerApi, systemLoginApi } from '../api/authApi';
+import { AUTH_UNAUTHORIZED_EVENT } from '../api/axiosInstance';
 
 const AuthContext = createContext();
 
@@ -15,22 +15,51 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
-  // Khôi phục phiên đăng nhập khi load lại trang
+  const clearStoredAuth = () => {
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+  };
+
+  const extractToken = (data) =>
+    data?.token || data?.Token || data?.accessToken || data?.AccessToken || data?.jwt || data?.Jwt;
+
+  const isJwtExpired = (token) => {
+    if (!token || token.split('.').length < 2) return false;
+    try {
+      const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+      const payload = JSON.parse(atob(padded));
+      if (!payload?.exp) return false;
+      return payload.exp * 1000 <= Date.now();
+    } catch {
+      return false;
+    }
+  };
+
+  const normalizeUser = (data) => ({
+    id: data?.accountId || data?.AccountId || data?.id || data?.Id,
+    username: data?.userName || data?.UserName || data?.username || data?.Username,
+    fullName: data?.fullName || data?.FullName,
+    image: data?.image || data?.Image,
+    role: data?.role || data?.Role,
+  });
+
   useEffect(() => {
     const initializeAuth = () => {
       try {
         const storedUser = localStorage.getItem('user');
         const storedToken = localStorage.getItem('token');
 
-        if (storedUser && storedToken) {
+        if (storedUser && storedToken && !isJwtExpired(storedToken)) {
           setUser(JSON.parse(storedUser));
         } else {
-          localStorage.removeItem('user');
-          localStorage.removeItem('token');
+          clearStoredAuth();
         }
       } catch (error) {
         console.error("Lỗi khi parse dữ liệu user từ localStorage:", error);
+        clearStoredAuth();
       } finally {
         setLoading(false);
       }
@@ -39,20 +68,28 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
-  // --- HÀM HỖ TRỢ XỬ LÝ DỮ LIỆU USER SAU KHI LOGIN ---
-  const handleAuthSuccess = (data) => {
-    const userFromApi = {
-      id: data.accountId,
-      username: data.userName,
-      fullName: data.fullName,
-      image: data.image,
-      role: data.role,
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setSessionExpired(true);
+      setUser(null);
+      clearStoredAuth();
     };
 
-    if (data.token) {
-      localStorage.setItem('token', data.token);
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
+    return () => window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
+  }, []);
+
+  const handleAuthSuccess = (data) => {
+    const token = extractToken(data);
+    const userFromApi = normalizeUser(data);
+
+    if (token) {
+      localStorage.setItem('token', token);
+    } else {
+      localStorage.removeItem('token');
     }
 
+    setSessionExpired(false);
     setUser(userFromApi);
     localStorage.setItem('user', JSON.stringify(userFromApi));
     return userFromApi;
@@ -109,11 +146,10 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // 4. Đăng xuất
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
+    setSessionExpired(false);
+    clearStoredAuth();
   };
 
   const forgotPassword = async () => {
@@ -131,6 +167,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     forgotPassword,
     loading,
+    sessionExpired,
     isAuthenticated: !!user,
     isCustomer: normalizedRole === 'customer',
     isEmployee: ['employee', 'staff'].includes(normalizedRole),

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { getPostLoginPath } from "../../utils/authRedirect";
+import { getLocationPath, getPostLoginPath } from "../../utils/authRedirect";
 import { App } from "antd";
 
 const LoginForm = ({ onSuccess }) => {
@@ -12,6 +12,7 @@ const LoginForm = ({ onSuccess }) => {
 
     const { login } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const { message } = App.useApp(); // Dùng chuẩn Antd v5
 
     const handleSubmit = async (e) => {
@@ -28,7 +29,7 @@ const LoginForm = ({ onSuccess }) => {
                 // Nếu component cha (ví dụ Modal) có truyền hàm onSuccess vào, thì gọi nó (để đóng Modal)
                 if (onSuccess) onSuccess();
 
-                navigate(getPostLoginPath(result.user?.role));
+                navigate(getPostLoginPath(result.user?.role, getLocationPath(location.state?.from)));
             } else {
                 setError(result.message || "Tên đăng nhập hoặc mật khẩu không đúng");
             }

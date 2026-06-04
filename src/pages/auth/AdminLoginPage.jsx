@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { App, Card, Input, Button, Form } from 'antd';
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
 // Đảm bảo đường dẫn này trỏ đúng vào file AuthContext của bạn
 import { useAuth } from '../../contexts/AuthContext';
-import { getPostLoginPath } from '../../utils/authRedirect';
+import { getLocationPath, getPostLoginPath } from '../../utils/authRedirect';
 
 const AdminLoginPage = () => {
     const { login, systemLogin } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const { message } = App.useApp(); // Dùng chuẩn Antd v5 để không báo lỗi vàng
     const [loading, setLoading] = useState(false);
 
@@ -23,7 +24,7 @@ const AdminLoginPage = () => {
 
         if (result.success) {
             message.success('Đăng nhập thành công!');
-            navigate(getPostLoginPath(result.user?.role));
+            navigate(getPostLoginPath(result.user?.role, getLocationPath(location.state?.from)));
         } else {
             message.error(result.message);
         }

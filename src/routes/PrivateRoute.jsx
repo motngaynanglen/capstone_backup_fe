@@ -1,11 +1,12 @@
 import React from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
 // Route dùng cho các trang yêu cầu đăng nhập, có thể kèm role
 
 const PrivateRoute = ({ children, requiredRole }) => {
-  const { isAuthenticated, user, loading } = useAuth();
+  const { isAuthenticated, user, loading, sessionExpired } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -16,7 +17,16 @@ const PrivateRoute = ({ children, requiredRole }) => {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{
+          from: location,
+          reason: sessionExpired ? "SESSION_EXPIRED" : "LOGIN_REQUIRED",
+        }}
+      />
+    );
   }
 
   if (requiredRole) {
