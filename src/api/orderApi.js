@@ -51,3 +51,15 @@ export const updateOrderItemFulfillmentApi = async (orderItemId, payload) => {
   );
   return response.data;
 };
+
+// 8. Checkout dịch vụ thiết kế (Custom Design — chọn ServiceOption)
+export const checkoutDesignApi = async (payload) => {
+  const response = await axiosInstance.post('/api/order/checkout-design', payload);
+  return response.data;
+};
+
+// 9. Checkout đặt in từ TechnicalDraft (Print on Demand)
+export const checkoutDraftsApi = async (payload) => {
+  const response = await axiosInstance.post('/api/order/checkout-draft', payload);
+  return response.data;
+};

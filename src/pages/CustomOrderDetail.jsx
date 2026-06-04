@@ -270,7 +270,8 @@ const CustomOrderDetail = () => {
             Xem đơn {order.linkedOrderCode ? `#${order.linkedOrderCode}` : ''}
           </Link>
         )}
-        {order.status !== 'CANCELLED' && !showProduction && (
+        {/* Chỉ cho hủy khi: chưa bị cancelled, chưa vào sản xuất, và đơn dịch vụ chưa được thanh toán */}
+        {order.status !== 'CANCELLED' && !showProduction && !isPaid && ['SUBMITTED', 'PENDING', 'APPROVED'].includes(order.status?.toUpperCase?.() || order.status) && (
           <button onClick={handleCancel} disabled={processing}
             style={{ padding: '4px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
             {showAwaitingPayment ? 'Hủy đơn hàng' : 'Hủy yêu cầu'}

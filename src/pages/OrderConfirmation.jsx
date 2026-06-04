@@ -126,7 +126,11 @@ const OrderConfirmation = () => {
               </div>
               <div className="bg-gray-50 rounded-xl px-5 py-4 border border-gray-100">
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Số sản phẩm</p>
-                <p className="text-base font-semibold text-gray-900">{order.totalItem ?? order.items?.length ?? 0}</p>
+                <p className="text-base font-semibold text-gray-900">
+                  {order.totalItem
+                    ?? (order.orderItems || order.items || []).reduce((s, it) => s + (it.quantityOrdered || it.quantity || 1), 0)
+                    || '—'}
+                </p>
               </div>
             </div>
           )}

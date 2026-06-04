@@ -178,7 +178,7 @@
   box-shadow: 0 4px 14px rgba(79, 70, 229, 0.08);
 }
 
-.product-mgmt__variant-card--live {
+.product-mgmt__variant-card--published {
   border-left: 3px solid #22c55e;
 }
 

@@ -71,11 +71,12 @@ export const CartProvider = ({ children }) => {
         return;
       }
       setItems((prev) =>
-        prev.map((i) =>
-          i.product?.id === productId && i.material === material
-            ? { ...i, quantity }
-            : i
-        )
+        prev.map((i) => {
+          if (!(i.product?.id === productId && i.material === material)) return i;
+          const isPreOrder = i.product?.sourceType === 'pre_order' || i.product?.isAllowPreOrder;
+          const max = isPreOrder ? 9999 : (i.product?.stock || 9999);
+          return { ...i, quantity: Math.min(quantity, max) };
+        })
       );
     },
     [removeFromCart]
@@ -87,15 +88,20 @@ export const CartProvider = ({ children }) => {
       const idx = prev.findIndex(
         (i) => i.product?.id === product.id && i.material === material
       );
+      // Giới hạn tồn kho — bỏ qua nếu Pre-Order
+      const isPreOrder = product.sourceType === 'pre_order' || product.isAllowPreOrder;
+      const maxStock = isPreOrder ? 9999 : (product.stock || 9999);
+
       if (idx >= 0) {
         const next = [...prev];
+        const newQty = Math.min((next[idx].quantity || 0) + quantity, maxStock);
         next[idx] = {
           ...next[idx],
-          quantity: (next[idx].quantity || 0) + quantity,
+          quantity: newQty,
         };
         return next;
       }
-      return [...prev, { product, material, quantity }];
+      return [...prev, { product, material, quantity: Math.min(quantity, maxStock) }];
     });
   }, []);
 

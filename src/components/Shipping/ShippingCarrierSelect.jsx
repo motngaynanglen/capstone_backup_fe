@@ -5,8 +5,16 @@ import { getShippingQuotesApi } from '../../api/shipmentApi';
 const formatPrice = (price) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
 
+// Option giao hàng thủ công (Nova3D nội bộ)
+const MANUAL_CARRIER = {
+  carrier: 'MANUAL',
+  name: 'Giao hàng Nova3D',
+  fee: 30000,
+  estimatedDays: 'Liên hệ xác nhận thời gian',
+};
+
 /**
- * Báo phí và chọn GHN (POST /api/shipment/quotes).
+ * Báo phí và chọn hình thức giao hàng: GHN + Nova3D thủ công.
  */
 const ShippingCarrierSelect = ({
   shippingAddressId,
@@ -63,7 +71,9 @@ const ShippingCarrierSelect = ({
       const res = await getShippingQuotesApi(payload);
       if (seq !== requestSeq.current) return;
 
-      const list = Array.isArray(res?.data) ? res.data : [];
+      const ghnList = Array.isArray(res?.data) ? res.data : [];
+      // Luôn thêm option giao hàng thủ công Nova3D
+      const list = [...ghnList, MANUAL_CARRIER];
       setQuotes(list);
 
       if (list.length > 0) {
@@ -74,11 +84,10 @@ const ShippingCarrierSelect = ({
       }
     } catch (e) {
       if (seq !== requestSeq.current) return;
-      setError(e?.response?.data?.message || e?.message || 'Không tính được phí vận chuyển');
-      setQuotes([]);
-      if (!selectedCarrierRef.current) {
-        onChangeRef.current?.('', 0);
-      }
+      // GHN lỗi → vẫn hiện option giao hàng thủ công
+      setError(null);
+      setQuotes([MANUAL_CARRIER]);
+      onChangeRef.current?.(MANUAL_CARRIER.carrier, MANUAL_CARRIER.fee);
     } finally {
       if (seq === requestSeq.current) {
         setLoading(false);

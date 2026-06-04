@@ -80,12 +80,12 @@ export default function OpsDashboardView({ role }) {
           </Col>
           <Col xs={24} sm={12} md={6}>
             <Card>
-              <Statistic title="MF2 mới gửi" value={counts.mf2Submitted ?? 0} />
+              <Statistic title="Thiết kế mới gửi" value={counts.mf2Submitted ?? 0} />
             </Card>
           </Col>
           <Col xs={24} sm={12} md={6}>
             <Card>
-              <Statistic title="MF2 chờ xử lý" value={counts.mf2Pending ?? 0} />
+              <Statistic title="Thiết kế chờ xử lý" value={counts.mf2Pending ?? 0} />
             </Card>
           </Col>
           <Col xs={24} sm={12} md={6}>
@@ -97,7 +97,7 @@ export default function OpsDashboardView({ role }) {
 
         <Card size="small" title="SLA (giờ)">
           <Space wrap>
-            <Tag>MF2 assign ≤ {sla.mf2AssignHours ?? 4}h</Tag>
+            <Tag>Phân công thiết kế ≤ {sla.mf2AssignHours ?? 4}h</Tag>
             <Tag>Production stale &gt; {sla.productionStaleHours ?? 48}h</Tag>
             <Tag>GHN sau FINISHED &gt; {sla.ghnAfterFinishedHours ?? 24}h</Tag>
           </Space>

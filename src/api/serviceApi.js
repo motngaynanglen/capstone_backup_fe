@@ -4,9 +4,15 @@ import axiosInstance from './axiosInstance';
 // SERVICE OPTIONS
 // ==========================================
 
-// 1. Lấy danh sách tùy chọn dịch vụ
+// 1. Lấy danh sách tùy chọn dịch vụ (tất cả, cho admin)
 export const getAllServiceOptionsApi = async () => {
   const response = await axiosInstance.get('/api/service-option/all');
+  return response.data;
+};
+
+// 1b. Lấy danh sách tùy chọn đang active (cho customer đặt dịch vụ)
+export const getActiveServiceOptionsApi = async () => {
+  const response = await axiosInstance.get('/api/service-option/active');
   return response.data;
 };
 

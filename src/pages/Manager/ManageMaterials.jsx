@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Table, Button, Modal, Form, Input, InputNumber, 
-  Tag, Card, Row, Col, Space, message, Typography, Divider, Tooltip, Switch, Popconfirm, Pagination
+import {
+  Table, Button, Modal, Form, Input, InputNumber,
+  Tag, Card, Row, Col, Space, message, Typography, Divider, Tooltip, Switch, Popconfirm, Pagination,
+  Tabs, DatePicker, Timeline, Alert, Spin
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, HistoryOutlined } from '@ant-design/icons';
 import materialApi from '../../api/materialApi';
@@ -30,11 +31,18 @@ const ManageMaterials = () => {
   // Forms
   const [materialForm] = Form.useForm();
   const [updateMaterialForm] = Form.useForm();
+  const [updateInfoForm] = Form.useForm();
+  const [updatePriceForm] = Form.useForm();
   const [tagForm] = Form.useForm();
 
   // Selected Items
   const [selectedMaterial, setSelectedMaterial] = useState(null);
   const [selectedTag, setSelectedTag] = useState(null);
+
+  // Price History
+  const [priceHistory, setPriceHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [isPriceHistoryVisible, setIsPriceHistoryVisible] = useState(false);
 
   // --- Fetch Data ---
   const fetchMaterials = async (searchText = '') => {
@@ -112,45 +120,94 @@ const ManageMaterials = () => {
     }
   };
 
-  const handleUpdateMaterial = async (values) => {
-    if (!selectedMaterial) return;
-    try {
-      const payload = {
-        name: values.name,
-        description: values.description,
-        baseCostPerGram: values.baseCostPerGram,
-        totalServiceCostPerGram: values.totalServiceCostPerGram,
-        effectiveDate: new Date().toISOString()
-      };
-      
-      await materialApi.update(selectedMaterial.id, payload);
-      message.success('Cập nhật vật liệu thành công');
-      setIsUpdateMaterialModalVisible(false);
-      updateMaterialForm.resetFields();
-      fetchMaterials(); // Refresh to show new current price
-    } catch (error) {
-      message.error('Cập nhật vật liệu thất bại');
-    }
-  };
+  // === CẬP NHẬT VẬT LIỆU — 3 PHẦN ===
 
   const openUpdateMaterialModal = (record) => {
     setSelectedMaterial(record);
-    updateMaterialForm.setFieldsValue({
-      name: record.name,
-      description: record.description,
-      baseCostPerGram: record.baseCostPerGram,
-      totalServiceCostPerGram: record.totalServiceCostPerGram
-    });
+    updateInfoForm.setFieldsValue({ name: record.name, description: record.description });
+    updatePriceForm.resetFields();
     setIsUpdateMaterialModalVisible(true);
   };
 
+  // Tab 1: Cập nhật thông tin (tên, mô tả)
+  const handleUpdateInfo = async (values) => {
+    if (!selectedMaterial) return;
+    try {
+      await materialApi.update(selectedMaterial.id, { name: values.name, description: values.description });
+      message.success('Đã cập nhật thông tin vật liệu');
+      fetchMaterials();
+      setSelectedMaterial(prev => ({ ...prev, name: values.name, description: values.description }));
+    } catch (error) {
+      message.error(error?.response?.data?.message || 'Cập nhật thất bại');
+    }
+  };
+
+  // Tab 2: Toggle Active/Deactive
   const handleToggleActive = async (id, checked) => {
     try {
-      await materialApi.toggleActive(id);
-      message.success(`Đã thay đổi trạng thái vật liệu`);
+      if (checked) {
+        await materialApi.activate(id);
+        message.success('Đã kích hoạt vật liệu');
+      } else {
+        await materialApi.deactivate(id);
+        message.success('Đã vô hiệu hóa vật liệu');
+      }
+      fetchMaterials();
+      if (selectedMaterial?.id === id) {
+        setSelectedMaterial(prev => prev ? { ...prev, isActive: checked } : prev);
+      }
+    } catch (error) {
+      message.error(error?.response?.data?.message || 'Thay đổi trạng thái thất bại — vật liệu cần có giá hiện hành để kích hoạt.');
+    }
+  };
+
+  // Tab 3: Cập nhật giá
+  const handleUpdatePrice = async (values) => {
+    if (!selectedMaterial) return;
+    try {
+      await materialApi.updatePrice(selectedMaterial.id, {
+        baseCostPerGram: values.baseCostPerGram,
+        totalServiceCostPerGram: values.totalServiceCostPerGram,
+        effectiveDate: values.effectiveDate?.toISOString() || new Date().toISOString(),
+      });
+      message.success('Đã cập nhật giá — giá biến thể đang active sẽ được đồng bộ.');
+      updatePriceForm.resetFields();
       fetchMaterials();
     } catch (error) {
-      message.error('Thay đổi trạng thái thất bại');
+      message.error(error?.response?.data?.message || 'Cập nhật giá thất bại');
+    }
+  };
+
+  // Xóa vật liệu
+  const handleDeleteMaterial = async (id) => {
+    try {
+      await materialApi.delete(id);
+      message.success('Đã xóa vật liệu');
+      fetchMaterials();
+    } catch (error) {
+      const msg = error?.response?.data?.message || '';
+      if (msg.includes('variant') || msg.includes('sản phẩm') || msg.includes('biến thể')) {
+        message.warning('Không thể xóa — vật liệu đang được dùng bởi sản phẩm. Hãy vô hiệu hóa thay thế.');
+      } else {
+        message.error(msg || 'Xóa thất bại');
+      }
+    }
+  };
+
+  // Lịch sử giá
+  const openPriceHistory = async (material) => {
+    setSelectedMaterial(material);
+    setLoadingHistory(true);
+    setIsPriceHistoryVisible(true);
+    try {
+      const res = await materialApi.getPriceHistory(material.id);
+      const history = (res?.data || []).slice(0, 5);
+      setPriceHistory(history);
+    } catch {
+      message.error('Không tải được lịch sử giá');
+      setPriceHistory([]);
+    } finally {
+      setLoadingHistory(false);
     }
   };
 
@@ -243,15 +300,21 @@ const ManageMaterials = () => {
       title: 'Tác vụ',
       key: 'action',
       render: (_, record) => (
-        <Space size="middle">
+        <Space size="small">
           <Tooltip title="Cập nhật">
-            <Button 
-              type="text" 
-              icon={<EditOutlined />} 
-              onClick={() => openUpdateMaterialModal(record)}
-              className="text-blue-600 hover:text-blue-800"
-            />
+            <Button type="text" icon={<EditOutlined />} onClick={() => openUpdateMaterialModal(record)} />
           </Tooltip>
+          <Tooltip title="Lịch sử giá">
+            <Button type="text" icon={<HistoryOutlined />} onClick={() => openPriceHistory(record)} />
+          </Tooltip>
+          <Popconfirm
+            title="Xóa vật liệu?"
+            description="Chỉ xóa được nếu không có sản phẩm nào đang dùng."
+            onConfirm={() => handleDeleteMaterial(record.id)}
+            okText="Xóa" okType="danger"
+          >
+            <Button type="text" icon={<DeleteOutlined />} danger />
+          </Popconfirm>
         </Space>
       ),
     },
@@ -413,54 +476,118 @@ const ManageMaterials = () => {
         </Form>
       </Modal>
 
-      {/* 2. Update Material Modal */}
+      {/* 2. Update Material Modal — 3 Tabs */}
       <Modal
         title={<span>Cập nhật vật liệu: <Text type="success">{selectedMaterial?.name}</Text></span>}
         open={isUpdateMaterialModalVisible}
         onCancel={() => setIsUpdateMaterialModalVisible(false)}
         footer={null}
+        width={600}
       >
-        <Form form={updateMaterialForm} layout="vertical" onFinish={handleUpdateMaterial}>
-          <Form.Item 
-            name="name" 
-            label="Tên Vật liệu" 
-            rules={[{ required: true, message: 'Vui lòng nhập tên!' }]}
-          >
-            <Input placeholder="Ví dụ: Nhựa PLA Tough" />
-          </Form.Item>
-          
-          <Form.Item 
-            name="description" 
-            label="Mô tả"
-          >
-            <Input.TextArea placeholder="Mô tả đặc tính..." rows={2} />
-          </Form.Item>
+        <Tabs defaultActiveKey="info" items={[
+          {
+            key: 'info',
+            label: 'Thông tin',
+            children: (
+              <Form form={updateInfoForm} layout="vertical" onFinish={handleUpdateInfo}>
+                <Form.Item name="name" label="Tên Vật liệu" rules={[{ required: true, message: 'Vui lòng nhập tên!' }]}>
+                  <Input placeholder="Ví dụ: Nhựa PLA Tough" />
+                </Form.Item>
+                <Form.Item name="description" label="Mô tả">
+                  <Input.TextArea placeholder="Mô tả đặc tính..." rows={2} />
+                </Form.Item>
+                <Button type="primary" htmlType="submit">Lưu thông tin</Button>
+              </Form>
+            ),
+          },
+          {
+            key: 'status',
+            label: 'Trạng thái',
+            children: (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <Text strong>Trạng thái hiện tại:</Text>
+                    <div className="mt-1">
+                      {selectedMaterial?.isActive
+                        ? <Tag color="green">Active</Tag>
+                        : <Tag color="red">Inactive</Tag>}
+                    </div>
+                  </div>
+                  <Popconfirm
+                    title={selectedMaterial?.isActive ? 'Vô hiệu hóa vật liệu?' : 'Kích hoạt vật liệu?'}
+                    description={selectedMaterial?.isActive
+                      ? 'Vật liệu sẽ không hiển thị cho khách hàng.'
+                      : 'Vật liệu phải có giá hiện hành mới kích hoạt được.'}
+                    onConfirm={() => handleToggleActive(selectedMaterial?.id, !selectedMaterial?.isActive)}
+                  >
+                    <Button type={selectedMaterial?.isActive ? 'default' : 'primary'} danger={selectedMaterial?.isActive}>
+                      {selectedMaterial?.isActive ? 'Vô hiệu hóa' : 'Kích hoạt'}
+                    </Button>
+                  </Popconfirm>
+                </div>
+              </div>
+            ),
+          },
+          {
+            key: 'price',
+            label: 'Cập nhật giá',
+            children: (
+              <Form form={updatePriceForm} layout="vertical" onFinish={handleUpdatePrice}>
+                <Alert
+                  message="Cập nhật giá sẽ tự đồng bộ cho tất cả biến thể đang Active dùng vật liệu này."
+                  type="info" showIcon className="mb-4"
+                />
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Form.Item name="baseCostPerGram" label="Giá vốn (VNĐ/g)" rules={[{ required: true }]}>
+                      <InputNumber min={0} style={{ width: '100%' }} />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item name="totalServiceCostPerGram" label="Giá dịch vụ (VNĐ/g)" rules={[{ required: true }]}>
+                      <InputNumber min={0} style={{ width: '100%' }} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Form.Item name="effectiveDate" label="Ngày hiệu lực">
+                  <DatePicker style={{ width: '100%' }} placeholder="Mặc định: ngay bây giờ" />
+                </Form.Item>
+                <Button type="primary" htmlType="submit">Cập nhật giá</Button>
+              </Form>
+            ),
+          },
+        ]} />
+      </Modal>
 
-           <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item 
-                name="baseCostPerGram" 
-                label="Giá vốn (VNĐ/g)" 
-                rules={[{ required: true }]}
-              >
-                 <InputNumber min={0} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item 
-                name="totalServiceCostPerGram" 
-                label="Giá dịch vụ (VNĐ/g)" 
-                rules={[{ required: true }]}
-              >
-                 <InputNumber min={0} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-          </Row>
-           <div className="text-right">
-            <Button onClick={() => setIsUpdateMaterialModalVisible(false)} style={{ marginRight: 8 }}>Hủy</Button>
-            <Button type="primary" htmlType="submit">Cập nhật Vật liệu</Button>
-          </div>
-        </Form>
+      {/* 2b. Price History Modal */}
+      <Modal
+        title={`Lịch sử giá — ${selectedMaterial?.name || ''}`}
+        open={isPriceHistoryVisible}
+        onCancel={() => setIsPriceHistoryVisible(false)}
+        footer={null}
+      >
+        {loadingHistory ? <div className="text-center py-8"><Spin /></div> : priceHistory.length === 0 ? (
+          <div className="text-center text-gray-400 py-8">Chưa có lịch sử giá</div>
+        ) : (
+          <Timeline
+            items={priceHistory.map((p, i) => ({
+              color: i === 0 ? 'green' : 'gray',
+              children: (
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <Text type="secondary" className="text-xs">
+                      {p.effectiveDate ? format(new Date(p.effectiveDate), 'dd/MM/yyyy HH:mm') : (p.created ? format(new Date(p.created), 'dd/MM/yyyy HH:mm') : '—')}
+                    </Text>
+                    {i === 0 && <Tag color="green" className="text-xs">Hiện tại</Tag>}
+                  </div>
+                  <div>Giá vốn: <Text strong>{(p.baseCostPerGram || 0).toLocaleString()}</Text> VNĐ/g</div>
+                  <div>Giá dịch vụ: <Text strong>{(p.totalServiceCostPerGram || 0).toLocaleString()}</Text> VNĐ/g</div>
+                </div>
+              ),
+            }))}
+          />
+        )}
       </Modal>
 
       {/* 3. Tag Modal */}

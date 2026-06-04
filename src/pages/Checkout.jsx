@@ -35,9 +35,9 @@ const PlusIcon = () => (
   </svg>
 );
 
+// Chỉ hỗ trợ thanh toán online qua PayOS — không hỗ trợ COD
 const PAYMENT_METHODS = [
-  { value: 'VNPAY', label: 'VNPay Sandbox', description: 'Thẻ / ví / QR qua cổng VNPay (môi trường thử nghiệm)' },
-  { value: 'CASH', label: 'Thanh toán trực tiếp (COD)', description: 'Thanh toán khi nhận hàng' },
+  { value: 'VNPAY', label: 'Thanh toán online (PayOS)', description: 'Hỗ trợ QR, thẻ ngân hàng, ví điện tử' },
 ];
 
 const DEFAULT_SHIPPING_FEE = 30000;
@@ -133,7 +133,7 @@ const Checkout = () => {
     province: 'Việt Nam',
     isDefault: false,
     note: '',
-    paymentMethod: 'CASH',
+    paymentMethod: 'VNPAY',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [shippingCarrier, setShippingCarrier] = useState('');
@@ -155,7 +155,7 @@ const Checkout = () => {
     addressMode === 'existing' && selectedAddressId
     && (selectedAddressHasGhn || hasAddressTextForGhn(selectedAddress));
   const shippingGhnReady = addressMode === 'new' ? newAddressGhnReady : existingAddressReady;
-  const collectOnDelivery = formData.paymentMethod === 'CASH';
+  const collectOnDelivery = false; // Hệ thống không hỗ trợ COD
 
   const handleShippingChange = useCallback((carrier, fee) => {
     setShippingCarrier(carrier);
@@ -306,7 +306,7 @@ const Checkout = () => {
           || 'Không tạo được link thanh toán.';
         notification.warning({
           message: 'Đơn đã tạo nhưng thanh toán chưa hoàn tất',
-          description: `${orderCode ? `Mã đơn: ${orderCode}. ` : ''}${payMsg} Bạn có thể thanh toán lại trong "Đơn của tôi" hoặc chọn COD.`,
+          description: `${orderCode ? `Mã đơn: ${orderCode}. ` : ''}${payMsg} Bạn có thể thanh toán lại trong "Đơn của tôi".`,
           placement: 'topRight',
           duration: 6,
         });
@@ -474,8 +474,9 @@ const Checkout = () => {
                 </div>
                 <div>
                   <label className="block mb-1.5 text-sm font-medium text-gray-700">Quốc gia</label>
-                  <input name="province" type="text" value={formData.province} onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm" />
+                  <div className="w-full px-4 py-2.5 border border-gray-100 rounded-xl text-sm bg-gray-50 text-gray-600">
+                    Việt Nam <span className="text-gray-400 text-xs ml-1">(Chỉ hỗ trợ giao nội địa)</span>
+                  </div>
                 </div>
                 <div className="md:col-span-2">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -489,29 +490,19 @@ const Checkout = () => {
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <div className="flex items-center gap-2 mb-6">
+            <div className="flex items-center gap-2 mb-4">
               <div className="w-1 h-6 bg-indigo-600 rounded-full"></div>
               <h2 className="text-lg font-bold text-gray-900">Phương thức thanh toán</h2>
             </div>
-            <div className="space-y-3">
-              {PAYMENT_METHODS.map((method) => (
-                <label key={method.value} className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer ${
-                  formData.paymentMethod === method.value ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
-                }`}>
-                  <input type="radio" name="paymentMethod" value={method.value} checked={formData.paymentMethod === method.value} onChange={handleChange}
-                    className="w-4 h-4 text-indigo-600 border-gray-300" />
-                  <div className="flex-1">
-                    <p className="font-medium text-sm text-gray-900">{method.label}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{method.description}</p>
-                  </div>
-                </label>
-              ))}
+            <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
+              </svg>
+              <div>
+                <p className="font-medium text-sm text-gray-900 m-0">Thanh toán online qua PayOS</p>
+                <p className="text-xs text-gray-500 m-0 mt-0.5">Hỗ trợ QR, thẻ ngân hàng, ví điện tử</p>
+              </div>
             </div>
-            {collectOnDelivery && (
-              <p className="mt-3 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-                COD: bạn thanh toán tiền hàng + phí ship khi nhận — không cần thanh toán online trước.
-              </p>
-            )}
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">

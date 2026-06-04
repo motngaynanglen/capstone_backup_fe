@@ -7,6 +7,51 @@ import transactionApi from '../api/transactionApi';
 import { buildCustomerTrackingSteps, resolveCustomerOrderDisplayStatus, normalizeOrderDetail, resolveOrderIsCod } from '../utils/orderNormalize';
 import OrderFeedbackSection from '../components/Orders/OrderFeedbackSection';
 
+// ─── COUNTDOWN TIMER cho đơn chờ thanh toán (15 phút)
+const PaymentCountdown = ({ dueDate, onExpired }) => {
+  const [remaining, setRemaining] = React.useState(null);
+
+  React.useEffect(() => {
+    if (!dueDate) return;
+    const target = new Date(dueDate).getTime();
+    const tick = () => {
+      const diff = target - Date.now();
+      if (diff <= 0) { setRemaining(0); onExpired?.(); return; }
+      setRemaining(diff);
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [dueDate, onExpired]);
+
+  if (remaining === null) return null;
+  if (remaining <= 0) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 flex items-center gap-2 text-red-700 font-semibold text-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 flex-shrink-0">
+          <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25Zm-1.72 6.97a.75.75 0 1 0-1.06 1.06L10.94 12l-1.72 1.72a.75.75 0 1 0 1.06 1.06L12 13.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L13.06 12l1.72-1.72a.75.75 0 1 0-1.06-1.06L12 10.94l-1.72-1.72Z" clipRule="evenodd" />
+        </svg>
+        Đã hết thời gian thanh toán — đơn hàng sẽ tự động hủy.
+      </div>
+    );
+  }
+  const mins = Math.floor(remaining / 60000);
+  const secs = Math.floor((remaining % 60000) / 1000);
+  const urgent = remaining < 300000;
+  return (
+    <div className={`border rounded-xl p-4 mb-4 ${urgent ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+      <div className="flex items-center justify-between">
+        <span className={`font-semibold text-sm ${urgent ? 'text-red-700' : 'text-amber-700'}`}>
+          Vui lòng thanh toán trong
+        </span>
+        <span className={`font-mono text-2xl font-bold ${urgent ? 'text-red-600 animate-pulse' : 'text-amber-600'}`}>
+          {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+        </span>
+      </div>
+    </div>
+  );
+};
+
 // ... (keep previous icons and configs)
 
 // SVG Icons
@@ -381,6 +426,11 @@ const OrderDetail = () => {
         </div>
       )}
 
+      {/* Countdown timer for pending orders */}
+      {orderStatus.toUpperCase() === 'PENDING' && invoice?.dueDate && (
+        <PaymentCountdown dueDate={invoice.dueDate} onExpired={() => window.location.reload()} />
+      )}
+
       {/* Note */}
       {orderNote && (
         <div className="flex items-start gap-3 p-4 mb-6 bg-blue-50 rounded-2xl border border-blue-200 text-blue-700">
@@ -403,8 +453,8 @@ const OrderDetail = () => {
               <h2 className="text-lg font-bold text-gray-900">Sản phẩm ({orderItems.length})</h2>
             </div>
 
-            {/* Delivery notice for pre-order/custom */}
-            {(hasPreOrder || hasCustom) && !isFailed && (
+            {/* Delivery notice for pre-order/custom — chỉ hiện khi đang xử lý, không hiện khi completed/cancelled */}
+            {(hasPreOrder || hasCustom) && !isFailed && ['PENDING', 'PROCESSING'].includes(orderStatus.toUpperCase()) && (
               <div className="flex items-start gap-3 p-3 mb-4 bg-amber-50 rounded-xl border border-amber-200 text-sm text-amber-800">
                 <ExclamationIcon />
                 <p>
@@ -475,15 +525,7 @@ const OrderDetail = () => {
               <div className="w-1 h-6 bg-indigo-600 rounded-full" />
               <h2 className="text-lg font-bold text-gray-900">Theo dõi đơn hàng</h2>
             </div>
-            {isCod && !isInvoicePaid && (
-              <div className="flex items-start gap-3 p-3 mb-4 bg-sky-50 rounded-xl border border-sky-200 text-sm text-sky-800">
-                <ExclamationIcon />
-                <p>
-                  Đơn <strong>COD</strong> — bạn thanh toán tiền mặt khi nhận hàng.
-                  Trạng thái &quot;Đã thanh toán&quot; chỉ hiện sau khi giao hàng thành công.
-                </p>
-              </div>
-            )}
+            {/* Đã xóa thông báo COD — hệ thống không hỗ trợ COD */}
             <div className="space-y-0">
               {trackingSteps.map((step, idx) => {
                 const stepComplete = step.done && !step.isCurrent;
@@ -763,13 +805,7 @@ const OrderDetail = () => {
                     </>
                   )}
                 </button>
-                <button
-                  onClick={() => handlePayNow('CASH')}
-                  disabled={payingNow}
-                  className="w-full py-3 bg-white text-gray-700 rounded-xl font-semibold text-sm border border-gray-200 hover:bg-gray-50 transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Thanh toán tiền mặt (COD)
-                </button>
+                {/* Đã xóa nút COD — hệ thống không hỗ trợ thanh toán khi nhận hàng */}
                 {canCancelOrder && (
                   <button
                     onClick={handleCancelOrder}

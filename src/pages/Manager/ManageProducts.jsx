@@ -368,7 +368,7 @@ const ManageProducts = () => {
     return (
       <div
         key={variant.id}
-        className={`product-mgmt__variant-card ${live ? 'product-mgmt__variant-card--live' : 'product-mgmt__variant-card--draft'}`}
+        className={`product-mgmt__variant-card ${live ? 'product-mgmt__variant-card--published' : 'product-mgmt__variant-card--draft'}`}
       >
         <div className="flex gap-3">
           <img
@@ -391,7 +391,7 @@ const ManageProducts = () => {
               </div>
               {live ? (
                 <Tag color="success" className="m-0 shrink-0">
-                  <ShopOutlined /> Live
+                  <ShopOutlined /> Đang bán
                 </Tag>
               ) : (
                 <Tag className="m-0">Ẩn</Tag>
@@ -530,7 +530,7 @@ const ManageProducts = () => {
         }
         return (
           <Tag icon={<CheckCircleOutlined />} color="success">
-            {active} live
+            {active} đang bán
           </Tag>
         );
       },

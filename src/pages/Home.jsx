@@ -307,23 +307,12 @@ const Home = () => {
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-xl bg-white border border-amber-200 shadow-sm p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-amber-600 m-0">Ưu đãi tháng này</p>
-                <p className="text-sm font-semibold text-slate-900 m-0">Giảm đến 20% cho đơn hàng đầu tiên</p>
-              </div>
-              <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-bold text-white">-20%</span>
-            </div>
-            <p className="mt-2 text-xs text-slate-500 m-0">
-              Áp dụng khi thanh toán. Mã <b>3DNEW20</b> (nếu được kích hoạt trên hệ thống).
-            </p>
-          </div>
+          {/* Đã xóa section "Ưu đãi tháng này" — hệ thống không có chức năng ưu đãi/khuyến mãi */}
           <div className="rounded-xl bg-slate-900 text-slate-50 p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-300 m-0">Hỗ trợ nhanh</p>
             <p className="mt-1 text-sm font-semibold m-0">Tư vấn file & vật liệu miễn phí</p>
             <p className="mt-2 text-xs text-slate-300 m-0">
-              Gửi file STL/OBJ/GLB hoặc ảnh tham khảo — kỹ thuật viên báo giá qua Mainflow2.
+              Gửi file STL/OBJ/GLB hoặc ảnh tham khảo — kỹ thuật viên sẽ báo giá cho bạn.
             </p>
             <Link to="/custom-order" className="inline-block mt-3 text-xs font-semibold text-emerald-300 hover:text-emerald-200 no-underline">
               Bắt đầu đặt in →

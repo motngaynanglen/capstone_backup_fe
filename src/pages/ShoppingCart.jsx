@@ -154,25 +154,41 @@ const ShoppingCart = () => {
                   <StatusBadge sourceType={item.product.sourceType} />
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => updateQuantity(item.product.id, item.material, item.quantity - 1)}
-                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 cursor-pointer font-medium"
-                      aria-label="Giảm số lượng"
-                    >
-                      −
-                    </button>
-                    <span className="w-10 text-center text-sm font-semibold text-gray-800">
-                      {item.quantity}
-                    </span>
-                    <button
-                      onClick={() => updateQuantity(item.product.id, item.material, item.quantity + 1)}
-                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 cursor-pointer font-medium"
-                      aria-label="Tăng số lượng"
-                    >
-                      +
-                    </button>
-                  </div>
+                  {(() => {
+                    const isPreOrder = item.product?.sourceType === 'pre_order' || item.product?.isAllowPreOrder;
+                    const maxQty = isPreOrder ? 9999 : (item.product?.stock || 9999);
+                    return (
+                      <div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => updateQuantity(item.product.id, item.material, item.quantity - 1)}
+                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 cursor-pointer font-medium"
+                            aria-label="Giảm số lượng"
+                          >
+                            −
+                          </button>
+                          <span className="w-10 text-center text-sm font-semibold text-gray-800">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => updateQuantity(item.product.id, item.material, item.quantity + 1)}
+                            disabled={item.quantity >= maxQty}
+                            className={`w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center transition-all duration-150 font-medium ${
+                              item.quantity >= maxQty
+                                ? 'text-gray-300 cursor-not-allowed'
+                                : 'text-gray-600 hover:bg-gray-50 hover:border-gray-300 cursor-pointer'
+                            }`}
+                            aria-label="Tăng số lượng"
+                          >
+                            +
+                          </button>
+                        </div>
+                        {!isPreOrder && item.quantity >= maxQty && (
+                          <span className="text-[10px] text-amber-600 mt-1 block">Đã đạt tối đa tồn kho</span>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <p className="font-bold text-indigo-600 text-sm">
                     {formatPrice(item.product.price * item.quantity)}
                   </p>

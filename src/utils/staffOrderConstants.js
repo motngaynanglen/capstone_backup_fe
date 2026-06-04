@@ -3,7 +3,7 @@
 export const ORDER_STATUSES = [
   { value: 'PENDING', label: 'Chờ xác nhận', color: 'default' },
   { value: 'PROCESSING', label: 'Đang xử lý / sản xuất', color: 'processing' },
-  { value: 'FINISHED', label: 'Sẵn sàng giao', color: 'cyan' },
+  { value: 'FINISHED', label: 'Đã đóng gói · Chờ giao', color: 'cyan' },
   { value: 'COMPLETED', label: 'Hoàn thành', color: 'success' },
   { value: 'CANCELLED', label: 'Đã hủy', color: 'error' },
 ];
