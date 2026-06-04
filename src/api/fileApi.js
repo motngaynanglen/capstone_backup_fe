@@ -2,16 +2,38 @@ import axiosInstance from './axiosInstance';
 
 /**
  * Upload flow dùng Presigned URL (Backblaze B2):
- *   1. GET /api/app-support/presigned-image-url?fileName=... → { UploadUrl, FileUrl }
- *   2. PUT file lên UploadUrl (trực tiếp B2, không qua BE)
+ *   1. GET /api/app-support/presigned-{image|model}-url?fileName=... → { UploadUrl, FileUrl }
+ *   2. PUT file lên UploadUrl (trực tiếp B2 từ browser, không qua BE)
  *   3. Trả về FileUrl (public URL trên B2)
  *
- * Tương tự cho model (GLB/STL):
- *   GET /api/app-support/presigned-model-url?fileName=...
+ * QUAN TRỌNG — Content-Type:
+ *   BE ký presigned URL với Content-Type cố định theo extension (xem S3StorageService.cs).
+ *   FE PHẢI gửi PUT với ĐÚNG Content-Type đó, nếu không B2 trả 403 SignatureDoesNotMatch.
  */
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'];
 const MODEL_EXTENSIONS = ['glb', 'stl', 'obj', 'fbx', '3mf'];
+
+/**
+ * Content-Type map — PHẢI KHỚP với BE S3StorageService._allowedExtensions.
+ * Nếu BE chưa có extension nào trong này → cần thêm vào BE trước khi FE dùng.
+ */
+const EXTENSION_CONTENT_TYPE = {
+  // Ảnh
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  bmp: 'image/bmp',
+  svg: 'image/svg+xml',
+  // Model 3D
+  glb: 'model/gltf-binary',
+  stl: 'application/vnd.ms-pki.stl',
+  obj: 'application/x-tgif',
+  fbx: 'application/octet-stream',
+  '3mf': 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml',
+};
 
 function getFileExtension(fileName) {
   return (fileName || '').split('.').pop().toLowerCase();
@@ -26,9 +48,15 @@ function isModelFile(fileName) {
 }
 
 /**
+ * Lấy Content-Type khớp chính xác với BE đã ký trong presigned URL.
+ */
+function getSignedContentType(fileName) {
+  const ext = getFileExtension(fileName);
+  return EXTENSION_CONTENT_TYPE[ext] || 'application/octet-stream';
+}
+
+/**
  * Lấy presigned upload URL từ BE.
- * @param {string} fileName — tên file kèm đuôi (vd: "avatar.png", "model.glb")
- * @returns {{ uploadUrl: string, fileUrl: string }}
  */
 async function getPresignedUrl(fileName) {
   const ext = getFileExtension(fileName);
@@ -53,16 +81,16 @@ async function getPresignedUrl(fileName) {
 }
 
 /**
- * Upload file lên B2 bằng presigned URL (PUT trực tiếp).
- * @param {string} uploadUrl — presigned URL từ BE
- * @param {File} file — File object
+ * PUT file trực tiếp lên B2 bằng presigned URL.
+ * Content-Type PHẢI khớp chính xác với BE đã ký.
  */
-async function putFileToB2(uploadUrl, file) {
-  // PUT trực tiếp lên B2, KHÔNG qua axiosInstance (không cần Bearer token)
+async function putFileToB2(uploadUrl, file, signedFileName) {
+  const contentType = getSignedContentType(signedFileName);
+
   const response = await fetch(uploadUrl, {
     method: 'PUT',
     headers: {
-      'Content-Type': file.type || 'application/octet-stream',
+      'Content-Type': contentType,
     },
     body: file,
   });
@@ -74,23 +102,17 @@ async function putFileToB2(uploadUrl, file) {
 }
 
 /**
- * Upload file công khai — thay thế POST /api/files/upload cũ.
- *
- * Flow: getPresignedUrl → PUT lên B2 → trả { url, fileUrl, fileName }
- *
- * @param {File} file — File object từ input
- * @returns {{ data: { url: string, publicUrl: string, fileName: string } }}
+ * Upload file công khai.
+ * Flow: getPresignedUrl → PUT trực tiếp lên B2 → trả FileUrl
  */
 export async function uploadPublicFile(file) {
-  // Tạo tên file unique để tránh trùng
   const timestamp = Date.now();
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const uniqueFileName = `${timestamp}_${safeName}`;
 
   const { uploadUrl, fileUrl } = await getPresignedUrl(uniqueFileName);
-  await putFileToB2(uploadUrl, file);
+  await putFileToB2(uploadUrl, file, uniqueFileName);
 
-  // Trả format tương thích với code cũ
   return {
     data: {
       url: fileUrl,
@@ -101,9 +123,6 @@ export async function uploadPublicFile(file) {
   };
 }
 
-/**
- * Upload file ảnh (shortcut, validate extension).
- */
 export async function uploadImageFile(file) {
   if (!isImageFile(file.name)) {
     throw new Error(`File "${file.name}" không phải ảnh hợp lệ. Hỗ trợ: ${IMAGE_EXTENSIONS.join(', ')}`);
@@ -111,9 +130,6 @@ export async function uploadImageFile(file) {
   return uploadPublicFile(file);
 }
 
-/**
- * Upload file 3D model (shortcut, validate extension).
- */
 export async function uploadModelFile(file) {
   if (!isModelFile(file.name)) {
     throw new Error(`File "${file.name}" không phải model 3D hợp lệ. Hỗ trợ: ${MODEL_EXTENSIONS.join(', ')}`);
