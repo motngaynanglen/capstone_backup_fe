@@ -23,7 +23,7 @@ export const CONCEP_TAG_ENDPOINTS = {
 
 export const DESIGN_TEMPLATE_ENDPOINTS = {
   QUERY: "/api/design-template/query",
-  MANAGE_CATALOG: "/api/design-template/manage-catalog",
+  // MANAGE_CATALOG đã xóa — không tồn tại trong BE. Dùng QUERY thay thế.
   DETAIL: "/api/design-template", // appending /{id}/detail in service
   ADD: "/api/design-template/add",
   UPDATE: "/api/design-template", // appending /{id}/update in service

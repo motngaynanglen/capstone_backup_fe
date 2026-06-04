@@ -11,10 +11,30 @@ const designTemplateApi = {
     }
   },
 
-  /** Mẫu thiết kế + danh sách biến thể (một request) — dùng cho trang quản lý sản phẩm. */
+  /**
+   * Mẫu thiết kế + danh sách biến thể (một request) — dùng cho trang quản lý sản phẩm.
+   * BE: POST /api/design-template/query (đã include Variants + Tags)
+   *
+   * FE gọi với: { pageNumber, pageSize, search, includeInactive, conceptTagId }
+   * BE nhận:    { PageNumber, PageSize, Search, IsActive, CatalogStatus, SortBy, SortDescending }
+   */
   manageCatalog: async (params) => {
     try {
-      const response = await axiosInstance.post(DESIGN_TEMPLATE_ENDPOINTS.MANAGE_CATALOG, params);
+      const body = {
+        PageNumber: params.pageNumber || 1,
+        PageSize: params.pageSize || 10,
+        Search: params.search || '',
+        SortBy: params.sortBy || 'created',
+        SortDescending: params.sortDescending ?? true,
+      };
+
+      // includeInactive=true → xem tất cả (không filter IsActive, không filter CatalogStatus)
+      // includeInactive=false → chỉ xem active/published
+      if (!params.includeInactive) {
+        body.CatalogStatus = 'PUBLISHED';
+      }
+
+      const response = await axiosInstance.post(DESIGN_TEMPLATE_ENDPOINTS.QUERY, body);
       return response.data;
     } catch (error) {
       throw error;
@@ -31,10 +51,25 @@ const designTemplateApi = {
     }
   },
 
+  /** BE không có GET /tags/{tagId} — dùng query rồi FE filter theo tag */
   getTemplatesByTag: async (tagId) => {
     try {
-      const url = `${DESIGN_TEMPLATE_ENDPOINTS.DETAIL}/tags/${tagId}`;
-      const response = await axiosInstance.get(url);
+      const response = await axiosInstance.post(DESIGN_TEMPLATE_ENDPOINTS.QUERY, {
+        PageNumber: 1,
+        PageSize: 100,
+        SortBy: 'created',
+        SortDescending: true,
+      });
+      // Filter client-side theo tag (BE query chưa hỗ trợ filter theo conceptTagId)
+      const items = response.data?.data || [];
+      if (tagId && Array.isArray(items)) {
+        const filtered = items.filter((t) =>
+          (t.designTags || t.tags || []).some(
+            (dt) => dt.conceptTagId === tagId || dt.id === tagId
+          )
+        );
+        return { ...response.data, data: filtered };
+      }
       return response.data;
     } catch (error) {
       throw error;

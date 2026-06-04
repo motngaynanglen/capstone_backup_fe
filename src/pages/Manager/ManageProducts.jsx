@@ -104,14 +104,22 @@ const ManageProducts = () => {
           pageSize: pagination.pageSize,
           search: search || '',
           includeInactive,
-          conceptTagId: tagId || undefined,
         });
-        const list = unwrapList(res);
+        let list = unwrapList(res);
+        // Client-side filter theo tag (BE query chưa hỗ trợ conceptTagId)
+        if (tagId) {
+          list = list.filter((t) =>
+            (t.conceptTagNames || []).length > 0
+              ? t.conceptTagNames.some((n) => conceptTags.find((ct) => ct.id === tagId && ct.name === n))
+              : (t.designTags || []).some((dt) => dt.conceptTagId === tagId)
+          );
+        }
         setCatalog(list);
+        const paging = res?.additionalData?.paging || res?.additionalData?.pagination;
         setPagination((prev) => ({
           ...prev,
           current: page,
-          total: res?.additionalData?.pagination?.totalCount ?? list.length,
+          total: paging?.totalCount ?? list.length,
         }));
       } catch (err) {
         console.error(err);
