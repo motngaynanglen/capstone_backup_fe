@@ -50,10 +50,11 @@ const designTemplateApi = {
     }
   },
 
+  // BE dùng PATCH (partial update)
   update: async (id, data) => {
     try {
       const url = `${DESIGN_TEMPLATE_ENDPOINTS.UPDATE}/${id}/update`;
-      const response = await axiosInstance.put(url, data);
+      const response = await axiosInstance.patch(url, data);
       return response.data;
     } catch (error) {
       throw error;

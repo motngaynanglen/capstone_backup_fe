@@ -2,24 +2,6 @@ import axios from "axios";
 
 export const AUTH_UNAUTHORIZED_EVENT = "auth:unauthorized";
 
-const AUTH_EXPIRED_CODES = new Set(["AUTH_003", "AUTH_004"]);
-
-function shouldInvalidateSession(error) {
-  const response = error.response;
-  if (response?.status !== 401) return false;
-
-  const token = localStorage.getItem("token");
-  if (!token) return false;
-
-  const body = response.data || {};
-  const code = body.code || body.Code;
-  if (AUTH_EXPIRED_CODES.has(code)) return true;
-
-  const authenticateHeader =
-    response.headers?.["www-authenticate"] || response.headers?.["WWW-Authenticate"] || "";
-  return /invalid_token|expired/i.test(authenticateHeader);
-}
-
 export const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
   headers: {
@@ -50,18 +32,11 @@ axiosInstance.interceptors.response.use(
     const isLoginApi = url.includes("/login");
 
     if (status === 401) {
-      if (!isLoginApi && shouldInvalidateSession(error)) {
-        window.dispatchEvent(
-          new CustomEvent(AUTH_UNAUTHORIZED_EVENT, {
-            detail: {
-              url,
-              message:
-                error.response?.data?.message ||
-                error.response?.data?.Message ||
-                "Phiên đăng nhập đã hết hạn hoặc không hợp lệ.",
-            },
-          }),
-        );
+      if (!isLoginApi) {
+        console.warn("Token hết hạn hoặc không hợp lệ, vui lòng đăng nhập lại!");
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        window.location.href = "/login";
       } else {
         console.warn("Đăng nhập thất bại.");
       }

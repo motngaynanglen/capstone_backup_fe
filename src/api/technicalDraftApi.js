@@ -1,24 +1,29 @@
 import axiosInstance from './axiosInstance';
 
 const technicalDraftApi = {
-  // Lấy danh sách draft của customer đang login (BE mới: /my-drafts)
+  // Lấy danh sách draft (dùng query vì BE không có /my-drafts)
+  // BE: POST /api/technical-draft/query
   getMyConfirmed: async () => {
-    const response = await axiosInstance.get('/api/technical-draft/my-drafts');
+    const response = await axiosInstance.post('/api/technical-draft/query', {
+      isConfirmed: true,
+      pageSize: 100,
+    });
     return response.data;
   },
 
   getMyDrafts: async (params = {}) => {
-    const response = await axiosInstance.get('/api/technical-draft/my-drafts', { params });
-    return response.data;
-  },
-
-  getByVersion: async (versionId) => {
-    const response = await axiosInstance.get(`/api/technical-draft/version/${versionId}`);
+    const response = await axiosInstance.post('/api/technical-draft/query', {
+      pageSize: 100,
+      ...params,
+    });
     return response.data;
   },
 
   getByDesignWork: async (designWorkId) => {
-    const response = await axiosInstance.get(`/api/technical-draft/design-work/${designWorkId}`);
+    const response = await axiosInstance.post('/api/technical-draft/query', {
+      designWorkId,
+      pageSize: 50,
+    });
     return response.data;
   },
 
@@ -28,9 +33,9 @@ const technicalDraftApi = {
     return response.data;
   },
 
-  // Tạo draft mới (staff)
+  // Tạo draft mới (staff) — BE: POST /api/technical-draft/add
   create: async (data) => {
-    const response = await axiosInstance.post('/api/technical-draft/', data);
+    const response = await axiosInstance.post('/api/technical-draft/add', data);
     return response.data;
   },
 

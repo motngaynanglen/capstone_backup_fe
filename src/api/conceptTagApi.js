@@ -42,10 +42,11 @@ const conceptTagApi = {
     }
   },
 
+  // BE dùng PUT cho delete (soft-delete)
   delete: async (id) => {
     try {
-      const url = `${CONCEP_TAG_ENDPOINTS.DELETE}/${id}`;
-      const response = await axiosInstance.delete(url);
+      const url = `/api/concept-tag/${id}/delete`;
+      const response = await axiosInstance.put(url);
       return response.data;
     } catch (error) {
       throw error;

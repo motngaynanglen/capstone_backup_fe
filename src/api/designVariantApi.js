@@ -11,10 +11,9 @@ const designVariantApi = {
     }
   },
 
-  // Query all variants with filtering
+  // Query all variants with filtering — BE: POST /api/design-variant/query
   getAll: async (params) => {
     try {
-      // API expects { designTemplateId, materialId, isActive }
       const response = await axiosInstance.post(DESIGN_VARIANT_ENDPOINTS.SEARCH, params);
       return response.data;
     } catch (error) {
@@ -22,7 +21,7 @@ const designVariantApi = {
     }
   },
 
-  // Add new variant
+  // Add new variant — BE: POST /api/design-variant/add
   add: async (data) => {
     try {
       const response = await axiosInstance.post(DESIGN_VARIANT_ENDPOINTS.ADD, data);
@@ -32,29 +31,17 @@ const designVariantApi = {
     }
   },
 
-  // Update variant
-  update: async (data) => {
+  // Update variant — BE: PATCH /api/design-variant/{id}/update
+  update: async (id, data) => {
     try {
-      // Cập nhật biến thể - takes full data payload
-      const response = await axiosInstance.put(DESIGN_VARIANT_ENDPOINTS.UPDATE, data);
+      const response = await axiosInstance.patch(`${DESIGN_VARIANT_ENDPOINTS.UPDATE}/${id}/update`, data);
       return response.data;
     } catch (error) {
       throw error;
     }
   },
 
-  // Add stock quantity
-  addQuantity: async (data) => {
-    try {
-      // payload { id, additionalQuantity }
-      const response = await axiosInstance.put(DESIGN_VARIANT_ENDPOINTS.UPDATE_QUANTITY, data);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  },
-
-  // Delete variant
+  // Delete variant — BE: DELETE /api/design-variant/{id}/delete
   delete: async (id) => {
     try {
       const response = await axiosInstance.delete(`${DESIGN_VARIANT_ENDPOINTS.DELETE}/${id}/delete`, { data: {} });

@@ -42,6 +42,7 @@ import designVariantApi from '../../api/designVariantApi';
 import materialApi from '../../api/materialApi';
 import designTemplateApi from '../../api/designTemplateApi';
 import conceptTagApi from '../../api/conceptTagApi';
+import designTagApi from '../../api/designTagApi';
 import { getTemplateMedia, getVariantMediaDisplay, fileLabel } from '../../utils/variantMedia';
 import './ManageProducts.css';
 
@@ -164,7 +165,7 @@ const ManageProducts = () => {
 
   const refresh = (page = pagination.current) => fetchCatalog(page);
 
-  const openTemplateDrawer = (template) => {
+  const openTemplateDrawer = async (template) => {
     setEditingTemplate(template);
     if (template) {
       templateForm.setFieldsValue({
@@ -173,7 +174,16 @@ const ManageProducts = () => {
         description: template.description,
         fileUrl: template.fileUrl,
         thumbnailUrl: template.thumbnailUrl,
+        tagIds: [],
       });
+      // Load tags hiện tại
+      try {
+        const res = await designTagApi.getTags(template.id);
+        const tagIds = (res?.data || []).map((t) => t.conceptTagId || t.id);
+        templateForm.setFieldsValue({ tagIds });
+      } catch {
+        /* ignore — tag load thất bại không ảnh hưởng */
+      }
     } else {
       templateForm.resetFields();
     }
@@ -200,15 +210,28 @@ const ManageProducts = () => {
         fileUrl: values.fileUrl.trim(),
         thumbnailUrl: values.thumbnailUrl?.trim() || '',
       };
+      let templateId;
       if (editingTemplate) {
         await designTemplateApi.update(editingTemplate.id, payload);
+        templateId = editingTemplate.id;
         message.success('Đã cập nhật mẫu — mọi biến thể dùng chung file & ảnh (trừ khi override)');
       } else {
         const created = await designTemplateApi.add(payload);
-        const newId = created?.data?.id;
+        templateId = created?.data?.id;
         message.success('Đã tạo mẫu. Thêm biến thể bên dưới (chỉ cần giá, vật liệu, tồn).');
-        if (newId) {
-          setExpandedKeys((k) => [...k, newId]);
+        if (templateId) {
+          setExpandedKeys((k) => [...k, templateId]);
+        }
+      }
+      // Sync tags (nếu có chọn)
+      if (templateId && values.tagIds) {
+        try {
+          await designTagApi.syncTags({
+            designTemplateId: templateId,
+            conceptTagIds: values.tagIds,
+          });
+        } catch {
+          message.warning('Lưu mẫu OK nhưng đồng bộ tag thất bại.');
         }
       }
       closeTemplateDrawer();
@@ -238,11 +261,17 @@ const ManageProducts = () => {
       variantForm.setFieldsValue({
         code: variant.code,
         name: variant.name,
+        description: variant.description || '',
         materialId: variant.materialId,
         price: variant.price,
         stockQuantity: variant.stockQuantity,
         sizeScale: variant.sizeScale ?? 1,
+        markupPercentage: variant.markupPercentage ?? 0,
+        estimatedWeightPerUnit: variant.estimatedWeightPerUnit ?? 0,
+        estimatedPrintTimePerUnit: variant.estimatedPrintTimePerUnit ?? 0,
+        minimumStockLevel: variant.minimumStockLevel ?? 0,
         isAllowPreOrder: variant.isAllowPreOrder !== false,
+        catalogStatus: variant.catalogStatus || 'DRAFT',
         previewModelUrl: variant.previewModelUrl || '',
         useTemplateMedia: !variant.previewModelUrl,
       });
@@ -250,7 +279,12 @@ const ManageProducts = () => {
       variantForm.setFieldsValue({
         sizeScale: 1,
         stockQuantity: 0,
+        markupPercentage: 0,
+        estimatedWeightPerUnit: 0,
+        estimatedPrintTimePerUnit: 0,
+        minimumStockLevel: 0,
         isAllowPreOrder: true,
+        catalogStatus: 'DRAFT',
         useTemplateMedia: true,
         previewModelUrl: '',
       });
@@ -270,12 +304,16 @@ const ManageProducts = () => {
       materialId: values.materialId,
       code: values.code,
       name: values.name,
+      description: values.description || '',
       sizeScale: values.sizeScale ?? 1,
       stockQuantity: values.stockQuantity ?? 0,
       price: values.price ?? 0,
+      markupPercentage: values.markupPercentage ?? 0,
       isAllowPreOrder: values.isAllowPreOrder !== false,
       estimatedWeightPerUnit: values.estimatedWeightPerUnit ?? 0,
       estimatedPrintTimePerUnit: values.estimatedPrintTimePerUnit ?? 0,
+      minimumStockLevel: values.minimumStockLevel ?? 0,
+      catalogStatus: values.catalogStatus || 'DRAFT',
     };
     if (!values.useTemplateMedia && values.previewModelUrl?.trim()) {
       payload.previewModelUrl = values.previewModelUrl.trim();
@@ -293,19 +331,23 @@ const ManageProducts = () => {
           materialId: values.materialId,
           code: values.code,
           name: values.name,
+          description: values.description || '',
           sizeScale: values.sizeScale ?? 1,
-          stockQuantity: values.stockQuantity ?? 0,
           price: values.price ?? 0,
+          markupPercentage: values.markupPercentage ?? 0,
           isAllowPreOrder: values.isAllowPreOrder !== false,
           estimatedWeightPerUnit: values.estimatedWeightPerUnit ?? 0,
           estimatedPrintTimePerUnit: values.estimatedPrintTimePerUnit ?? 0,
+          minimumStockLevel: values.minimumStockLevel ?? 0,
+          catalogStatus: values.catalogStatus || 'DRAFT',
         };
+        // Không gửi stockQuantity khi update — dùng InventoryTransaction
         if (values.useTemplateMedia) {
           updatePayload.clearPreviewOverride = true;
         } else if (values.previewModelUrl?.trim()) {
           updatePayload.previewModelUrl = values.previewModelUrl.trim();
         }
-        await designVariantApi.update(updatePayload);
+        await designVariantApi.update(editingVariant.id, updatePayload);
         message.success('Đã cập nhật biến thể');
       } else {
         await designVariantApi.add(buildVariantPayload(values, variantContextTemplate.id));
@@ -351,8 +393,29 @@ const ManageProducts = () => {
       await designVariantApi.delete(variantId);
       message.success('Đã xóa biến thể');
       refresh();
-    } catch {
-      message.error('Xóa thất bại');
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.response?.data?.data || '';
+      if (/order|đơn hàng/i.test(msg)) {
+        message.warning('Không thể xóa — biến thể đã có đơn hàng. Chuyển sang Archived (ngừng bán) thay thế.');
+      } else {
+        message.error(msg || 'Xóa thất bại');
+      }
+    }
+  };
+
+  const updateCatalogStatus = async (variantId, newStatus) => {
+    try {
+      await designVariantApi.update(variantId, { catalogStatus: newStatus });
+      const labels = { DRAFT: 'Bản thảo', PUBLISHED: 'Đang bán', ARCHIVED: 'Ngừng bán' };
+      message.success(`Đã chuyển trạng thái → ${labels[newStatus] || newStatus}`);
+      refresh();
+    } catch (err) {
+      const msg = err?.response?.data?.message || '';
+      if (newStatus === 'DRAFT' && /order|đơn hàng/i.test(msg)) {
+        message.error('Không thể chuyển về Draft — sản phẩm đã có đơn hàng.');
+      } else {
+        message.error(msg || 'Thay đổi trạng thái thất bại');
+      }
     }
   };
 
@@ -363,12 +426,14 @@ const ManageProducts = () => {
   const renderVariantCard = (template, variant) => {
     const media = getVariantMediaDisplay(variant, template);
     const matName = materialNameById[String(variant.materialId)];
-    const live = variant.isActive;
+    const cs = (variant.catalogStatus || 'DRAFT').toUpperCase();
+    const csColor = cs === 'PUBLISHED' ? 'green' : cs === 'ARCHIVED' ? 'default' : 'blue';
+    const csLabel = cs === 'PUBLISHED' ? 'Đang bán' : cs === 'ARCHIVED' ? 'Ngừng bán' : 'Bản thảo';
 
     return (
       <div
         key={variant.id}
-        className={`product-mgmt__variant-card ${live ? 'product-mgmt__variant-card--published' : 'product-mgmt__variant-card--draft'}`}
+        className={`product-mgmt__variant-card ${cs === 'PUBLISHED' ? 'product-mgmt__variant-card--published' : 'product-mgmt__variant-card--draft'}`}
       >
         <div className="flex gap-3">
           <img
@@ -389,13 +454,9 @@ const ManageProducts = () => {
                   {variant.code}
                 </Text>
               </div>
-              {live ? (
-                <Tag color="success" className="m-0 shrink-0">
-                  <ShopOutlined /> Đang bán
-                </Tag>
-              ) : (
-                <Tag className="m-0">Ẩn</Tag>
-              )}
+              <Tag color={csColor} className="m-0 shrink-0">
+                {cs === 'PUBLISHED' && <ShopOutlined />} {csLabel}
+              </Tag>
             </div>
             <div className="mt-2 flex flex-wrap gap-2 text-xs">
               <Tag>{matName || 'Vật liệu'}</Tag>
@@ -403,6 +464,9 @@ const ManageProducts = () => {
               <Tag color={variant.stockQuantity > 0 ? 'green' : 'orange'}>
                 Tồn {variant.stockQuantity}
               </Tag>
+              {variant.estimatedWeightPerUnit > 0 && (
+                <Tag>{variant.estimatedWeightPerUnit}g</Tag>
+              )}
             </div>
             <Tooltip title={media.model || 'Kế thừa mẫu'}>
               <span className="product-mgmt__file-pill mt-2">
@@ -413,13 +477,36 @@ const ManageProducts = () => {
             </Tooltip>
           </div>
         </div>
-        <div className="mt-3 pt-3 border-t border-slate-100 flex justify-end gap-1">
-          <Button size="small" icon={<EditOutlined />} onClick={() => openVariantDrawer(template, variant)}>
-            Sửa
-          </Button>
-          <Popconfirm title="Xóa biến thể?" onConfirm={() => deleteVariant(variant.id)}>
-            <Button size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+        <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap justify-between gap-1">
+          <Space size="small" wrap>
+            {cs === 'DRAFT' && (
+              <Popconfirm title="Mở bán biến thể này?" onConfirm={() => updateCatalogStatus(variant.id, 'PUBLISHED')}>
+                <Button size="small" type="primary">Mở bán</Button>
+              </Popconfirm>
+            )}
+            {cs === 'PUBLISHED' && (
+              <Popconfirm title="Ngừng bán biến thể này?" onConfirm={() => updateCatalogStatus(variant.id, 'ARCHIVED')}>
+                <Button size="small" danger>Ngừng bán</Button>
+              </Popconfirm>
+            )}
+            {cs === 'ARCHIVED' && (
+              <Popconfirm title="Mở bán lại biến thể này?" onConfirm={() => updateCatalogStatus(variant.id, 'PUBLISHED')}>
+                <Button size="small" type="primary">Mở lại</Button>
+              </Popconfirm>
+            )}
+          </Space>
+          <Space size="small">
+            <Button size="small" icon={<EditOutlined />} onClick={() => openVariantDrawer(template, variant)}>
+              Sửa
+            </Button>
+            <Popconfirm
+              title="Xóa biến thể?"
+              description="Chỉ xóa được nếu chưa có đơn hàng. Nếu đã bán, hãy chọn Ngừng bán."
+              onConfirm={() => deleteVariant(variant.id)}
+            >
+              <Button size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          </Space>
         </div>
       </div>
     );
@@ -725,6 +812,21 @@ const ManageProducts = () => {
             <Form.Item name="description" label="Mô tả">
               <Input.TextArea rows={2} />
             </Form.Item>
+            <Form.Item name="tagIds" label="Thẻ phân loại">
+              <Select
+                mode="multiple"
+                placeholder="Tìm và chọn tag..."
+                showSearch
+                filterOption={(input, option) =>
+                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+                options={conceptTags.map((tag) => ({
+                  value: tag.id,
+                  label: tag.name,
+                }))}
+                allowClear
+              />
+            </Form.Item>
 
             <Form.Item name="fileUrl" hidden>
               <Input type="hidden" />
@@ -766,7 +868,7 @@ const ManageProducts = () => {
 
         <Drawer
           title={editingVariant ? 'Sửa biến thể bán' : 'Thêm biến thể'}
-          width={480}
+          width={600}
           open={variantDrawerOpen}
           onClose={closeVariantDrawer}
           extra={
@@ -777,11 +879,20 @@ const ManageProducts = () => {
         >
           {variantInheritPanel}
           <Form form={variantForm} layout="vertical" onClick={(e) => e.stopPropagation()}>
-            <Form.Item name="code" label="Mã SKU" rules={[{ required: true }]}>
-              <Input autoComplete="off" />
-            </Form.Item>
-            <Form.Item name="name" label="Tên trên cửa hàng" rules={[{ required: true }]}>
-              <Input autoComplete="off" />
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item name="code" label="Mã SKU" rules={[{ required: true }]}>
+                  <Input autoComplete="off" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="name" label="Tên trên cửa hàng" rules={[{ required: true }]}>
+                  <Input autoComplete="off" />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Form.Item name="description" label="Mô tả">
+              <Input.TextArea rows={2} placeholder="Mô tả ngắn cho biến thể (tùy chọn)" />
             </Form.Item>
             <Form.Item name="materialId" label="Vật liệu" rules={[{ required: true }]}>
               <Select showSearch optionFilterProp="children">
@@ -793,24 +904,65 @@ const ManageProducts = () => {
               </Select>
             </Form.Item>
             <Row gutter={12}>
-              <Col span={12}>
+              <Col span={8}>
                 <Form.Item name="price" label="Giá (VNĐ)" rules={[{ required: true }]}>
-                  <InputNumber className="w-full" min={0} controls />
+                  <InputNumber className="w-full" min={0} controls
+                    formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={(v) => v.replace(/,/g, '')}
+                  />
                 </Form.Item>
               </Col>
-              <Col span={12}>
-                <Form.Item name="stockQuantity" label="Tồn kho" rules={[{ required: true }]}>
-                  <InputNumber className="w-full" min={0} controls />
+              <Col span={8}>
+                <Form.Item name="markupPercentage" label="Markup %" initialValue={0}>
+                  <InputNumber className="w-full" min={0} max={500} controls />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="sizeScale" label="Scale" initialValue={1}>
+                  <InputNumber className="w-full" min={0.1} step={0.1} controls />
                 </Form.Item>
               </Col>
             </Row>
             <Row gutter={12}>
               <Col span={12}>
-                <Form.Item name="sizeScale" label="Scale">
-                  <InputNumber className="w-full" min={0} step={0.1} controls />
+                <Form.Item name="estimatedWeightPerUnit" label="Cân nặng (gram)">
+                  <InputNumber className="w-full" min={0} controls placeholder="0" />
                 </Form.Item>
               </Col>
               <Col span={12}>
+                <Form.Item name="estimatedPrintTimePerUnit" label="Thời gian in (phút)">
+                  <InputNumber className="w-full" min={0} controls placeholder="0" />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item name="stockQuantity" label={editingVariant ? 'Tồn kho (chỉ đọc)' : 'Tồn kho ban đầu'} rules={!editingVariant ? [{ required: true }] : []}>
+                  <InputNumber className="w-full" min={0} controls disabled={!!editingVariant} />
+                </Form.Item>
+                {editingVariant && (
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    Điều chỉnh tồn kho qua mục Quản lý kho
+                  </Text>
+                )}
+              </Col>
+              <Col span={12}>
+                <Form.Item name="minimumStockLevel" label="Mức tồn tối thiểu" initialValue={0}>
+                  <InputNumber className="w-full" min={0} controls />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={12}>
+              <Col span={8}>
+                <Form.Item name="catalogStatus" label="Trạng thái" initialValue="DRAFT">
+                  <Select options={[
+                    { value: 'DRAFT', label: 'Bản thảo' },
+                    { value: 'PUBLISHED', label: 'Đang bán' },
+                    { value: 'ARCHIVED', label: 'Ngừng bán' },
+                  ]} />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
                 <Form.Item name="isAllowPreOrder" label="Pre-order" valuePropName="checked">
                   <Switch />
                 </Form.Item>

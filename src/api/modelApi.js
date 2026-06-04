@@ -1,5 +1,5 @@
 import axiosInstance from './axiosInstance';
-import { uploadFile } from './mainflow2Api';
+import { uploadPublicFile, extractUploadUrl } from './fileApi';
 import { resolvePublicMediaUrl } from '../utils/mediaUrl';
 
 const AI_GENERATE_URL =
@@ -166,7 +166,7 @@ export const generateGlbFromImage = async (imageFile) => {
 /** Gọi AI lấy GLB → upload lên BE → trả URL công khai. */
 export const generateAndUploadGlbFromImage = async (imageFile) => {
   const glbFile = await generateGlbFromImage(imageFile);
-  const uploadRes = await uploadFile(glbFile);
+  const uploadRes = await uploadPublicFile(glbFile);
   const data = uploadRes?.data || uploadRes;
   const glbUrl = resolvePublicMediaUrl(data?.publicUrl || data?.url);
   if (!glbUrl) throw new Error('Server không trả về URL file GLB.');

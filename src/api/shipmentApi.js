@@ -28,13 +28,15 @@ export const markShipmentReadyApi = async (id) => {
   return response.data;
 };
 
+// BE: PATCH /api/shipment/{id}/mark-shipped
 export const markShipmentInTransitApi = async (id, payload) => {
-  const response = await axiosInstance.patch(`/api/shipment/${id}/mark-in-transit`, payload);
+  const response = await axiosInstance.patch(`/api/shipment/${id}/mark-shipped`, payload);
   return response.data;
 };
 
+// BE: PATCH /api/shipment/{id}/mark-delivered
 export const confirmShipmentDeliveredApi = async (id) => {
-  const response = await axiosInstance.patch(`/api/shipment/${id}/confirm-delivered`);
+  const response = await axiosInstance.patch(`/api/shipment/${id}/mark-delivered`);
   return response.data;
 };
 

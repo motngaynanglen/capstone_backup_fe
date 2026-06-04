@@ -31,10 +31,10 @@ const shippingAddressApi = {
     }
   },
 
-  // Xóa địa chỉ
+  // Xóa địa chỉ — BE: DELETE /api/shipping-address/{id}/delete
   remove: async (id) => {
     try {
-      const response = await axiosInstance.delete(`/api/shipping-address/${id}/remove`, { data: {} });
+      const response = await axiosInstance.delete(`/api/shipping-address/${id}/delete`, { data: {} });
       return response.data;
     } catch (error) {
       throw error;

@@ -258,7 +258,7 @@ const DesignTemplateEdit = () => {
           estimatedWeightPerUnit: values.estimatedWeightPerUnit || 0,
           estimatedPrintTimePerUnit: values.estimatedPrintTimePerUnit || 0
         };
-        await designVariantApi.update(updatePayload);
+        await designVariantApi.update(editingVariant.id, updatePayload);
         message.success('Cập nhật biến thể thành công');
       } else {
         if (!id) throw new Error("Chưa có Template ID! Vui lòng lưu template trước.");

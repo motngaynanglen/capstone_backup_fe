@@ -242,14 +242,7 @@ export default function StaffOrderDetailModal({ open, orderId, onClose, onUpdate
             <Alert type="warning" showIcon message="Đơn chưa thanh toán — chưa vào sản xuất." />
           )}
 
-          {isCod && !paid && os !== 'COMPLETED' && (
-            <Alert
-              type="info"
-              showIcon
-              message="Đơn COD — thu tiền khi giao hàng"
-              description="Có thể tiếp nhận và xử lý đơn mà không cần ghi nhận thanh toán trước."
-            />
-          )}
+          {/* Đã xóa thông báo COD — hệ thống không hỗ trợ COD */}
 
           {readyForShip && (
             <Alert
@@ -308,6 +301,27 @@ export default function StaffOrderDetailModal({ open, orderId, onClose, onUpdate
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
+
+          {/* Tổng cân nặng ước tính — hỗ trợ nhập khối lượng cho GHN */}
+          {(() => {
+            const items = order?.items || [];
+            const totalWeight = items.reduce((sum, it) => {
+              const w = it.estimatedWeightPerUnit || it.weight || 0;
+              const q = it.quantityOrdered || it.quantity || 1;
+              return sum + w * q;
+            }, 0);
+            return totalWeight > 0 ? (
+              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '8px 12px' }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>Tổng cân nặng ước tính:</Text>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#2563eb' }}>
+                  {totalWeight.toLocaleString()}g
+                  <span style={{ fontSize: 13, fontWeight: 400, color: '#6b7280', marginLeft: 8 }}>
+                    ({(totalWeight / 1000).toFixed(2)} kg)
+                  </span>
+                </div>
+              </div>
+            ) : null;
+          })()}
 
           <StaffCarrierActions
             orderId={order.id}

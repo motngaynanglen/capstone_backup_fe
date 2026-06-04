@@ -39,10 +39,9 @@ export const DESIGN_TAG_ENDPOINTS = {
 };
 
 export const DESIGN_VARIANT_ENDPOINTS = {
-  SEARCH: "/api/design-variant/",
-  DETAIL: "/api/design-variant",
-  ADD: "/api/design-variant/add",
-  UPDATE: "/api/design-variant/update",
-  UPDATE_QUANTITY: "/api/design-variant/quantity",
-  DELETE: "/api/design-variant", // appending /{id}/delete
+  SEARCH: "/api/design-variant/query",       // POST — BE: /api/design-variant/query
+  DETAIL: "/api/design-variant",              // GET /{id}/detail
+  ADD: "/api/design-variant/add",             // POST
+  UPDATE: "/api/design-variant",              // PATCH /{id}/update — BE dùng PATCH, có {id} trong path
+  DELETE: "/api/design-variant",              // DELETE /{id}/delete
 };

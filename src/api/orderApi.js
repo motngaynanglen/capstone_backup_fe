@@ -24,9 +24,9 @@ export const checkoutOrderApi = async (payload) => {
   return response.data;
 };
 
-// 5. Thực hiện thanh toán đơn hàng
+// 5. Tạo link thanh toán — BE: POST /api/transaction/create-payment-link
 export const performTransactionApi = async (payload) => {
-  const response = await axiosInstance.post('/api/transaction/perform-transaction', payload);
+  const response = await axiosInstance.post('/api/transaction/create-payment-link', payload);
   return response.data;
 };
 

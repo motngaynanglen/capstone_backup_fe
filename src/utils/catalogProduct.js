@@ -60,6 +60,9 @@ export const normalizeVariant = (v) => {
     thumbnailUrl: effectiveThumb ? resolvePublicMediaUrl(effectiveThumb) : null,
     modelSrc: previewModelUrl || pickFallbackGlb(v?.id),
     isAllowPreOrder: !!v?.isAllowPreOrder,
+    estimatedWeightPerUnit: Number(v?.estimatedWeightPerUnit ?? 0),
+    estimatedPrintTimePerUnit: Number(v?.estimatedPrintTimePerUnit ?? 0),
+    catalogStatus: v?.catalogStatus || 'DRAFT',
     usesTemplateMedia: v?.usesTemplateMedia !== false && !v?.previewModelUrl,
   };
 };

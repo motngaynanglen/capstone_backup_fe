@@ -79,7 +79,7 @@ const ProductDetail = () => {
     quantity,
     material: product.material,
     modelSrc: product.modelSrc,
-    sourceType: product.stock > 0 ? 'IN_STOCK' : 'PRE_ORDER',
+    sourceType: 'IN_STOCK',
   });
 
   const handleBuyNow = () => {
@@ -99,7 +99,7 @@ const ProductDetail = () => {
         designTemplateName: product.designTemplateName,
         price: product.price,
         modelSrc: product.modelSrc,
-        sourceType: product.stock > 0 ? 'in_stock' : 'pre_order',
+        sourceType: 'IN_STOCK',
         stock: product.stock,
         materials: [product.material],
       },
@@ -107,6 +107,25 @@ const ProductDetail = () => {
       quantity
     );
     notification.success({ message: 'Đã thêm vào giỏ hàng' });
+  };
+
+  const handlePreOrder = () => {
+    if (!isAuthenticated) {
+      notification.info({ message: 'Vui lòng đăng nhập để đặt trước' });
+      navigate('/login');
+      return;
+    }
+    const preOrderItem = {
+      variantId: product.id != null ? String(product.id) : undefined,
+      name: product.name,
+      designTemplateName: product.designTemplateName,
+      price: product.price,
+      quantity,
+      material: product.material,
+      modelSrc: product.modelSrc,
+      sourceType: 'PRE_ORDER',
+    };
+    navigate('/checkout', { state: { cartItems: [preOrderItem] } });
   };
 
   const outOfStock = product && product.stock <= 0;
@@ -203,46 +222,71 @@ const ProductDetail = () => {
 
                 <Divider />
 
-                <div className="mb-6">
-                  <label className="block mb-2 font-semibold text-gray-800">Chất liệu</label>
-                  <Tag color="blue" className="text-sm px-3 py-1">
-                    {product.material}
-                  </Tag>
-                </div>
-
-                <div className="mb-6">
-                  <label className="block mb-2 font-semibold text-gray-800">Số lượng</label>
-                  <div className="flex items-center gap-4 flex-wrap">
-                    <InputNumber
-                      min={1}
-                      max={product.stock > 0 ? product.stock : 99}
-                      value={quantity}
-                      onChange={(v) => setQuantity(v || 1)}
-                      size="large"
-                      style={{ width: 120 }}
-                    />
-                    <Tag
-                      color={product.stock > 5 ? 'success' : product.stock > 0 ? 'warning' : 'default'}
-                      icon={<CheckCircleOutlined />}
-                    >
-                      {outOfStock
-                        ? (product.isAllowPreOrder ? 'Hết hàng — đặt trước' : 'Hết hàng')
-                        : `Còn ${product.stock} sản phẩm`}
-                    </Tag>
+                {/* Thông số sản phẩm */}
+                <div className="mb-6 bg-gray-50 rounded-lg p-4">
+                  <label className="block mb-3 font-semibold text-gray-800">Thông số sản phẩm</label>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-gray-500">Chất liệu:</span>
+                      <div><Tag color="blue">{product.material}</Tag></div>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Tồn kho:</span>
+                      <div>
+                        <Tag color={product.stock > 5 ? 'success' : product.stock > 0 ? 'warning' : 'default'}>
+                          {outOfStock ? 'Hết hàng' : `Còn ${product.stock}`}
+                        </Tag>
+                      </div>
+                    </div>
+                    {product.estimatedWeightPerUnit > 0 && (
+                      <div>
+                        <span className="text-gray-500">Trọng lượng:</span>
+                        <div className="font-medium">{product.estimatedWeightPerUnit}g</div>
+                      </div>
+                    )}
+                    {product.estimatedPrintTimePerUnit > 0 && (
+                      <div>
+                        <span className="text-gray-500">Thời gian in:</span>
+                        <div className="font-medium">
+                          {product.estimatedPrintTimePerUnit >= 60
+                            ? `${Math.floor(product.estimatedPrintTimePerUnit / 60)}h ${product.estimatedPrintTimePerUnit % 60}p`
+                            : `${product.estimatedPrintTimePerUnit} phút`}
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-gray-500">Đặt trước:</span>
+                      <div>
+                        {product.isAllowPreOrder
+                          ? <Tag color="orange">Cho phép Pre-Order</Tag>
+                          : <Tag>Không hỗ trợ</Tag>}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <Divider />
-
+                {/* Khu vực mua hàng */}
                 <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                  {showBuyNow && (
+                  {/* Còn hàng — mua bình thường */}
+                  {product.stock > 0 && showBuyNow && (
                     <>
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <label className="font-semibold text-gray-800">Số lượng:</label>
+                        <InputNumber
+                          min={1}
+                          max={product.stock}
+                          value={quantity}
+                          onChange={(v) => setQuantity(v || 1)}
+                          size="large"
+                          style={{ width: 120 }}
+                        />
+                        <span className="text-xs text-gray-400">Còn {product.stock} sản phẩm</span>
+                      </div>
                       <Button
                         type="primary"
                         size="large"
                         icon={<ShoppingOutlined />}
                         onClick={handleBuyNow}
-                        disabled={!canOrder}
                         block
                         style={{ height: 50 }}
                       >
@@ -252,13 +296,55 @@ const ProductDetail = () => {
                         size="large"
                         icon={<ShoppingCartOutlined />}
                         onClick={handleAddToCart}
-                        disabled={!canOrder}
                         block
                         style={{ height: 50 }}
                       >
                         Thêm vào giỏ
                       </Button>
                     </>
+                  )}
+
+                  {/* Hết hàng + cho Pre-Order → nút riêng */}
+                  {outOfStock && product.isAllowPreOrder && showBuyNow && (
+                    <>
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                        <div className="flex items-center gap-2 text-amber-700 mb-1">
+                          <InfoCircleOutlined />
+                          <span className="font-semibold text-sm">Sản phẩm hết hàng — Có thể đặt trước</span>
+                        </div>
+                        <p className="text-xs text-amber-600 m-0">
+                          Đơn Pre-Order sẽ được sản xuất và giao khi sẵn sàng.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <label className="font-semibold text-gray-800">Số lượng đặt trước:</label>
+                        <InputNumber
+                          min={1}
+                          max={9999}
+                          value={quantity}
+                          onChange={(v) => setQuantity(v || 1)}
+                          size="large"
+                          style={{ width: 120 }}
+                        />
+                      </div>
+                      <Button
+                        type="primary"
+                        size="large"
+                        icon={<ShoppingOutlined />}
+                        onClick={handlePreOrder}
+                        block
+                        style={{ height: 50, backgroundColor: '#f59e0b', borderColor: '#f59e0b' }}
+                      >
+                        Đặt trước (Pre-Order)
+                      </Button>
+                    </>
+                  )}
+
+                  {/* Hết hàng + không Pre-Order */}
+                  {outOfStock && !product.isAllowPreOrder && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+                      <span className="text-red-600 font-semibold">Sản phẩm hiện đã hết hàng</span>
+                    </div>
                   )}
 
                   <Button
