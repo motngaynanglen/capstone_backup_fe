@@ -1,0 +1,3958 @@
+{
+  "x-generator": "NSwag v14.1.0.0 (NJsonSchema v11.0.2.0 (Newtonsoft.Json v13.0.0.0))",
+  "openapi": "3.0.0",
+  "info": {
+    "title": "3D_printshop_API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://103.90.227.51:8080"
+    }
+  ],
+  "paths": {
+    "/": {
+      "options": {
+        "operationId": "Options",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/account/query": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "[Admin] Truy vấn danh sách tài khoản.",
+        "description": "Hỗ trợ tìm kiếm, lọc và phân trang danh sách tài khoản trong hệ thống. Nếu data null nghĩa là mặc định lấy hết. Xắp xếp hỗ trợ: 'Name', 'Email', 'Phone', 'Created', 'Deleted' ",
+        "operationId": "PostApiAccountQuery",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetAccountsWithPaginationQuery"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/account/add": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "[Admin] Tạo tài khoản mới.",
+        "description": "Tạo một tài khoản người dùng mới với các thông tin cung cấp.",
+        "operationId": "PostApiAccountAdd",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccountCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/account/{id}/detail": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "[Admin] Lấy thông tin chi tiết tài khoản.",
+        "description": "Trả về toàn bộ thông tin chi tiết của một tài khoản dựa trên ID.",
+        "operationId": "GetApiAccountDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/account/{id}/update": {
+      "patch": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "[Admin] Cập nhật thông tin tài khoản với ID.",
+        "operationId": "PatchApiAccountUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAccountCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/account/{id}/active": {
+      "patch": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "[Admin] Kích hoạt tài khoản có ID.",
+        "description": "Để trống dữ liệu Request BODY khi gọi",
+        "operationId": "PatchApiAccountActive",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActiveAccountCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/account/{id}/deactive": {
+      "patch": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "[Admin] Tạm ngưng hoạt động tài khoản có ID.",
+        "description": "Để trống dữ liệu Request BODY khi gọi",
+        "operationId": "PatchApiAccountDeactive",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeactiveAccountCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/account/{id}/delete": {
+      "delete": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "[Admin] Xóa mềm tài khoản có ID.",
+        "description": "Để trống dữ liệu Request BODY khi gọi",
+        "operationId": "DeleteApiAccountDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccountCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/account/me": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "[Customer] Lấy thông tin chi tiết của tài khoản hiển tại.",
+        "operationId": "GetApiAccountMe",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/account/me/update": {
+      "patch": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "[Customer] Cập nhật thông tin chi tiết của tài khoản hiển tại.",
+        "operationId": "PatchApiAccountMeUpdate",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAccountMineCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/account/change-password": {
+      "patch": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "[Customer] Đổi mật khẩu của tài khoản hiện tại.",
+        "operationId": "PatchApiAccountChangePassword",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordAccountCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/ai-generated-design/register": {
+      "post": {
+        "tags": [
+          "AI generated design"
+        ],
+        "summary": "[Customer] Đăng ký mô hình AI (URL file + giá) để đặt hàng qua /api/order/checkout.",
+        "operationId": "PostApiAiGeneratedDesignRegister",
+        "requestBody": {
+          "x-name": "body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterAiGeneratedDesignWorkCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ]
+      }
+    },
+    "/api/app-support/presigned-upload-url": {
+      "get": {
+        "tags": [
+          "AppSupport"
+        ],
+        "summary": "[Staff/Manager] Lấy link đăng kí trước cho upload",
+        "operationId": "GetApiAppSupportPresignedUploadUrl",
+        "parameters": [
+          {
+            "name": "fileName",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/app-support/test-upload-to-b2": {
+      "post": {
+        "tags": [
+          "AppSupport"
+        ],
+        "summary": "[Dev Only] Test đẩy file trực tiếp lên B2 bằng Presigned URL.",
+        "operationId": "PostApiAppSupportTestUploadToB2",
+        "parameters": [
+          {
+            "name": "uploadUrl",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/auth/system-login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "[Admin] Đăng nhập hệ thống.",
+        "operationId": "PostApiAuthSystemLogin",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SystemLoginCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "[Customer/Staff/Manager] Đăng nhập hệ thống.",
+        "operationId": "PostApiAuthLogin",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "[Guest] Đăng kí tài khoản.",
+        "operationId": "PostApiAuthRegister",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/auth/forgot-password": {
+      "patch": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "[Guest] Xin mã để đặt lại mật khẩu.",
+        "operationId": "PatchApiAuthForgotPassword",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgetPasswordCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/auth/reset-password": {
+      "patch": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "[Guest] Đặt lại mật khẩu.",
+        "operationId": "PatchApiAuthResetPassword",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/concept-tag/all": {
+      "get": {
+        "tags": [
+          "ConceptTag"
+        ],
+        "summary": "[All] Truy vấn danh sách tag.",
+        "operationId": "GetApiConceptTagAll",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/concept-tag/query": {
+      "post": {
+        "tags": [
+          "ConceptTag"
+        ],
+        "summary": "[All] Truy vấn danh sách với search và paging.",
+        "operationId": "PostApiConceptTagQuery",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetConceptTagsByNameQuery"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/concept-tag/add": {
+      "post": {
+        "tags": [
+          "ConceptTag"
+        ],
+        "summary": "[Manager] Thêm Tag.",
+        "operationId": "PostApiConceptTagAdd",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConceptTagCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/concept-tag/{id}/update": {
+      "put": {
+        "tags": [
+          "ConceptTag"
+        ],
+        "summary": "[Manager] Cập nhật nội dung tag.",
+        "operationId": "PutApiConceptTagUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateConceptTagCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/concept-tag/{id}/delete": {
+      "put": {
+        "tags": [
+          "ConceptTag"
+        ],
+        "summary": "[Manager] Xóa concept tag và các tag được dán trên sản phẩm với tag ID.",
+        "operationId": "PutApiConceptTagDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/design-tag/{templateId}/tags": {
+      "get": {
+        "tags": [
+          "DesignTag"
+        ],
+        "summary": "[Manager] Lấy tất cả tag của một Template với TemplateID.",
+        "operationId": "GetApiDesignTagTags",
+        "parameters": [
+          {
+            "name": "templateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/design-tag/sync": {
+      "post": {
+        "tags": [
+          "DesignTag"
+        ],
+        "summary": "[Manager] Cập nhật tất cả tags của một Template với TemplateID và danh sách TagId.",
+        "operationId": "PostApiDesignTagSync",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncDesignTagCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/design-tag": {
+      "post": {
+        "tags": [
+          "DesignTag"
+        ],
+        "summary": "[Manager] Thêm một tag mới cho Template.",
+        "operationId": "PostApiDesignTag",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDesignTagCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/design-tag/{id}": {
+      "put": {
+        "tags": [
+          "DesignTag"
+        ],
+        "summary": "[Manager] Cập nhật trạng thái MainTag cho một Tag cụ thể.",
+        "operationId": "PutApiDesignTag",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDesignTagCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "DesignTag"
+        ],
+        "summary": "[Manager] Xóa một tag khỏi Template.",
+        "operationId": "DeleteApiDesignTag",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/design-template/query": {
+      "post": {
+        "tags": [
+          "DesignTemplate"
+        ],
+        "summary": "Lấy danh sách Thiết kế theo Filter có phân trang",
+        "operationId": "PostApiDesignTemplateQuery",
+        "requestBody": {
+          "x-name": "query",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetDesignTemplatesWithPaginationQuery"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/design-template/add": {
+      "post": {
+        "tags": [
+          "DesignTemplate"
+        ],
+        "summary": "Tạo mới Thiết kế",
+        "operationId": "PostApiDesignTemplateAdd",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDesignTemplateCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/design-template/{id}/detail": {
+      "get": {
+        "tags": [
+          "DesignTemplate"
+        ],
+        "summary": "Xem chi tiết mẫu thiết kế",
+        "operationId": "GetApiDesignTemplateDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/design-template/tags/{id}": {
+      "get": {
+        "tags": [
+          "DesignTemplate"
+        ],
+        "summary": "Lấy danh sách Thiết kế theo Tag",
+        "operationId": "GetApiDesignTemplateTags",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/design-template/{id}/update": {
+      "put": {
+        "tags": [
+          "DesignTemplate"
+        ],
+        "summary": "Cập nhật thiết kế",
+        "operationId": "PutApiDesignTemplateUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDesignTemplateCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/design-template/{id}/delete": {
+      "delete": {
+        "tags": [
+          "DesignTemplate"
+        ],
+        "operationId": "DeleteApiDesignTemplateDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteDesignTemplateCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/design-variant": {
+      "post": {
+        "tags": [
+          "Design Variant"
+        ],
+        "summary": "Lấy danh sách Biến thể",
+        "operationId": "PostApiDesignVariant",
+        "requestBody": {
+          "x-name": "query",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetDesignVariantListQuery"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/design-variant/add": {
+      "post": {
+        "tags": [
+          "Design Variant"
+        ],
+        "summary": "Thêm mới biến thể",
+        "operationId": "PostApiDesignVariantAdd",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDesignVariantCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/design-variant/update": {
+      "put": {
+        "tags": [
+          "Design Variant"
+        ],
+        "summary": "Cập nhật biến thể",
+        "operationId": "PutApiDesignVariantUpdate",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDesignVariantCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/design-variant/quantity": {
+      "put": {
+        "tags": [
+          "Design Variant"
+        ],
+        "summary": "Cộng số lượng biến thể vào kho",
+        "operationId": "PutApiDesignVariantQuantity",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDesignVariantQuantityCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/design-variant/{id}/delete": {
+      "delete": {
+        "tags": [
+          "Design Variant"
+        ],
+        "summary": "Xoá biến thể",
+        "operationId": "DeleteApiDesignVariantDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/feedback/my-pending": {
+      "post": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "[Customer] Lấy danh sách các món hàng (OrderItem) đã nhận nhưng chưa đánh giá.",
+        "operationId": "PostApiFeedbackMyPending",
+        "requestBody": {
+          "x-name": "query",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetPendingFeedbacksQuery"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/feedback/send": {
+      "post": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "[Customer] Gửi đánh giá mới (kèm tối đa 5 ảnh).",
+        "operationId": "PostApiFeedbackSend",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFeedbackCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/feedback/my-history": {
+      "post": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "[Customer] Xem lại các đánh giá đã gửi.",
+        "operationId": "PostApiFeedbackMyHistory",
+        "requestBody": {
+          "x-name": "query",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetMyFeedbackHistoryQuery"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/feedback/template": {
+      "post": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "[All] Xem danh sách feedback của một mẫu thiết kế (kèm paging, filter theo số sao).",
+        "operationId": "PostApiFeedbackTemplate",
+        "requestBody": {
+          "x-name": "query",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetFeedbacksByTemplateWithPaginationQuery"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/feedback/query": {
+      "post": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "[Staff/Manager] Lấy toàn bộ feedback để kiểm duyệt (Paging, Search).",
+        "operationId": "PostApiFeedbackQuery",
+        "requestBody": {
+          "x-name": "query",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetFeedbacksWithPaginationQuery"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/feedback/{id}/reply": {
+      "patch": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "[Staff/Manager] Nhân viên phản hồi đánh giá của khách.",
+        "operationId": "PatchApiFeedbackReply",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplyFeedbackCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/feedback/{id}/toggle-status": {
+      "patch": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "[Staff/Manager] Ẩn/Hiện đánh giá (nếu vi phạm quy tắc cộng đồng).",
+        "description": "Để trống dữ liệu Request BODY khi gọi",
+        "operationId": "PatchApiFeedbackToggleStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/feedback/{id}/delete": {
+      "patch": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "[Customer/Staff/Manager] Xóa đánh giá với ID.",
+        "description": "Để trống dữ liệu Request BODY khi gọi; Customer sẽ xóa được feedback của bản thân. Staff, Manager có thể xóa mọi feedback",
+        "operationId": "PatchApiFeedbackDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/inventory-transaction/query": {
+      "post": {
+        "tags": [
+          "Inventory Transaction"
+        ],
+        "summary": "[Staff/Manager] Lấy danh sách lịch sử biến động kho (Paging, Filter).",
+        "operationId": "PostApiInventoryTransactionQuery",
+        "requestBody": {
+          "x-name": "query",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetInventoryTransactionsWithPaginationQuery"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/inventory-transaction/reference/{orderId}": {
+      "get": {
+        "tags": [
+          "Inventory Transaction"
+        ],
+        "summary": "[Staff/Manager] Truy vết lịch sử kho theo ReferenceId (ví dụ OrderId).",
+        "operationId": "GetApiInventoryTransactionReference",
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/inventory-transaction/create": {
+      "post": {
+        "tags": [
+          "Inventory Transaction"
+        ],
+        "summary": "[Staff/Manager] Tạo mới một giao dịch kho (Nhập/Xuất/Điều chỉnh).",
+        "operationId": "PostApiInventoryTransactionCreate",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInventoryTransactionCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/mainflow-2/design-requests": {
+      "post": {
+        "tags": [
+          "Mainflow 2"
+        ],
+        "summary": "Mainflow 2 — [Customer] Tạo yêu cầu thiết kế + ảnh ý tưởng.",
+        "operationId": "PostApiMainflow2DesignRequests",
+        "requestBody": {
+          "x-name": "body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMainflow2DesignRequestCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Mainflow 2"
+        ],
+        "summary": "Mainflow 2 — [Customer/Staff/Manager] Danh sách yêu cầu (phân quyền theo vai trò).",
+        "operationId": "GetApiMainflow2DesignRequests",
+        "parameters": [
+          {
+            "name": "Status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            },
+            "x-position": 1
+          },
+          {
+            "name": "PageNumber",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "x-position": 2
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "x-position": 3
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ]
+      }
+    },
+    "/api/mainflow-2/design-requests/{id}": {
+      "get": {
+        "tags": [
+          "Mainflow 2"
+        ],
+        "summary": "Mainflow 2 — Chi tiết, thread tin nhắn và timeline trạng thái.",
+        "operationId": "GetApiMainflow2DesignRequests2",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ]
+      }
+    },
+    "/api/mainflow-2/design-requests/{id}/messages": {
+      "post": {
+        "tags": [
+          "Mainflow 2"
+        ],
+        "summary": "Mainflow 2 — Gửi ghi chú / chat (khách hoặc NV được phân công).",
+        "operationId": "PostApiMainflow2DesignRequestsMessages",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMainflow2DesignMessageCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ]
+      }
+    },
+    "/api/mainflow-2/design-requests/{id}/staff/assign": {
+      "post": {
+        "tags": [
+          "Mainflow 2"
+        ],
+        "summary": "Mainflow 2 — [Staff] Tiếp nhận yêu cầu.",
+        "operationId": "PostApiMainflow2DesignRequestsStaffAssign",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ]
+      }
+    },
+    "/api/mainflow-2/design-requests/{id}/staff/quote": {
+      "post": {
+        "tags": [
+          "Mainflow 2"
+        ],
+        "summary": "Mainflow 2 — [Staff] Gửi bản thiết kế + báo giá mới.",
+        "operationId": "PostApiMainflow2DesignRequestsStaffQuote",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffSubmitMainflow2QuoteCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ]
+      }
+    },
+    "/api/mainflow-2/design-requests/{id}/approve": {
+      "post": {
+        "tags": [
+          "Mainflow 2"
+        ],
+        "summary": "Mainflow 2 — [Customer] Chấp nhận báo giá hiện tại.",
+        "operationId": "PostApiMainflow2DesignRequestsApprove",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ]
+      }
+    },
+    "/api/mainflow-2/design-requests/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Mainflow 2"
+        ],
+        "summary": "Mainflow 2 — Hủy yêu cầu (khách hoặc NV/manager được phép).",
+        "operationId": "PostApiMainflow2DesignRequestsCancel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ]
+      }
+    },
+    "/api/material/add": {
+      "post": {
+        "tags": [
+          "Material"
+        ],
+        "summary": "[Manager] Tạo mới vật liệu",
+        "description": "Tạo vật liệu mới với các thông tin: giá, mô tả, ...",
+        "operationId": "PostApiMaterialAdd",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMaterialCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/material/all": {
+      "get": {
+        "tags": [
+          "Material"
+        ],
+        "summary": "[Manager] Lấy danh sách vật liệu",
+        "operationId": "GetApiMaterialAll",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/material/{id}/detail": {
+      "get": {
+        "tags": [
+          "Material"
+        ],
+        "summary": "[Manager] Xem chi tiết vật liệu",
+        "operationId": "GetApiMaterialDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/material/{id}/update": {
+      "put": {
+        "tags": [
+          "Material"
+        ],
+        "summary": "[Manager] Cập nhật vật liệu",
+        "operationId": "PutApiMaterialUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMaterialCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/material/{id}/toggle-active": {
+      "delete": {
+        "tags": [
+          "Material"
+        ],
+        "summary": "Chuyển đổi trạng thái Active của vật liệu",
+        "operationId": "DeleteApiMaterialToggleActive",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteMaterialCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/model-generate": {
+      "post": {
+        "tags": [
+          "Model Generate"
+        ],
+        "summary": "Tạo mô hình 3D từ ảnh",
+        "operationId": "PostApiModelGenerate",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Image": {
+                    "type": "string",
+                    "format": "binary",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/order/query": {
+      "post": {
+        "tags": [
+          "Order"
+        ],
+        "summary": "[All] Truy vấn danh sách đơn hàng.",
+        "operationId": "PostApiOrderQuery",
+        "requestBody": {
+          "x-name": "query",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetOrdersWithPaginationQuery"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/order/checkout": {
+      "post": {
+        "tags": [
+          "Order"
+        ],
+        "summary": "[Customer] Tạo đơn hàng (thống nhất 3 luồng).",
+        "description": "IN_STOCK / PRE_ORDER: Items[].DesignVariantId. CUSTOM_QUOTE_MF2: sau khi khách duyệt báo giá — Items[].DesignWorkId. AI_GENERATED: sau POST /api/ai-generated-design/register — Items[].DesignWorkId. Luôn cần ShippingAddressId. Sau checkout: thanh toán + tracking qua chi tiết đơn. SourceType: IN_STOCK, PRE_ORDER, DESIGN_SERVICE, PRINT_SERVICE, CUSTOM_QUOTE_MF2, AI_GENERATED",
+        "operationId": "PostApiOrderCheckout",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/order/{id}/detail": {
+      "get": {
+        "tags": [
+          "Order"
+        ],
+        "summary": "[All] lấy thông tin chi tiết đơn hàng có ID.",
+        "operationId": "GetApiOrderDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/order/{id}/cancel": {
+      "patch": {
+        "tags": [
+          "Order"
+        ],
+        "summary": "[Customer/Staff/Manager] Hủy đơn hàng có ID.",
+        "description": "Chỉ hỗ trợ đơn hàng chưa thanh toán, hoặc đã tạo link thanh toán nhưng chưa thanh toán.",
+        "operationId": "PatchApiOrderCancel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelOrderCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/service-option/all": {
+      "get": {
+        "tags": [
+          "ServiceOption"
+        ],
+        "summary": "[All] Lấy danh sách tùy chọn dịch vụ.",
+        "operationId": "GetApiServiceOptionAll",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/service-option/add": {
+      "post": {
+        "tags": [
+          "ServiceOption"
+        ],
+        "summary": "[Staff/Manager] Tạo tùy chọn dịch vụ mới.",
+        "operationId": "PostApiServiceOptionAdd",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateServiceOptionCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/service-option/{id}/update": {
+      "patch": {
+        "tags": [
+          "ServiceOption"
+        ],
+        "summary": "[Staff/Manager] Cập nhật thông tin tùy chọn.",
+        "operationId": "PatchApiServiceOptionUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateServiceOptionCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/service-option/{id}/active": {
+      "patch": {
+        "tags": [
+          "ServiceOption"
+        ],
+        "summary": "[Staff/Manager] Kích hoạt tùy chọn.",
+        "operationId": "PatchApiServiceOptionActive",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/service-option/{id}/deactive": {
+      "patch": {
+        "tags": [
+          "ServiceOption"
+        ],
+        "summary": "[Staff/Manager] Ngưng kích hoạt tùy chọn.",
+        "operationId": "PatchApiServiceOptionDeactive",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/service-option/{id}/delete": {
+      "delete": {
+        "tags": [
+          "ServiceOption"
+        ],
+        "summary": "[Staff/Manager] Xóa tùy chọn dịch vụ.",
+        "operationId": "DeleteApiServiceOptionDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/service-package/query": {
+      "post": {
+        "tags": [
+          "ServicePackage"
+        ],
+        "summary": "[All] Lấy danh sách các gói (P1, P2...).",
+        "operationId": "PostApiServicePackageQuery",
+        "requestBody": {
+          "x-name": "query",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetServicePackagesQuery"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/service-package/add": {
+      "post": {
+        "tags": [
+          "ServicePackage"
+        ],
+        "summary": "[Staff/Manager] Tạo gói mới.",
+        "operationId": "PostApiServicePackageAdd",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateServicePackageCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/shipment/query": {
+      "post": {
+        "tags": [
+          "Shipment"
+        ],
+        "summary": "[Staff/Manager] Truy vấn danh sách tài khoản.",
+        "description": "Hỗ trợ tìm kiếm, lọc và phân trang danh sách tài khoản trong hệ thống. Nếu data null nghĩa là mặc định lấy hết. Xắp xếp hỗ trợ: 'Tracking', 'Fee', 'Created', 'Shipped', 'Delivered' ",
+        "operationId": "PostApiShipmentQuery",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetShipmentsWithPaginationQuery"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/shipment/{id}/update": {
+      "patch": {
+        "tags": [
+          "Shipment"
+        ],
+        "summary": "[Staff/Manager] Cập nhật thông tin đơn vận có ID.",
+        "operationId": "PatchApiShipmentUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateShipmentCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/shipment/{orderId}/detail-by-order-id": {
+      "get": {
+        "tags": [
+          "Shipment"
+        ],
+        "summary": "[All] Lấy thông tin đơn vận có đơn hàng ID.",
+        "operationId": "GetApiShipmentDetailByOrderId",
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/shipment/{id}/detail": {
+      "get": {
+        "tags": [
+          "Shipment"
+        ],
+        "summary": "[Customer/Staff/Manager] Lấy thông tin đơn vận có ID.",
+        "description": "Bảo mật: Nếu là Customer, chỉ cho phép xem vận đơn của chính họ\n Manager và Staff có quyền xem mọi vận đơn",
+        "operationId": "GetApiShipmentDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/shipping-address/add": {
+      "post": {
+        "tags": [
+          "ShippingAddress"
+        ],
+        "summary": "[Customer] Thêm địa chỉ nhận hàng mới.",
+        "operationId": "PostApiShippingAddressAdd",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateShippingAddressCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/shipping-address/my": {
+      "get": {
+        "tags": [
+          "ShippingAddress"
+        ],
+        "summary": "[Customer] Lấy danh sách địa chỉ.",
+        "operationId": "GetApiShippingAddressMy",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/shipping-address/{id}/update": {
+      "patch": {
+        "tags": [
+          "ShippingAddress"
+        ],
+        "summary": "[Customer] Cập nhật địa chỉ của bản thân có ID.",
+        "operationId": "PatchApiShippingAddressUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateShippingAddressCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/shipping-address/{id}/remove": {
+      "delete": {
+        "tags": [
+          "ShippingAddress"
+        ],
+        "summary": "[Customer] Xóa địa chỉ có ID.",
+        "description": "Để trống dữ liệu Request BODY khi gọi",
+        "operationId": "DeleteApiShippingAddressRemove",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteShippingAddressCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/transaction/payos-webhook": {
+      "post": {
+        "tags": [
+          "Transaction"
+        ],
+        "summary": "[PayOS] Đây là api để payos gọi để xác thực đã thanh toán",
+        "operationId": "PostApiTransactionPayosWebhook",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcessOnlinePaymentCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/transaction/perform-transaction": {
+      "post": {
+        "tags": [
+          "Transaction"
+        ],
+        "summary": "[All] Gửi yêu cầu thanh toán đơn hàng có ID.",
+        "description": "Trước mắt hỗ trợ 2 phương thức: 'PAYOS' và 'CASH'. CASH là thanh toán trực tiếp, có thể dùng để test!",
+        "operationId": "PostApiTransactionPerformTransaction",
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PerformTransactionCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/transaction/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Transaction"
+        ],
+        "summary": "[All] Gửi yêu cầu thanh toán đơn hàng có ID.",
+        "operationId": "PostApiTransactionCancel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "command",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelTransactionCommand"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/transaction/{orderId}/detail-by-order-id": {
+      "get": {
+        "tags": [
+          "Transaction"
+        ],
+        "summary": "[All] Tìm chi tiết giao dịch bằng ID hàng hóa.",
+        "operationId": "GetApiTransactionDetailByOrderId",
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "GetAccountsWithPaginationQuery": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "type": "string",
+            "default": "CUSTOMER",
+            "nullable": true
+          },
+          "search": {
+            "type": "string",
+            "default": "Nguyen van a",
+            "nullable": true
+          },
+          "sortBy": {
+            "type": "string",
+            "default": "Name",
+            "nullable": true
+          },
+          "sortDescending": {
+            "type": "boolean"
+          },
+          "includeDeleted": {
+            "type": "boolean"
+          },
+          "paging": {
+            "$ref": "#/components/schemas/PaginationData"
+          }
+        }
+      },
+      "PaginationData": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "PaginationRequest": {
+        "type": "object",
+        "x-abstract": true,
+        "additionalProperties": false,
+        "properties": {
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32",
+            "default": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32",
+            "default": 10
+          }
+        }
+      },
+      "CreateAccountCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "username": {
+            "type": "string",
+            "default": "daylausername"
+          },
+          "password": {
+            "type": "string",
+            "default": "123456"
+          },
+          "fullname": {
+            "type": "string",
+            "default": "daylafullname"
+          },
+          "email": {
+            "type": "string",
+            "default": "Email@gmail.com"
+          },
+          "contactPhone": {
+            "type": "string",
+            "default": "0777777777",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "default": "CUSTOMER"
+          }
+        }
+      },
+      "UpdateAccountCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "fullname": {
+            "type": "string",
+            "default": "newFullname",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "default": "newemail123@gmail.com",
+            "nullable": true
+          },
+          "password": {
+            "type": "string",
+            "default": "newPassword123",
+            "nullable": true
+          },
+          "contactPhone": {
+            "type": "string",
+            "default": "0777777777",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "nullable": true
+          }
+        }
+      },
+      "ActiveAccountCommand": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "DeactiveAccountCommand": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "DeleteAccountCommand": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "UpdateAccountMineCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "fullname": {
+            "type": "string",
+            "default": "newFullname",
+            "nullable": true
+          },
+          "contactPhone": {
+            "type": "string",
+            "default": "0777777777",
+            "nullable": true
+          }
+        }
+      },
+      "ChangePasswordAccountCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "oldPassword": {
+            "type": "string",
+            "default": "Matkhaucu123"
+          },
+          "newPassword": {
+            "type": "string",
+            "default": "Matkhaumoi123456"
+          },
+          "confirmNewPassword": {
+            "type": "string",
+            "default": "Matkhaumoi123456"
+          }
+        }
+      },
+      "RegisterAiGeneratedDesignWorkCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "modelFileUrl": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "quotedUnitPrice": {
+            "type": "number",
+            "format": "decimal"
+          }
+        }
+      },
+      "SystemLoginCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "username": {
+            "type": "string",
+            "default": "AdminUsername@123"
+          },
+          "password": {
+            "type": "string",
+            "default": "AdminPassword@123"
+          }
+        }
+      },
+      "LoginCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "username": {
+            "type": "string",
+            "default": "Username@123"
+          },
+          "password": {
+            "type": "string",
+            "default": "Password@123"
+          }
+        }
+      },
+      "RegisterCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "username": {
+            "type": "string",
+            "default": "Username@123"
+          },
+          "password": {
+            "type": "string",
+            "default": "Password@123"
+          },
+          "fullname": {
+            "type": "string",
+            "default": "Nguyen van A"
+          },
+          "email": {
+            "type": "string",
+            "default": "VanA@gmail.com"
+          },
+          "contactPhone": {
+            "type": "string",
+            "default": "0777777777",
+            "nullable": true
+          }
+        }
+      },
+      "ForgetPasswordCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        }
+      },
+      "ResetPasswordCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "username": {
+            "type": "string",
+            "default": "Username@123"
+          },
+          "token": {
+            "type": "string",
+            "default": "00000000-0000-0000-0000-000000000000"
+          },
+          "newPassword": {
+            "type": "string",
+            "default": "NewPassword@123"
+          }
+        }
+      },
+      "GetConceptTagsByNameQuery": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "search": {
+                "type": "string",
+                "default": "Resin"
+              },
+              "isMainTag": {
+                "type": "boolean",
+                "default": false,
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "CreateConceptTagCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "default": "Resin"
+          },
+          "description": {
+            "type": "string",
+            "default": "Sản phẩm được in từ Resin"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isMainTag": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UpdateConceptTagCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "default": "Resin",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "default": "Sản phẩm được in từ Resin",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": false,
+            "nullable": true
+          },
+          "isMainTag": {
+            "type": "boolean",
+            "default": false,
+            "nullable": true
+          }
+        }
+      },
+      "SyncDesignTagCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "designTemplateId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncDesignTagItem"
+            }
+          }
+        }
+      },
+      "SyncDesignTagItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "conceptTagId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "isMainTag": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "CreateDesignTagCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "designTemplateId": {
+            "type": "string",
+            "format": "guid",
+            "default": "00000000-0000-0000-0000-000000000001"
+          },
+          "conceptTagId": {
+            "type": "string",
+            "format": "guid",
+            "default": "00000000-0000-0000-0000-000000000001"
+          },
+          "isMainTag": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "UpdateDesignTagCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid",
+            "default": "00000000-0000-0000-0000-000000000001"
+          },
+          "isMainTag": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "GetDesignTemplatesWithPaginationQuery": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "search": {
+                "type": "string",
+                "nullable": true
+              },
+              "isActive": {
+                "type": "boolean"
+              },
+              "sortDescending": {
+                "type": "boolean"
+              },
+              "sortBy": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "CreateDesignTemplateCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "fileUrl": {
+            "type": "string"
+          },
+          "thumbnailUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateDesignTemplateCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "fileUrl": {
+            "type": "string"
+          },
+          "thumbnailUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "DeleteDesignTemplateCommand": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "GetDesignVariantListQuery": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "designTemplateId": {
+            "type": "string",
+            "format": "guid",
+            "default": "00000000-0000-0000-0000-000000000000",
+            "nullable": true
+          },
+          "materialId": {
+            "type": "string",
+            "format": "guid",
+            "default": "00000000-0000-0000-0000-000000000000",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CreateDesignVariantCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "designTemplateId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "materialId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sizeScale": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "stockQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "price": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "isAllowPreOrder": {
+            "type": "boolean"
+          },
+          "estimatedWeightPerUnit": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "estimatedPrintTimePerUnit": {
+            "type": "number",
+            "format": "decimal"
+          }
+        }
+      },
+      "UpdateDesignVariantCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid",
+            "default": "00000000-0000-0000-0000-000000000000"
+          },
+          "materialId": {
+            "type": "string",
+            "format": "guid",
+            "default": "00000000-0000-0000-0000-000000000000",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "sizeScale": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "stockQuantity": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "price": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "isAllowPreOrder": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "estimatedWeightPerUnit": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "estimatedPrintTimePerUnit": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          }
+        }
+      },
+      "UpdateDesignVariantQuantityCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid",
+            "default": "00000000-0000-0000-0000-000000000000"
+          },
+          "additionalQuantity": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "GetPendingFeedbacksQuery": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "CreateFeedbackCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "orderItemId": {
+            "type": "string",
+            "format": "guid",
+            "default": "00000000-0000-0000-0000-000000000000"
+          },
+          "rating": {
+            "type": "integer",
+            "format": "int32",
+            "default": 5
+          },
+          "comment": {
+            "type": "string",
+            "default": "Sản phẩm ổn đấy chứ!!!",
+            "nullable": true
+          },
+          "imageUrls": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "GetMyFeedbackHistoryQuery": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "GetFeedbacksByTemplateWithPaginationQuery": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "templateId": {
+                "type": "string",
+                "format": "guid",
+                "default": "00000000-0000-0000-0000-000000000000"
+              },
+              "rating": {
+                "type": "integer",
+                "format": "int32",
+                "default": 5,
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "GetFeedbacksWithPaginationQuery": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rating": {
+                "type": "integer",
+                "format": "int32",
+                "nullable": true
+              },
+              "isHidden": {
+                "type": "boolean",
+                "nullable": true
+              },
+              "isDeleted": {
+                "type": "boolean",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "ReplyFeedbackCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "staffReply": {
+            "type": "string",
+            "default": "Cảm ơn đã ủng hộ!"
+          }
+        }
+      },
+      "GetInventoryTransactionsWithPaginationQuery": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "designVariantId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "type": {
+                "type": "string",
+                "default": "ADJUSTMENT",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "CreateInventoryTransactionCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "designVariantId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          "type": {
+            "type": "string",
+            "default": "ADJUSTMENT"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CreateMainflow2DesignRequestCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "requirementBrief": {
+            "type": "string"
+          },
+          "initialIdeaImageUrls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "AddMainflow2DesignMessageCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "designWorkId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "content": {
+            "type": "string"
+          },
+          "attachmentUrls": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "StaffSubmitMainflow2QuoteCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "designWorkId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "quotedPrice": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "staffNote": {
+            "type": "string",
+            "nullable": true
+          },
+          "designFileUrls": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CreateMaterialCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "baseCostPerGram": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "totalServiceCostPerGram": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "effectiveDate": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "UpdateMaterialCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "baseCostPerGram": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "totalServiceCostPerGram": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "effectiveDate": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DeleteMaterialCommand": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "GetOrdersWithPaginationQuery": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "search": {
+                "type": "string",
+                "nullable": true
+              },
+              "status": {
+                "type": "string",
+                "nullable": true
+              },
+              "priority": {
+                "type": "integer",
+                "format": "int32",
+                "nullable": true
+              },
+              "sortDescending": {
+                "type": "boolean",
+                "default": false,
+                "nullable": true
+              },
+              "sortBy": {
+                "type": "string",
+                "default": "created",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "CheckoutCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "shippingAddressId": {
+            "type": "string",
+            "format": "guid",
+            "default": "00000000-0000-0000-0000-000000000000"
+          },
+          "sourceType": {
+            "type": "string",
+            "default": "IN_STOCK"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckoutItemRequest"
+            }
+          }
+        }
+      },
+      "CheckoutItemRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "designVariantId": {
+            "type": "string",
+            "format": "guid",
+            "default": "00000000-0000-0000-0000-000000000000",
+            "nullable": true
+          },
+          "designWorkId": {
+            "type": "string",
+            "format": "guid",
+            "default": "00000000-0000-0000-0000-000000000000",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "CancelOrderCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "type": "string",
+            "default": "Tôi thích thì tôi hủy đơn thôi.",
+            "nullable": true
+          }
+        }
+      },
+      "CreateServiceOptionCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "default": "CodeAutoGenSau"
+          },
+          "name": {
+            "type": "string"
+          },
+          "optionType": {
+            "type": "string",
+            "default": "ADDON Hoặc CONFIG"
+          },
+          "defaultPrice": {
+            "type": "number",
+            "format": "decimal"
+          }
+        }
+      },
+      "UpdateServiceOptionCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "optionType": {
+            "type": "string",
+            "nullable": true
+          },
+          "defaultPrice": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "nullable": true
+          }
+        }
+      },
+      "GetServicePackagesQuery": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "search": {
+            "type": "string",
+            "default": "",
+            "nullable": true
+          },
+          "service": {
+            "type": "string",
+            "default": "DESIGN Hoặc PRINTING",
+            "nullable": true
+          },
+          "sortBy": {
+            "type": "string",
+            "default": "Created",
+            "nullable": true
+          },
+          "sortDescending": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CreateServicePackageCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "serviceType": {
+            "type": "string"
+          },
+          "basePrice": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreatePackageOptionDTO"
+            }
+          }
+        }
+      },
+      "CreatePackageOptionDTO": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "serviceOptionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "isRequired": {
+            "type": "boolean"
+          },
+          "priceOverride": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "maxQuantity": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "GetShipmentsWithPaginationQuery": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "status": {
+                "type": "string",
+                "default": "PENDING",
+                "nullable": true
+              },
+              "search": {
+                "type": "string",
+                "default": "SPX123",
+                "nullable": true
+              },
+              "sortBy": {
+                "type": "string",
+                "default": "Created",
+                "nullable": true
+              },
+              "sortDescending": {
+                "type": "boolean"
+              }
+            }
+          }
+        ]
+      },
+      "UpdateShipmentCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "trackingNumber": {
+            "type": "string",
+            "default": "SPX123456789",
+            "nullable": true
+          },
+          "shipmentStatus": {
+            "type": "string",
+            "default": "SHIPPED",
+            "nullable": true
+          },
+          "estimatedDeliveryTime": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "CreateShippingAddressCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "receiverName",
+          "phone",
+          "addressLine"
+        ],
+        "properties": {
+          "receiverName": {
+            "type": "string",
+            "default": "Nguyễn Văn A",
+            "minLength": 1
+          },
+          "phone": {
+            "type": "string",
+            "default": "0901234567",
+            "minLength": 1
+          },
+          "addressLine": {
+            "type": "string",
+            "default": "123 Đường ABC, Phường 5",
+            "minLength": 1
+          },
+          "ward": {
+            "type": "string",
+            "default": "Phường Bến Nghé"
+          },
+          "district": {
+            "type": "string",
+            "default": "Quận 1"
+          },
+          "city": {
+            "type": "string",
+            "default": "Hồ Chí Minh"
+          },
+          "province": {
+            "type": "string",
+            "default": "Việt Nam"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "UpdateShippingAddressCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "receiverName",
+          "phone",
+          "addressLine"
+        ],
+        "properties": {
+          "receiverName": {
+            "type": "string",
+            "default": "Nguyễn Văn A",
+            "minLength": 1
+          },
+          "phone": {
+            "type": "string",
+            "default": "0901234567",
+            "minLength": 1
+          },
+          "addressLine": {
+            "type": "string",
+            "default": "123 Đường ABC, Phường 5",
+            "minLength": 1
+          },
+          "ward": {
+            "type": "string",
+            "default": "Phường Bến Nghé",
+            "nullable": true
+          },
+          "district": {
+            "type": "string",
+            "default": "Quận 1",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "default": "Hồ Chí Minh",
+            "nullable": true
+          },
+          "province": {
+            "type": "string",
+            "default": "Việt Nam",
+            "nullable": true
+          },
+          "isDefault": {
+            "type": "boolean",
+            "default": true,
+            "nullable": true
+          }
+        }
+      },
+      "DeleteShippingAddressCommand": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "ProcessOnlinePaymentCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "webhookBody": {
+            "$ref": "#/components/schemas/Webhook"
+          }
+        }
+      },
+      "Webhook": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "desc": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/WebhookData"
+          },
+          "signature": {
+            "type": "string"
+          }
+        }
+      },
+      "WebhookData": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "orderCode": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "description": {
+            "type": "string"
+          },
+          "accountNumber": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "transactionDateTime": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "paymentLinkId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "desc": {
+            "type": "string"
+          },
+          "counterAccountBankId": {
+            "type": "string",
+            "nullable": true
+          },
+          "counterAccountBankName": {
+            "type": "string",
+            "nullable": true
+          },
+          "counterAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "counterAccountNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "virtualAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "virtualAccountNumber": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PerformTransactionCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "orderId",
+          "paymentMethod"
+        ],
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1
+          },
+          "paymentMethod": {
+            "type": "string",
+            "default": "PAYOS",
+            "minLength": 1
+          }
+        }
+      },
+      "CancelTransactionCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "type": "string",
+            "default": "Tôi thích thì tôi hủy đơn thôi.",
+            "nullable": true
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "JWT": {
+        "type": "apiKey",
+        "description": "Type into the textbox: Bearer {your JWT token}.",
+        "name": "Authorization",
+        "in": "header"
+      }
+    }
+  },
+  "security": [
+    {
+      "JWT": []
+    }
+  ]
+}
