@@ -45,9 +45,8 @@ const PAYMENT_METHODS = [
   { value: 'PAYOS', label: 'PayOS', description: 'Quét mã QR để thanh toán (⚠️ thanh toán bằng tiền thật)', icon: '📱', warning: true },
 ];
 
-// TODO: GHN temporarily hidden until BE shipping quote/carrier endpoints are restored.
-const ENABLE_GHN_SHIPPING = false;
-const DEFAULT_SHIPPING_FEE = 0; // Tạm miễn phí vận chuyển
+const ENABLE_GHN_SHIPPING = true;
+const DEFAULT_SHIPPING_FEE = 30000;
 
 const formatPrice = (price) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
@@ -60,6 +59,37 @@ const hasGhnCodes = (addr) =>
 /** BE tự map từ ward/district/city nếu thiếu mã GHN. */
 const hasAddressTextForGhn = (addr) =>
   Boolean(addr?.ward?.trim() && (addr?.district?.trim() || addr?.city?.trim()));
+
+const emptyGhnLocation = () => ({
+  provinceId: null,
+  provinceName: '',
+  districtId: null,
+  districtName: '',
+  wardCode: '',
+  wardName: '',
+});
+
+const addressToGhnLocation = (addr = {}) => ({
+  provinceId: addr.ghnProvinceId || null,
+  provinceName: addr.city || '',
+  districtId: addr.ghnDistrictId || null,
+  districtName: addr.district || '',
+  wardCode: addr.ghnWardCode || '',
+  wardName: addr.ward || '',
+});
+
+const makeAddressPayload = (form, location) => ({
+  receiverName: form.receiverName.trim(),
+  phone: form.phone.trim(),
+  addressLine: form.addressLine.trim(),
+  ward: location.wardName || form.ward || '',
+  district: location.districtName || form.district || '',
+  city: location.provinceName || form.city || '',
+  province: form.province || 'Việt Nam',
+  isDefault: Boolean(form.isDefault),
+  ghnDistrictId: location.districtId,
+  ghnWardCode: location.wardCode,
+});
 
 /** BE yêu cầu Guid dạng chuỗi — không gửi number (lỗi 400 binding). */
 const toGuidString = (value, label = 'ID') => {
@@ -127,14 +157,7 @@ const Checkout = () => {
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [loadingAddresses, setLoadingAddresses] = useState(true);
-  const [ghnLocation, setGhnLocation] = useState({
-    provinceId: null,
-    provinceName: '',
-    districtId: null,
-    districtName: '',
-    wardCode: '',
-    wardName: '',
-  });
+  const [ghnLocation, setGhnLocation] = useState(emptyGhnLocation);
   const [formData, setFormData] = useState({
     receiverName: '',
     phone: '',
@@ -151,6 +174,20 @@ const Checkout = () => {
   const [shippingCarrier, setShippingCarrier] = useState('');
   const [shippingFee, setShippingFee] = useState(0);
   const [shippingQuoteReady, setShippingQuoteReady] = useState(false);
+  const [addressEditorOpen, setAddressEditorOpen] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    receiverName: '',
+    phone: '',
+    addressLine: '',
+    ward: '',
+    district: '',
+    city: '',
+    province: 'Việt Nam',
+    isDefault: false,
+  });
+  const [editGhnLocation, setEditGhnLocation] = useState(emptyGhnLocation);
+  const [savingAddress, setSavingAddress] = useState(false);
   // PayOS QR modal (hiển thị ngay sau checkout nếu chọn PayOS)
   const [paymentModal, setPaymentModal] = useState(false);
   const [paymentData, setPaymentData] = useState(null);
@@ -181,6 +218,7 @@ const Checkout = () => {
   const shippingReady = ENABLE_GHN_SHIPPING
     ? (addressMode === 'new' ? newAddressGhnReady : existingAddressReady)
     : (addressMode === 'new' ? newAddressManualReady : Boolean(selectedAddressId));
+  const shippingSelectionReady = !ENABLE_GHN_SHIPPING || !shippingReady || shippingQuoteReady;
   const collectOnDelivery = false; // Hệ thống không hỗ trợ COD
 
   const handleShippingChange = useCallback((carrier, fee) => {
@@ -191,14 +229,7 @@ const Checkout = () => {
 
   useEffect(() => {
     if (addressMode === 'new') return;
-    setGhnLocation({
-      provinceId: null,
-      provinceName: '',
-      districtId: null,
-      districtName: '',
-      wardCode: '',
-      wardName: '',
-    });
+    setGhnLocation(emptyGhnLocation());
   }, [addressMode]);
 
   useEffect(() => {
@@ -259,6 +290,100 @@ const Checkout = () => {
     setFormData({ ...formData, [name]: type === 'checkbox' ? checked : value });
   };
 
+  const handleEditAddressChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setEditFormData((current) => ({ ...current, [name]: type === 'checkbox' ? checked : value }));
+  };
+
+  const refreshAddresses = async (preferredId) => {
+    const response = await shippingAddressApi.getMyAddresses();
+    const addresses = response?.data || response || [];
+    const list = Array.isArray(addresses) ? addresses : [];
+    setSavedAddresses(list);
+    if (preferredId && list.some((addr) => addr.id === preferredId)) {
+      setSelectedAddressId(preferredId);
+    } else if (list.length > 0 && !list.some((addr) => addr.id === selectedAddressId)) {
+      setSelectedAddressId((list.find((addr) => addr.isDefault) || list[0]).id);
+    }
+    return list;
+  };
+
+  const openAddressEditor = (addr) => {
+    setEditingAddress(addr);
+    setEditFormData({
+      receiverName: addr.receiverName || '',
+      phone: addr.phone || '',
+      addressLine: addr.addressLine || '',
+      ward: addr.ward || '',
+      district: addr.district || '',
+      city: addr.city || '',
+      province: addr.province || 'Việt Nam',
+      isDefault: Boolean(addr.isDefault),
+    });
+    setEditGhnLocation(addressToGhnLocation(addr));
+    setAddressEditorOpen(true);
+  };
+
+  const closeAddressEditor = () => {
+    setAddressEditorOpen(false);
+    setEditingAddress(null);
+    setEditFormData({
+      receiverName: '',
+      phone: '',
+      addressLine: '',
+      ward: '',
+      district: '',
+      city: '',
+      province: 'Việt Nam',
+      isDefault: false,
+    });
+    setEditGhnLocation(emptyGhnLocation());
+  };
+
+  const handleSaveAddress = async () => {
+    if (!editingAddress?.id) return;
+    if (!editFormData.receiverName.trim() || !editFormData.phone.trim() || !editFormData.addressLine.trim()) {
+      notification.warning({
+        message: 'Thiếu thông tin địa chỉ',
+        description: 'Vui lòng nhập đủ người nhận, số điện thoại và địa chỉ cụ thể.',
+      });
+      return;
+    }
+    if (!editGhnLocation.districtId || !String(editGhnLocation.wardCode || '').trim()) {
+      notification.warning({
+        message: 'Thiếu khu vực GHN',
+        description: 'Vui lòng chọn đủ Tỉnh/Thành, Quận/Huyện và Phường/Xã theo danh mục GHN.',
+      });
+      return;
+    }
+
+    try {
+      setSavingAddress(true);
+      const payload = makeAddressPayload(editFormData, editGhnLocation);
+      const res = await shippingAddressApi.update(editingAddress.id, payload);
+      const updated = res?.data || res;
+      const updatedId = updated?.id || updated?.Id || editingAddress.id;
+      await refreshAddresses(updatedId);
+      setShippingCarrier('');
+      setShippingFee(0);
+      setShippingQuoteReady(false);
+      closeAddressEditor();
+      notification.success({ message: 'Cập nhật địa chỉ thành công' });
+    } catch (error) {
+      notification.error({
+        message: 'Cập nhật địa chỉ thất bại',
+        description:
+          error?.response?.data?.detail
+          || error?.response?.data?.message
+          || error?.response?.data?.Message
+          || error.message
+          || 'Có lỗi xảy ra.',
+      });
+    } finally {
+      setSavingAddress(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -270,20 +395,13 @@ const Checkout = () => {
         if (ENABLE_GHN_SHIPPING && !newAddressGhnReady) {
           throw new Error('Vui lòng chọn đủ Tỉnh → Quận → Phường theo danh mục GHN.');
         }
-        const payload = {
-          receiverName: formData.receiverName,
-          phone: formData.phone,
-          addressLine: formData.addressLine,
-          ward: ENABLE_GHN_SHIPPING ? ghnLocation.wardName : formData.ward,
-          district: ENABLE_GHN_SHIPPING ? ghnLocation.districtName : formData.district,
-          city: ENABLE_GHN_SHIPPING ? ghnLocation.provinceName : formData.city,
-          province: formData.province,
-          isDefault: formData.isDefault,
-        };
-        if (ENABLE_GHN_SHIPPING) {
-          payload.ghnDistrictId = ghnLocation.districtId;
-          payload.ghnWardCode = ghnLocation.wardCode;
-        }
+        const payload = makeAddressPayload(formData, ENABLE_GHN_SHIPPING ? ghnLocation : {
+          wardName: formData.ward,
+          districtName: formData.district,
+          provinceName: formData.city,
+          districtId: null,
+          wardCode: '',
+        });
         const res = await shippingAddressApi.add(payload);
         const rawAddrId =
           res?.data?.id ||
@@ -298,6 +416,8 @@ const Checkout = () => {
       }
 
       const isDraftCheckout = checkoutMode === 'DRAFT' || cartItems.some((it) => it.isDraft || it.technicalDraftId);
+      const selectedShippingCarrier = ENABLE_GHN_SHIPPING ? (shippingCarrier || 'MANUAL') : 'MANUAL';
+      const selectedShippingFee = Number(effectiveShippingFee) || 0;
       let orderRes;
 
       if (isDraftCheckout) {
@@ -305,6 +425,8 @@ const Checkout = () => {
         const draftPayload = {
           shippingAddressId,
           note: formData.note || '',
+          shippingFee: selectedShippingFee,
+          shippingCarrier: selectedShippingCarrier,
           items: cartItems.map((it) => ({
             technicalDraftId: toGuidString(it.technicalDraftId, 'Bản nháp kỹ thuật'),
             quantity: Number(it.quantity) || 1,
@@ -321,6 +443,8 @@ const Checkout = () => {
           shippingAddressId,
           sourceType,
           note: formData.note || '',
+          shippingFee: selectedShippingFee,
+          shippingCarrier: selectedShippingCarrier,
           items: cartItems.map((it) => {
             const designVariantId = toGuidString(it.variantId || it.id, 'Sản phẩm');
             if (!designVariantId) {
@@ -491,11 +615,27 @@ const Checkout = () => {
                               Mặc định
                             </span>
                           )}
+                          {hasGhnCodes(addr) && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700">
+                              GHN
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-gray-500 leading-relaxed">
                           {[addr.addressLine, addr.ward, addr.district, addr.city, addr.province].filter(Boolean).join(', ')}
                         </p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          openAddressEditor(addr);
+                        }}
+                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 px-2 py-1 rounded-lg hover:bg-indigo-100"
+                      >
+                        Sửa
+                      </button>
                       {selectedAddressId === addr.id && (
                         <span className="text-indigo-600 flex-shrink-0">
                           <CheckCircleIcon />
@@ -719,9 +859,10 @@ const Checkout = () => {
                 || (addressMode === 'existing' && !selectedAddressId)
                 || (addressMode === 'new' && (!formData.receiverName || !formData.phone || !formData.addressLine || !shippingReady))
                 || (addressMode === 'existing' && !shippingReady)
+                || !shippingSelectionReady
               }
               className={`w-full py-3.5 rounded-xl font-semibold text-sm transition-colors duration-200 cursor-pointer flex items-center justify-center ${
-                isSubmitting || (addressMode === 'existing' && !selectedAddressId)
+                isSubmitting || (addressMode === 'existing' && !selectedAddressId) || !shippingSelectionReady
                   ? 'bg-indigo-400 text-white cursor-not-allowed'
                   : 'bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800'
               }`}
@@ -736,6 +877,69 @@ const Checkout = () => {
       </form>
 
       {/* PayOS QR Modal — hiện khi chọn PayOS */}
+      <Modal
+        title="Cập nhật địa chỉ giao hàng"
+        open={addressEditorOpen}
+        onCancel={closeAddressEditor}
+        onOk={handleSaveAddress}
+        okText="Lưu địa chỉ"
+        cancelText="Hủy"
+        confirmLoading={savingAddress}
+        destroyOnClose
+      >
+        <div className="space-y-4 pt-2">
+          <div>
+            <label className="block mb-1.5 text-sm font-medium text-gray-700">Họ và tên người nhận *</label>
+            <input
+              name="receiverName"
+              type="text"
+              value={editFormData.receiverName}
+              onChange={handleEditAddressChange}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm"
+              placeholder="Nguyễn Văn A"
+            />
+          </div>
+          <div>
+            <label className="block mb-1.5 text-sm font-medium text-gray-700">Số điện thoại *</label>
+            <input
+              name="phone"
+              type="tel"
+              value={editFormData.phone}
+              onChange={handleEditAddressChange}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm"
+              placeholder="0901 234 567"
+            />
+          </div>
+          <div>
+            <label className="block mb-1.5 text-sm font-medium text-gray-700">Địa chỉ cụ thể *</label>
+            <input
+              name="addressLine"
+              type="text"
+              value={editFormData.addressLine}
+              onChange={handleEditAddressChange}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm"
+              placeholder="Số nhà, tên đường"
+            />
+          </div>
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+            <p className="text-xs font-semibold text-slate-600 mb-3 uppercase tracking-wide">
+              Khu vực giao hàng GHN
+            </p>
+            <GhnLocationPicker value={editGhnLocation} onChange={setEditGhnLocation} />
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              name="isDefault"
+              checked={editFormData.isDefault}
+              onChange={handleEditAddressChange}
+              className="w-4 h-4 text-indigo-600 border-gray-300 rounded"
+            />
+            <span className="text-sm text-gray-700">Đặt làm địa chỉ mặc định</span>
+          </label>
+        </div>
+      </Modal>
+
       <CheckoutPayOSModal
         open={paymentModal}
         data={paymentData}

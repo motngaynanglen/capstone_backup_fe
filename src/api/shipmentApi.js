@@ -50,6 +50,36 @@ export const markShipmentFailedApi = async (id, payload) => {
   return response.data;
 };
 
+export const markShipmentReturningApi = async (id, payload) => {
+  const response = await axiosInstance.patch(`/api/shipment/${id}/mark-returning`, payload);
+  return response.data;
+};
+
+export const confirmShipmentReturnedApi = async (id, payload) => {
+  const response = await axiosInstance.patch(`/api/shipment/${id}/confirm-returned`, payload);
+  return response.data;
+};
+
+export const markShipmentLostOrDamagedApi = async (id, payload) => {
+  const response = await axiosInstance.patch(`/api/shipment/${id}/mark-lost-or-damaged`, payload);
+  return response.data;
+};
+
+export const requestShipmentAddressChangeApi = async (id, payload) => {
+  const response = await axiosInstance.post(`/api/shipment/${id}/address-change-requests`, payload);
+  return response.data;
+};
+
+export const approveShipmentAddressChangeApi = async (id, payload) => {
+  const response = await axiosInstance.patch(`/api/shipment/address-change-requests/${id}/approve`, payload);
+  return response.data;
+};
+
+export const rejectShipmentAddressChangeApi = async (id, payload) => {
+  const response = await axiosInstance.patch(`/api/shipment/address-change-requests/${id}/reject`, payload);
+  return response.data;
+};
+
 // 5. Báo phí GHN
 export const getShippingQuotesApi = async (payload) => {
   const response = await axiosInstance.post('/api/shipment/quotes', payload);

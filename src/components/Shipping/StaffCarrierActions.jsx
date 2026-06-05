@@ -7,6 +7,8 @@ import {
   Descriptions,
   Typography,
   Space,
+  Input,
+  DatePicker,
   InputNumber,
   Tag,
   Popconfirm,
@@ -27,8 +29,7 @@ import GhnLocationPicker from './GhnLocationPicker';
 
 const { Text } = Typography;
 
-// TODO: GHN temporarily hidden until BE shipping quote/carrier endpoints are restored.
-const ENABLE_GHN_SHIPPING = false;
+const ENABLE_GHN_SHIPPING = true;
 
 function pick(obj, ...keys) {
   if (!obj) return undefined;
@@ -83,6 +84,11 @@ export default function StaffCarrierActions({
     districtName: '',
     wardCode: '',
     wardName: '',
+  });
+  const [manualShipment, setManualShipment] = useState({
+    carrierName: '',
+    trackingNumber: '',
+    estimatedDeliveryTime: null,
   });
 
   const load = useCallback(async () => {
@@ -153,6 +159,14 @@ export default function StaffCarrierActions({
   const canCreateGhn = ENABLE_GHN_SHIPPING && os === 'FINISHED' && !carrierOrderCode;
   const isCompleted = os === 'COMPLETED';
 
+  useEffect(() => {
+    setManualShipment((current) => ({
+      carrierName: current.carrierName || carrier || '',
+      trackingNumber: current.trackingNumber || displayedTrackingCode || '',
+      estimatedDeliveryTime: current.estimatedDeliveryTime,
+    }));
+  }, [carrier, displayedTrackingCode]);
+
   const handleCreateGhn = async () => {
     setCreating(true);
     try {
@@ -201,15 +215,29 @@ export default function StaffCarrierActions({
     'Đã xác nhận vận đơn sẵn sàng giao',
   );
 
-  const handleMarkInTransit = () => runShipmentAction(
-    (id) => markShipmentInTransitApi(id, {
-      carrierName: carrier || 'MANUAL',
-      trackingNumber: tracking || `MANUAL-${String(orderId).slice(0, 8)}`,
-      shippedAt: new Date().toISOString(),
-      estimatedDeliveryTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-    }),
-    'Đã bàn giao cho vận chuyển',
-  );
+  const handleMarkInTransit = () => {
+    const carrierName = manualShipment.carrierName.trim();
+    const trackingNumber = manualShipment.trackingNumber.trim();
+    const estimatedDeliveryTime = manualShipment.estimatedDeliveryTime;
+
+    if (!carrierName || !trackingNumber || !estimatedDeliveryTime) {
+      message.warning('Vui lòng nhập đủ mã vận đơn, đơn vị vận chuyển và ngày giao dự kiến.');
+      return;
+    }
+
+    return runShipmentAction(
+      (id) => markShipmentInTransitApi(id, {
+        carrierName,
+        trackingNumber,
+        shippedAt: new Date().toISOString(),
+        estimatedDeliveryTime:
+          typeof estimatedDeliveryTime.toISOString === 'function'
+            ? estimatedDeliveryTime.toISOString()
+            : new Date(estimatedDeliveryTime).toISOString(),
+      }),
+      'Đã bàn giao cho vận chuyển',
+    );
+  };
 
   const handleConfirmDelivered = () => runShipmentAction(
     (id) => confirmShipmentDeliveredApi(id),
@@ -385,14 +413,53 @@ export default function StaffCarrierActions({
           )}
 
           {!isCompleted && shipmentId && status === 'READY_FOR_PICKUP' && (
-            <Button
-              type="primary"
-              icon={<SendOutlined />}
-              loading={creating}
-              onClick={handleMarkInTransit}
-            >
-              Đã bàn giao cho vận chuyển
-            </Button>
+            <Space direction="vertical" size={10} style={{ width: '100%' }}>
+              <Alert
+                type="info"
+                showIcon
+                message="Nhập thông tin vận chuyển thủ công trước khi bàn giao đơn."
+              />
+              <Input
+                value={manualShipment.carrierName}
+                onChange={(event) => setManualShipment((current) => ({
+                  ...current,
+                  carrierName: event.target.value,
+                }))}
+                placeholder="Đơn vị vận chuyển"
+                maxLength={120}
+              />
+              <Input
+                value={manualShipment.trackingNumber}
+                onChange={(event) => setManualShipment((current) => ({
+                  ...current,
+                  trackingNumber: event.target.value,
+                }))}
+                placeholder="Mã vận đơn"
+                maxLength={120}
+              />
+              <DatePicker
+                showTime
+                style={{ width: '100%' }}
+                value={manualShipment.estimatedDeliveryTime}
+                onChange={(value) => setManualShipment((current) => ({
+                  ...current,
+                  estimatedDeliveryTime: value,
+                }))}
+                format="DD/MM/YYYY HH:mm"
+                placeholder="Ngày giao tới dự kiến"
+                disabledDate={(current) =>
+                  current && current.valueOf() < Date.now() - 24 * 60 * 60 * 1000
+                }
+              />
+              <Button
+                type="primary"
+                icon={<SendOutlined />}
+                loading={creating}
+                onClick={handleMarkInTransit}
+              >
+                Đã bàn giao cho vận chuyển
+              </Button>
+            </Space>
           )}
 
           {!isCompleted && status === 'IN_TRANSIT' && (

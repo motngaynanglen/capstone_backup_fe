@@ -2,6 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { Select, Spin } from 'antd';
 import { getGhnProvincesApi, getGhnDistrictsApi, getGhnWardsApi } from '../../api/ghnApi';
 
+const extractList = (res) => {
+  const data = res?.data ?? res;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
+
+const withSelectedOption = (options, selectedValue, selectedLabel) => {
+  if (!selectedValue || !selectedLabel) return options;
+  if (options.some((option) => String(option.value) === String(selectedValue))) return options;
+  return [{ value: selectedValue, label: selectedLabel }, ...options];
+};
+
 /**
  * Chọn Tỉnh → Quận → Phường theo master data GHN (mã district_id + ward_code).
  */
@@ -22,7 +35,7 @@ const GhnLocationPicker = ({ value, onChange, disabled = false }) => {
         setLoadingProvinces(true);
         setError(null);
         const res = await getGhnProvincesApi();
-        setProvinces(res?.data || []);
+        setProvinces(extractList(res));
       } catch (e) {
         setError(e?.response?.data?.message || e?.message || 'Không tải tỉnh/thành GHN');
       } finally {
@@ -41,7 +54,7 @@ const GhnLocationPicker = ({ value, onChange, disabled = false }) => {
       try {
         setLoadingDistricts(true);
         const res = await getGhnDistrictsApi(v.provinceId);
-        setDistricts(res?.data || []);
+        setDistricts(extractList(res));
       } catch {
         setDistricts([]);
       } finally {
@@ -59,7 +72,7 @@ const GhnLocationPicker = ({ value, onChange, disabled = false }) => {
       try {
         setLoadingWards(true);
         const res = await getGhnWardsApi(v.districtId);
-        setWards(res?.data || []);
+        setWards(extractList(res));
       } catch {
         setWards([]);
       } finally {
@@ -80,6 +93,33 @@ const GhnLocationPicker = ({ value, onChange, disabled = false }) => {
     });
   };
 
+  const provinceOptions = withSelectedOption(
+    provinces.map((p) => ({
+      value: p.provinceId,
+      label: p.provinceName,
+    })),
+    v.provinceId,
+    v.provinceName,
+  );
+
+  const districtOptions = withSelectedOption(
+    districts.map((d) => ({
+      value: d.districtId,
+      label: d.districtName,
+    })),
+    v.districtId,
+    v.districtName,
+  );
+
+  const wardOptions = withSelectedOption(
+    wards.map((w) => ({
+      value: w.wardCode,
+      label: w.wardName,
+    })),
+    v.wardCode,
+    v.wardName,
+  );
+
   return (
     <div className="space-y-3">
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -93,10 +133,7 @@ const GhnLocationPicker = ({ value, onChange, disabled = false }) => {
           value={v.provinceId || undefined}
           optionFilterProp="label"
           notFoundContent={loadingProvinces ? <Spin size="small" /> : null}
-          options={provinces.map((p) => ({
-            value: p.provinceId,
-            label: p.provinceName,
-          }))}
+          options={provinceOptions}
           onChange={(id, opt) => {
             emit({
               provinceId: id,
@@ -118,10 +155,7 @@ const GhnLocationPicker = ({ value, onChange, disabled = false }) => {
           className="w-full"
           value={v.districtId || undefined}
           optionFilterProp="label"
-          options={districts.map((d) => ({
-            value: d.districtId,
-            label: d.districtName,
-          }))}
+          options={districtOptions}
           onChange={(id, opt) => {
             emit({
               districtId: id,
@@ -141,10 +175,7 @@ const GhnLocationPicker = ({ value, onChange, disabled = false }) => {
           className="w-full"
           value={v.wardCode || undefined}
           optionFilterProp="label"
-          options={wards.map((w) => ({
-            value: w.wardCode,
-            label: w.wardName,
-          }))}
+          options={wardOptions}
           onChange={(code, opt) => {
             emit({
               wardCode: code,

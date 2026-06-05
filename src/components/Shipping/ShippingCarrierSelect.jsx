@@ -9,8 +9,10 @@ const formatPrice = (price) =>
 const MANUAL_CARRIER = {
   carrier: 'MANUAL',
   name: 'Giao hàng Nova3D',
+  carrierName: 'Giao hàng Nova3D',
   fee: 30000,
-  estimatedDays: 'Liên hệ xác nhận thời gian',
+  leadDays: 3,
+  message: 'Shop tự điều phối giao hàng.',
 };
 
 /**
