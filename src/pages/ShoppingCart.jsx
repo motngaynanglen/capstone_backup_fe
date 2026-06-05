@@ -75,9 +75,7 @@ const ShoppingCart = () => {
   const hasCustom = items.some(i => i.product.sourceType === 'custom');
   const showDeliveryWarning = hasPreOrder || hasCustom;
 
-  // Fix 30k shipping by default if cart has items
-  const shipping = items.length > 0 ? 30000 : 0;
-  const total = subtotal + shipping;
+  const total = subtotal;
 
   const formatPrice = (price) =>
     new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
@@ -225,12 +223,12 @@ const ShoppingCart = () => {
                 <span className="text-gray-500">Tạm tính</span>
                 <span className="font-medium text-gray-900">{formatPrice(subtotal)}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Phí vận chuyển</span>
-                <span className="font-medium text-gray-900">{formatPrice(shipping)}</span>
+              <div className="flex justify-between text-xs text-gray-400">
+                <span>Phí vận chuyển</span>
+                <span>Tính khi thanh toán</span>
               </div>
               <div className="pt-3 border-t border-gray-100 flex justify-between">
-                <span className="font-bold text-gray-900">Tổng cộng</span>
+                <span className="font-bold text-gray-900">Tạm tính</span>
                 <span className="font-bold text-indigo-600 text-lg">{formatPrice(total)}</span>
               </div>
             </div>

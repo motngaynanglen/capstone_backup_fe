@@ -161,7 +161,9 @@ export default function StaffCarrierActions({
   const os = normStatus(orderStatus);
   const allItemsFinished = Array.isArray(orderItems) && orderItems.length > 0
     && orderItems.every((item) => normStatus(pick(item, 'fulfillmentStatus', 'FulfillmentStatus')) === 'FINISHED');
-  const canCreateGhn = ENABLE_GHN_SHIPPING && os === 'FINISHED' && !carrierOrderCode;
+  const canCreateGhn = ENABLE_GHN_SHIPPING
+    && (os === 'FINISHED' || (os === 'PROCESSING' && allItemsFinished))
+    && !carrierOrderCode;
   const isCompleted = os === 'COMPLETED';
 
   useEffect(() => {

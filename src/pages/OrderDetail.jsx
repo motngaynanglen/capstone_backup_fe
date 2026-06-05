@@ -10,13 +10,19 @@ import OrderFeedbackSection from '../components/Orders/OrderFeedbackSection';
 // ─── COUNTDOWN TIMER cho đơn chờ thanh toán (15 phút)
 const PaymentCountdown = ({ dueDate, onExpired }) => {
   const [remaining, setRemaining] = React.useState(null);
+  const expiredCalled = React.useRef(false);
 
   React.useEffect(() => {
     if (!dueDate) return;
+    expiredCalled.current = false;
     const target = new Date(dueDate).getTime();
     const tick = () => {
       const diff = target - Date.now();
-      if (diff <= 0) { setRemaining(0); onExpired?.(); return; }
+      if (diff <= 0) {
+        setRemaining(0);
+        if (!expiredCalled.current) { expiredCalled.current = true; onExpired?.(); }
+        return;
+      }
       setRemaining(diff);
     };
     tick();
@@ -303,8 +309,8 @@ const OrderDetail = () => {
           message: 'Thanh toán thành công!',
           description: `Đơn hàng đã được xác nhận. Mã giao dịch: ${txData?.internalCode || ''}`,
         });
-        // Reload để cập nhật trạng thái đơn hàng
-        window.location.reload();
+        // Soft reload để cập nhật trạng thái đơn hàng
+        await reloadOrder();
       } else if (status === 'PENDING') {
         notification.info({
           message: 'Chưa nhận được thanh toán',
@@ -345,7 +351,7 @@ const OrderDetail = () => {
               message: 'Đã hủy đơn hàng',
               placement: 'topRight',
             });
-            window.location.reload();
+            await reloadOrder();
           } else {
             notification.error({
               message: 'Không thể hủy đơn',
@@ -483,7 +489,10 @@ const OrderDetail = () => {
 
       {/* Countdown timer for pending orders */}
       {orderStatus.toUpperCase() === 'PENDING' && invoice?.dueDate && (
-        <PaymentCountdown dueDate={invoice.dueDate} onExpired={() => window.location.reload()} />
+        <PaymentCountdown dueDate={invoice.dueDate} onExpired={() => {
+          // Soft reload sau 5s — tránh loop nếu BE chưa cập nhật status
+          setTimeout(() => reloadOrder().catch(() => {}), 5000);
+        }} />
       )}
 
       {/* Note */}
