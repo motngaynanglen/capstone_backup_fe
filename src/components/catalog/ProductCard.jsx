@@ -10,7 +10,13 @@ const ProductCard = ({ product, viewMode = 'grid', onQuickBuy, onAddToCart }) =>
   const isGrid = viewMode === 'grid';
   const outOfStock = product.stock <= 0;
   const lowStock = !outOfStock && product.stock <= 5;
+  const allowPreOrder =
+    product.isAllowPreOrder === true ||
+    String(product.sourceType || '').toUpperCase() === 'PRE_ORDER';
   const detailPath = `/products/${product.id}`;
+  const preOrderTagClass = allowPreOrder
+    ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
+    : 'bg-slate-50 text-slate-500 ring-1 ring-slate-200';
 
   const goToDetail = (e) => {
     e?.preventDefault?.();
@@ -51,12 +57,12 @@ const ProductCard = ({ product, viewMode = 'grid', onQuickBuy, onAddToCart }) =>
             360°
           </div>
         )}
-        {outOfStock && product.isAllowPreOrder && (
+        {outOfStock && allowPreOrder && (
           <span className="absolute left-2 top-2 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm z-10 pointer-events-none">
             Đặt trước
           </span>
         )}
-        {outOfStock && !product.isAllowPreOrder && (
+        {outOfStock && !allowPreOrder && (
           <span className="absolute left-2 top-2 rounded-full bg-slate-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm z-10 pointer-events-none">
             Hết hàng
           </span>
@@ -74,7 +80,7 @@ const ProductCard = ({ product, viewMode = 'grid', onQuickBuy, onAddToCart }) =>
         <p className="text-[11px] text-slate-500 m-0">Chất liệu: {product.material}</p>
         <p className={`text-[11px] font-medium m-0 ${lowStock ? 'text-rose-500' : outOfStock ? 'text-slate-400' : 'text-emerald-600'}`}>
           {outOfStock
-            ? (product.isAllowPreOrder ? 'Có thể đặt trước' : 'Hết hàng')
+            ? (allowPreOrder ? 'Có thể đặt trước' : 'Hết hàng')
             : lowStock ? `Chỉ còn ${product.stock}` : `Còn ${product.stock} sản phẩm`}
         </p>
 
@@ -86,12 +92,16 @@ const ProductCard = ({ product, viewMode = 'grid', onQuickBuy, onAddToCart }) =>
           >
             {formatPrice(product.price)}
           </button>
+          <div className="flex flex-col items-end gap-1">
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${preOrderTagClass}`}>
+              {allowPreOrder ? 'Cho pre-order' : 'Không pre-order'}
+            </span>
           {(onAddToCart || onQuickBuy) && (
             <div className="hidden sm:flex items-center gap-1">
               {onAddToCart && (
                 <button
                   type="button"
-                  disabled={outOfStock && !product.isAllowPreOrder}
+                  disabled={outOfStock && !allowPreOrder}
                   onClick={(e) => {
                     e.stopPropagation();
                     onAddToCart(product);
@@ -104,7 +114,7 @@ const ProductCard = ({ product, viewMode = 'grid', onQuickBuy, onAddToCart }) =>
               {onQuickBuy && (
                 <button
                   type="button"
-                  disabled={outOfStock && !product.isAllowPreOrder}
+                  disabled={outOfStock && !allowPreOrder}
                   onClick={(e) => {
                     e.stopPropagation();
                     onQuickBuy(product);
@@ -116,6 +126,7 @@ const ProductCard = ({ product, viewMode = 'grid', onQuickBuy, onAddToCart }) =>
               )}
             </div>
           )}
+          </div>
         </div>
 
         {!isGrid && (

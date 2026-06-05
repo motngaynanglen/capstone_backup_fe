@@ -476,6 +476,9 @@ const ManageProducts = () => {
               <Tag color={variant.stockQuantity > 0 ? 'green' : 'orange'}>
                 Tồn {variant.stockQuantity}
               </Tag>
+              <Tag color={variant.isAllowPreOrder ? 'gold' : 'default'}>
+                {variant.isAllowPreOrder ? 'Cho pre-order' : 'Không pre-order'}
+              </Tag>
               {variant.estimatedWeightPerUnit > 0 && (
                 <Tag>{variant.estimatedWeightPerUnit}g</Tag>
               )}
