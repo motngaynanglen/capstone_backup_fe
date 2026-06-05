@@ -595,6 +595,8 @@ const OrderDetail = () => {
             <div className="space-y-0">
               {trackingSteps.map((step, idx) => {
                 const stepComplete = step.done && !step.isCurrent;
+                const displayLabel = stepComplete && step.completedLabel ? step.completedLabel : step.label;
+                const displayDescription = stepComplete && step.completedDescription ? step.completedDescription : step.description;
                 return (
                 <div key={step.key} className="flex gap-4">
                   <div className="flex flex-col items-center">
@@ -622,7 +624,7 @@ const OrderDetail = () => {
                       <p className={`font-semibold text-sm ${
                         step.isCurrent ? 'text-indigo-700' : stepComplete || step.done ? 'text-gray-900' : 'text-gray-400'
                       }`}>
-                        {step.label}
+                        {displayLabel}
                       </p>
                       {step.isPreOrder && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200">
@@ -637,7 +639,7 @@ const OrderDetail = () => {
                       )}
                     </div>
                     <p className={`text-xs mt-0.5 ${step.isCurrent || stepComplete ? 'text-gray-500' : 'text-gray-400'}`}>
-                      {step.description}
+                      {displayDescription}
                     </p>
                   </div>
                 </div>

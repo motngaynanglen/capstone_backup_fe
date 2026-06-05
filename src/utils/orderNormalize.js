@@ -160,7 +160,9 @@ export function buildCustomerTrackingSteps(
     steps.push({
       key: 'production',
       label: preOrder && !customMfg ? 'Đang sản xuất (Pre-Order)' : 'Đang sản xuất / in 3D',
+      completedLabel: preOrder && !customMfg ? 'Đã sản xuất (Pre-Order)' : 'Đã sản xuất / in 3D',
       description: 'Xưởng đang in và hoàn thiện sản phẩm theo đơn của bạn.',
+      completedDescription: 'Xưởng đã in và hoàn thiện sản phẩm theo đơn của bạn.',
       done: productionComplete,
       isCurrent: inProduction,
       isPreOrder: preOrder,
@@ -176,7 +178,9 @@ export function buildCustomerTrackingSteps(
     steps.push({
       key: 'processing',
       label: 'Đang chuẩn bị / đóng gói',
+      completedLabel: 'Đã chuẩn bị / đóng gói',
       description: 'Shop đang soạn và đóng gói sản phẩm.',
+      completedDescription: 'Shop đã soạn và đóng gói sản phẩm.',
       done: productionComplete,
       isCurrent: inProduction,
     });
@@ -185,7 +189,9 @@ export function buildCustomerTrackingSteps(
   steps.push({
     key: 'shipping',
     label: 'Đang vận chuyển',
+    completedLabel: 'Đã vận chuyển',
     description: 'Đơn đã bàn giao cho đơn vị vận chuyển.',
+    completedDescription: 'Đơn đã được đơn vị vận chuyển xử lý.',
     done: delivered || isShipmentProblem,
     isCurrent: inTransit && !isShipmentProblem,
   });
