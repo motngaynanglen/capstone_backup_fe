@@ -53,6 +53,11 @@ const ManagerLayout = ({ children }) => {
       icon: '🏭'
     },
     {
+      path: '/manager/services',
+      label: 'Quản lý Dịch vụ',
+      icon: '⚙️'
+    },
+    {
       path: '/manager/invoices',
       label: 'Quản lý Hóa Đơn',
       icon: '🧾'

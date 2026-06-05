@@ -94,6 +94,11 @@ const Header = () => {
         icon: <FileTextOutlined />,
         label: <Link to="/my-custom-orders">Đơn hàng Custom</Link>,
       },
+      {
+        key: 'my-designs',
+        icon: <FileTextOutlined />,
+        label: <Link to="/my-designs">Kho đồ thiết kế</Link>,
+      },
     ];
 
     if (dashboardNavItem) {

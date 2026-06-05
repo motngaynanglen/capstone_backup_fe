@@ -284,9 +284,19 @@ const StaffCustomOrderDetail = () => {
 
           {/* Composer */}
           {order.status === 'SUBMITTED' ? (
-            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center' }}>
-              <p style={{ margin: '0 0 8px 0', color: '#6b7280', fontSize: 13 }}>Bạn chưa nhận việc. Tiếp nhận để bắt đầu trao đổi.</p>
-              <Button type="primary" style={{ background: '#4f46e5' }} onClick={handleAssign} loading={processing}>Tiếp nhận xử lý</Button>
+            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb' }}>
+              <div style={{ padding: '10px 16px', background: '#fffbeb', borderBottom: '1px solid #fde68a', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ color: '#b45309', fontSize: 12, flex: 1, minWidth: 200 }}>
+                  Khách chưa thanh toán phí thiết kế — bạn vẫn có thể trao đổi, nhưng chỉ <b>tạo được báo giá sau khi khách thanh toán</b>.
+                </span>
+                <Button size="small" type="primary" style={{ background: '#4f46e5' }} onClick={handleAssign} loading={processing}>Tiếp nhận</Button>
+              </div>
+              <ChatComposer
+                value={chatMessage}
+                onChange={setChatMessage}
+                onSend={handleSendChat}
+                uploading={uploading}
+              />
             </div>
           ) : order.status === 'CANCELLED' ? (
             <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#dc2626', fontSize: 13, fontWeight: 500 }}>
@@ -303,7 +313,7 @@ const StaffCustomOrderDetail = () => {
               onSend={handleSendChat}
               uploading={uploading}
               extraLeft={
-                ['ASSIGNED', 'QUOTED', 'NEGOTIATING'].includes(order.status) ? (
+                order.designServicePaid && ['ASSIGNED', 'QUOTED', 'NEGOTIATING'].includes(order.status) ? (
                   <Button
                     onClick={() => setQuoteModalOpen(true)}
                     style={{ flexShrink: 0, background: '#ecfdf5', borderColor: '#6ee7b7', color: '#059669', fontWeight: 600 }}

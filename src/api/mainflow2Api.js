@@ -170,6 +170,10 @@ function normalizeDesignWork(work, messages = []) {
     CANCELLED: 'CANCELLED',
   };
 
+  // BE expose cờ IsDesignServicePaid (Status đã qua PENDING). Fallback suy từ rawStatus.
+  const designServicePaid = work?.isDesignServicePaid ?? work?.IsDesignServicePaid
+    ?? ['IN_PROGRESS', 'REVIEWING', 'COMPLETED'].includes(rawStatus);
+
   return {
     ...work,
     id: work?.id || work?.Id,
@@ -186,7 +190,10 @@ function normalizeDesignWork(work, messages = []) {
     designServiceOrderId: work?.designServiceOrderId || work?.DesignServiceOrderId,
     designServiceOrderCode: work?.designServiceOrderCode || work?.DesignServiceOrderCode,
     designServiceOrderStatus: work?.designServiceOrderStatus || work?.DesignServiceOrderStatus,
-    designServicePaymentStatus: work?.designServicePaymentStatus || work?.DesignServicePaymentStatus,
+    designServicePaid,
+    designServicePaymentStatus:
+      work?.designServicePaymentStatus || work?.DesignServicePaymentStatus
+      || (designServicePaid ? 'PAID' : 'UNPAID'),
     designServiceTotalAmount: work?.designServiceTotalAmount || work?.DesignServiceTotalAmount,
     messages,
   };

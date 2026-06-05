@@ -282,6 +282,16 @@ const AppRouter = () => {
             </PrivateRoute>
           }
         />
+        <Route
+          path="/manager/services"
+          element={
+            <PrivateRoute requiredRole={['manager', 'admin']}>
+              <ManagerLayout>
+                <AdminServices />
+              </ManagerLayout>
+            </PrivateRoute>
+          }
+        />
 
         {/* ========================================== */}
         {/* CỤM ROUTES: STAFF (StaffLayout + JWT)      */}
