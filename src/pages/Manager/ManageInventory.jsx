@@ -180,10 +180,13 @@ const ManageInventory = () => {
       dataIndex: 'quantity',
       width: 90,
       align: 'right',
-      render: (qty, record) => {
-        const color = record.type === 'ORDER_OUT' ? '#ef4444' : (record.type === 'PURCHASE_IN' || record.type === 'PRODUCTION_IN') ? '#10b981' : '#3b82f6';
-        const sign = record.type === 'ORDER_OUT' ? '-' : '+';
-        return <span style={{ color, fontWeight: 600 }}>{sign}{Math.abs(qty)}</span>;
+      render: (qty) => {
+        const n = Number(qty);
+        const isNeg = n < 0;
+        const isPos = n > 0;
+        const color = isNeg ? '#ef4444' : isPos ? '#10b981' : '#6b7280';
+        const sign = isNeg ? '' : '+'; // số âm đã có dấu - sẵn
+        return <span style={{ color, fontWeight: 600 }}>{sign}{n}</span>;
       },
     },
     {
@@ -215,7 +218,11 @@ const ManageInventory = () => {
 
   const refColumns = [
     { title: 'Loại', dataIndex: 'type', render: (type) => { const t = typeMap[type]; return t ? <Tag color={t.color}>{t.label}</Tag> : <Tag>{type}</Tag>; } },
-    { title: 'Số lượng', dataIndex: 'quantity', align: 'right' },
+    { title: 'Số lượng', dataIndex: 'quantity', align: 'right', render: (qty) => {
+      const n = Number(qty);
+      const color = n < 0 ? '#ef4444' : n > 0 ? '#10b981' : '#6b7280';
+      return <span style={{ color, fontWeight: 600 }}>{n < 0 ? '' : '+'}{n}</span>;
+    }},
     { title: 'Ghi chú', dataIndex: 'note', ellipsis: true },
     { title: 'Thời gian', dataIndex: 'createdAt', render: (d) => d ? format(new Date(d), 'dd/MM/yyyy HH:mm', { locale: vi }) : '—' },
   ];
