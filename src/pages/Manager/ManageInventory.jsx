@@ -17,8 +17,9 @@ const { Option } = Select;
 const { TextArea } = Input;
 
 const TRANSACTION_TYPES = [
-  { value: 'INBOUND', label: 'Nhập kho', color: 'green', icon: <ArrowDownOutlined /> },
-  { value: 'OUTBOUND', label: 'Xuất kho', color: 'red', icon: <ArrowUpOutlined /> },
+  { value: 'PURCHASE_IN', label: 'Nhập hàng (NCC)', color: 'green', icon: <ArrowDownOutlined /> },
+  { value: 'PRODUCTION_IN', label: 'Nhập kho (in xong)', color: 'cyan', icon: <ArrowDownOutlined /> },
+  { value: 'ORDER_OUT', label: 'Xuất kho (đơn hàng)', color: 'red', icon: <ArrowUpOutlined /> },
   { value: 'ADJUSTMENT', label: 'Điều chỉnh', color: 'blue', icon: <SwapOutlined /> },
 ];
 
@@ -180,8 +181,8 @@ const ManageInventory = () => {
       width: 90,
       align: 'right',
       render: (qty, record) => {
-        const color = record.type === 'OUTBOUND' ? '#ef4444' : record.type === 'INBOUND' ? '#10b981' : '#3b82f6';
-        const sign = record.type === 'OUTBOUND' ? '-' : '+';
+        const color = record.type === 'ORDER_OUT' ? '#ef4444' : (record.type === 'PURCHASE_IN' || record.type === 'PRODUCTION_IN') ? '#10b981' : '#3b82f6';
+        const sign = record.type === 'ORDER_OUT' ? '-' : '+';
         return <span style={{ color, fontWeight: 600 }}>{sign}{Math.abs(qty)}</span>;
       },
     },
@@ -363,11 +364,11 @@ const ManageInventory = () => {
                   <Form.Item
                     name="note"
                     label="Ghi chú"
-                    rules={txType === 'INBOUND' ? [{ required: true, message: 'Ghi chú nhập kho là bắt buộc' }] : []}
+                    rules={(txType === 'PURCHASE_IN' || txType === 'PRODUCTION_IN') ? [{ required: true, message: 'Ghi chú nhập kho là bắt buộc' }] : []}
                   >
                     <TextArea
                       rows={3}
-                      placeholder={txType === 'INBOUND' ? 'Bắt buộc — mô tả lý do nhập kho' : 'Lý do nhập/xuất/điều chỉnh...'}
+                      placeholder={(txType === 'PURCHASE_IN' || txType === 'PRODUCTION_IN') ? 'Bắt buộc — mô tả lý do nhập kho' : 'Lý do nhập/xuất/điều chỉnh...'}
                     />
                   </Form.Item>
                 </>
