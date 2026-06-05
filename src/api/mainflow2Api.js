@@ -114,6 +114,51 @@ export const getDesignRequests = async (params) => {
 // ─── Chi tiết design work ───────────────────────────────────────────────
 // BE: POST /api/design-work/query rồi filter
 // (GET /{id}/detail bị comment out trong BE, dùng query thay)
+function extractResponseList(payload) {
+  const data = payload?.data ?? payload;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.Items)) return data.Items;
+  return [];
+}
+
+function normalizeDesignLog(log) {
+  const imageUrls = log?.imageUrls || log?.ImageUrls || [];
+  const metadata = log?.metadataJson
+    || log?.MetadataJson
+    || log?.metadata
+    || log?.Metadata
+    || (imageUrls.length > 0 ? JSON.stringify(imageUrls) : null);
+
+  return {
+    ...log,
+    id: log?.id || log?.Id,
+    designWorkId: log?.designWorkId || log?.DesignWorkId,
+    accountId: log?.accountId || log?.AccountId,
+    authorAccountId: log?.authorAccountId || log?.AuthorAccountId || log?.accountId || log?.AccountId,
+    senderName: log?.senderName || log?.SenderName,
+    avatarUrl: log?.avatarUrl || log?.AvatarUrl,
+    content: log?.content ?? log?.Content ?? '',
+    logType: log?.logType || log?.LogType || 'COMMUNICATION',
+    created: log?.created || log?.Created || log?.createdAt || log?.CreatedAt,
+    metadataJson: metadata,
+    imageUrls,
+    versions: log?.versions || log?.Versions || [],
+  };
+}
+
+async function getDesignWorkMessagesSafe(designWorkId) {
+  try {
+    const response = await axiosInstance.get(`/api/design-log/${designWorkId}/getLogsByWork`, {
+      params: { pageNumber: 1, pageSize: 50 },
+    });
+    return extractResponseList(response.data).map(normalizeDesignLog);
+  } catch (error) {
+    console.warn('Khong tai duoc lich su chat design work:', error);
+    return [];
+  }
+}
+
 export const getDesignRequestDetail = async (id) => {
   // Thử query với search = id (BE sẽ filter)
   // Hoặc dùng query all rồi find — nhưng BE không có GET detail endpoint
@@ -144,10 +189,13 @@ export const getDesignRequestDetail = async (id) => {
     const found = Array.isArray(allItems)
       ? allItems.find((item) => item.id === id || item.Id === id)
       : null;
-    return { data: found || null, statusCode: found ? 200 : 404 };
+    if (!found) return { data: null, statusCode: 404 };
+    const messages = await getDesignWorkMessagesSafe(id);
+    return { data: { ...found, messages }, statusCode: 200 };
   }
 
-  return { data: match, statusCode: 200 };
+  const messages = await getDesignWorkMessagesSafe(id);
+  return { data: { ...match, messages }, statusCode: 200 };
 };
 
 // ─── Staff: Assign vào design work ──────────────────────────────────────
@@ -262,7 +310,10 @@ export const postDesignRequestMessage = async (id, payload) => {
 // BE: GET /api/design-log/{designWorkId}/getLogsByWork
 export const getDesignRequestMessages = async (designWorkId) => {
   const response = await axiosInstance.get(`/api/design-log/${designWorkId}/getLogsByWork`);
-  return response.data;
+  return {
+    ...response.data,
+    data: extractResponseList(response.data).map(normalizeDesignLog),
+  };
 };
 
 // ─── Lấy version history ────────────────────────────────────────────────
