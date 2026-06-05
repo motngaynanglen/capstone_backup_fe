@@ -15,14 +15,14 @@ import {
   message,
   Divider,
 } from 'antd';
-import { CheckCircleOutlined, LinkOutlined, ReloadOutlined, SendOutlined, TruckOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, ReloadOutlined, SendOutlined, TruckOutlined } from '@ant-design/icons';
 import {
   getShipmentByOrderApi,
+  createShipmentApi,
   createCarrierShipmentApi,
   markShipmentReadyApi,
   markShipmentInTransitApi,
   confirmShipmentDeliveredApi,
-  getShipmentLabelApi,
   syncCarrierShipmentApi,
   cancelShipmentApi,
 } from '../../api/shipmentApi';
@@ -156,15 +156,17 @@ export default function StaffCarrierActions({
   const carrierCode = String(pick(shipment, 'carrier', 'Carrier') ?? pick(summary, 'carrier', 'Carrier') ?? '').toUpperCase();
   const isGhnShipment = carrierCode === 'GHN' || (Boolean(carrierOrderCode) && carrierCode !== 'MANUAL');
   const displayedTrackingCode = carrierOrderCode || tracking;
-  const labelUrl = pick(shipment, 'carrierLabelUrl', 'CarrierLabelUrl');
   const shipmentId = pick(shipment, 'id', 'Id') ?? pick(summary, 'id', 'Id');
   const os = normStatus(orderStatus);
   const allItemsFinished = Array.isArray(orderItems) && orderItems.length > 0
     && orderItems.every((item) => normStatus(pick(item, 'fulfillmentStatus', 'FulfillmentStatus')) === 'FINISHED');
-  const canCreateGhn = ENABLE_GHN_SHIPPING
-    && (os === 'FINISHED' || (os === 'PROCESSING' && allItemsFinished))
-    && !carrierOrderCode;
   const isCompleted = os === 'COMPLETED';
+  const canCreateGhn = ENABLE_GHN_SHIPPING
+    && !isCompleted
+    && (os === 'FINISHED' || (os === 'PROCESSING' && allItemsFinished))
+    && !carrierOrderCode
+    && !tracking
+    && !['DELIVERED', 'IN_TRANSIT', 'CANCELLED'].includes(status);
 
   useEffect(() => {
     setManualShipment((current) => ({
@@ -283,47 +285,24 @@ export default function StaffCarrierActions({
     }
   };
 
-  const handlePrintLabel = async () => {
-    if (!shipmentId) return;
-    if (labelUrl) {
-      window.open(labelUrl, '_blank', 'noopener');
-      return;
-    }
+  const handleSwitchToManual = async () => {
     setCreating(true);
     try {
-      const res = await getShipmentLabelApi(shipmentId);
-      const url = res?.data?.labelUrl || res?.data?.LabelUrl;
-      if (url) {
-        window.open(url, '_blank', 'noopener');
-      } else {
-        message.warning('Chưa lấy được phiếu in từ GHN.');
+      if (shipmentId) {
+        await cancelShipmentApi(shipmentId, { reason: 'Chuyển sang giao thủ công' });
       }
-      await load();
-    } catch (e) {
-      message.error(apiErrorMessage(e, 'Không lấy được phiếu in vận đơn'));
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const handleCancelShipment = async () => {
-    if (!shipmentId) return;
-    setCreating(true);
-    try {
-      await cancelShipmentApi(shipmentId, { reason: 'Staff hủy vận đơn' });
-      message.success('Đã hủy vận đơn');
+      await createShipmentApi({ orderId });
+      message.success('Đã chuyển sang giao thủ công.');
       await load();
       onUpdated?.();
     } catch (e) {
-      message.error(apiErrorMessage(e, 'Không thể hủy vận đơn. GHN có thể từ chối hủy ở trạng thái hiện tại.'));
+      message.error(apiErrorMessage(e, 'Không thể chuyển sang giao thủ công'));
     } finally {
       setCreating(false);
     }
   };
 
   const isShipmentProblem = ['FAILED', 'RETURNING', 'RETURNED', 'LOST_OR_DAMAGED'].includes(status);
-  const canCancelGhn = isGhnShipment && carrierOrderCode
-    && !['DELIVERED', 'CANCELLED', 'RETURNED', 'LOST_OR_DAMAGED'].includes(status);
 
   const statusTag = shipmentStatusMap[status];
 
@@ -372,11 +351,20 @@ export default function StaffCarrierActions({
         <Space wrap align="center">
           <Popconfirm
             title="Tạo vận đơn GHN?"
-            description="Đơn phải ở trạng thái FINISHED. GHN sẽ nhận thông tin giao hàng từ đơn."
+            description="GHN sẽ nhận thông tin giao hàng từ đơn. Nếu khu vực không khả dụng, hãy chuyển sang giao thủ công."
             onConfirm={handleCreateGhn}
           >
             <Button type="primary" icon={<TruckOutlined />} loading={creating}>
               Tạo vận đơn GHN
+            </Button>
+          </Popconfirm>
+          <Popconfirm
+            title="Chuyển sang giao thủ công?"
+            description="Hủy vận đơn GHN hiện tại và tạo vận đơn thủ công mới."
+            onConfirm={handleSwitchToManual}
+          >
+            <Button loading={creating}>
+              Giao thủ công
             </Button>
           </Popconfirm>
         </Space>
@@ -479,13 +467,6 @@ export default function StaffCarrierActions({
               type="success"
               showIcon
               message={`Đã có vận đơn ${carrier || 'MANUAL'}: ${displayedTrackingCode}`}
-              description={
-                labelUrl ? (
-                  <a href={labelUrl} target="_blank" rel="noreferrer">
-                    <LinkOutlined /> Mở nhãn vận đơn
-                  </a>
-                ) : null
-              }
             />
           )}
 
@@ -517,22 +498,6 @@ export default function StaffCarrierActions({
                 <Button icon={<ReloadOutlined />} loading={creating} onClick={handleSyncGhn}>
                   Đồng bộ trạng thái GHN
                 </Button>
-                <Button icon={<LinkOutlined />} loading={creating} onClick={handlePrintLabel}>
-                  In vận đơn
-                </Button>
-                {canCancelGhn && (
-                  <Popconfirm
-                    title="Hủy vận đơn GHN?"
-                    description="GHN sẽ hủy đơn vận chuyển. Hành động không thể hoàn tác nếu shipper đã lấy hàng."
-                    okText="Hủy vận đơn"
-                    okButtonProps={{ danger: true }}
-                    onConfirm={handleCancelShipment}
-                  >
-                    <Button danger loading={creating}>
-                      Hủy vận đơn
-                    </Button>
-                  </Popconfirm>
-                )}
               </Space>
             </Space>
           )}

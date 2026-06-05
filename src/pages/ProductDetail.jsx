@@ -267,40 +267,71 @@ const ProductDetail = () => {
 
                 {/* Khu vực mua hàng */}
                 <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                  {/* Còn hàng — mua bình thường */}
+                  {/* Còn hàng */}
                   {product.stock > 0 && showBuyNow && (
                     <>
+                      {product.isAllowPreOrder && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                          <div className="flex items-center gap-2 text-amber-700 mb-1">
+                            <InfoCircleOutlined />
+                            <span className="font-semibold text-sm">Hỗ trợ đặt trước (Pre-Order)</span>
+                          </div>
+                          <p className="text-xs text-amber-600 m-0">
+                            Nhập số lượng vượt tồn kho ({product.stock}) để chuyển sang đặt trước.
+                          </p>
+                        </div>
+                      )}
                       <div className="flex items-center gap-4 flex-wrap">
                         <label className="font-semibold text-gray-800">Số lượng:</label>
                         <InputNumber
                           min={1}
-                          max={product.stock}
+                          max={product.isAllowPreOrder ? 9999 : product.stock}
                           value={quantity}
                           onChange={(v) => setQuantity(v || 1)}
                           size="large"
                           style={{ width: 120 }}
                         />
-                        <span className="text-xs text-gray-400">Còn {product.stock} sản phẩm</span>
+                        <span className="text-xs text-gray-400">
+                          Còn {product.stock} sản phẩm
+                          {product.isAllowPreOrder && quantity > product.stock && (
+                            <Tag color="orange" className="ml-2">Pre-Order</Tag>
+                          )}
+                        </span>
                       </div>
-                      <Button
-                        type="primary"
-                        size="large"
-                        icon={<ShoppingOutlined />}
-                        onClick={handleBuyNow}
-                        block
-                        style={{ height: 50 }}
-                      >
-                        Mua ngay
-                      </Button>
-                      <Button
-                        size="large"
-                        icon={<ShoppingCartOutlined />}
-                        onClick={handleAddToCart}
-                        block
-                        style={{ height: 50 }}
-                      >
-                        Thêm vào giỏ
-                      </Button>
+                      {product.isAllowPreOrder && quantity > product.stock ? (
+                        <Button
+                          type="primary"
+                          size="large"
+                          icon={<ShoppingOutlined />}
+                          onClick={handlePreOrder}
+                          block
+                          style={{ height: 50, backgroundColor: '#f59e0b', borderColor: '#f59e0b' }}
+                        >
+                          Đặt trước (Pre-Order)
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            type="primary"
+                            size="large"
+                            icon={<ShoppingOutlined />}
+                            onClick={handleBuyNow}
+                            block
+                            style={{ height: 50 }}
+                          >
+                            Mua ngay
+                          </Button>
+                          <Button
+                            size="large"
+                            icon={<ShoppingCartOutlined />}
+                            onClick={handleAddToCart}
+                            block
+                            style={{ height: 50 }}
+                          >
+                            Thêm vào giỏ
+                          </Button>
+                        </>
+                      )}
                     </>
                   )}
 
