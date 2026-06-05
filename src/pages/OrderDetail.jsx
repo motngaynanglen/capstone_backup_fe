@@ -860,8 +860,14 @@ const OrderDetail = () => {
 };
 
 // ─── PayOS Payment QR Modal ─────────────────────────────────────────
+import { QRCodeSVG } from 'qrcode.react';
+
 const PayOSModal = ({ open, data, onCheck, onClose }) => {
   if (!data) return null;
+
+  // BE trả qrCode dạng EMVCo string (không phải URL ảnh)
+  const isQrUrl = data.qrCode && (data.qrCode.startsWith('http') || data.qrCode.startsWith('data:'));
+
   return (
     <Modal
       open={open}
@@ -875,11 +881,22 @@ const PayOSModal = ({ open, data, onCheck, onClose }) => {
       <div className="text-center space-y-4 py-2">
         {data.qrCode && (
           <div className="flex justify-center">
-            <img
-              src={data.qrCode}
-              alt="QR thanh toán PayOS"
-              className="w-56 h-56 rounded-xl border border-gray-200 shadow-sm"
-            />
+            {isQrUrl ? (
+              <img
+                src={data.qrCode}
+                alt="QR thanh toán PayOS"
+                className="w-56 h-56 rounded-xl border border-gray-200 shadow-sm"
+              />
+            ) : (
+              <div className="p-3 bg-white rounded-xl border border-gray-200 shadow-sm inline-block">
+                <QRCodeSVG
+                  value={data.qrCode}
+                  size={208}
+                  level="M"
+                  includeMargin={false}
+                />
+              </div>
+            )}
           </div>
         )}
         <p className="text-sm text-gray-600">
