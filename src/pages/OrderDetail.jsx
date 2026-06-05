@@ -749,6 +749,7 @@ const OrderDetail = () => {
                     <div className="flex justify-between">
                       <span className="text-gray-500">Phương thức</span>
                       <span className="font-medium text-gray-800">
+                        {/* VNPay (ẩn): txMethod.toUpperCase() === 'VNPAY' ? 'VNPay' : */}
                         PayOS (Chuyển khoản)
                       </span>
                     </div>
@@ -805,9 +806,15 @@ const OrderDetail = () => {
               </div>
             )}
 
-            {/* Thanh toán PayOS — chỉ hiện khi chưa thanh toán */}
+            {/* Thanh toán — chỉ hiện khi chưa thanh toán */}
             {!isInvoicePaid && orderStatus.toUpperCase() === 'PENDING' && (
               <div className="pt-4 border-t border-gray-100 space-y-2">
+                {/* === Nút VNPay (ẩn — bỏ comment để bật lại) ===
+                <button onClick={handlePayNowVNPay} disabled={payingNow}
+                  className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors cursor-pointer disabled:opacity-50">
+                  Thanh toán qua VNPay
+                </button>
+                */}
                 <button
                   onClick={handlePayNow}
                   disabled={payingNow}

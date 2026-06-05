@@ -1,9 +1,9 @@
 import axiosInstance from './axiosInstance';
 
 const transactionApi = {
-  // Gửi yêu cầu tạo link thanh toán — BE: POST /api/transaction/create-payment-link
+  // Gửi yêu cầu tạo link thanh toán — BE: POST /api/transaction/perform-transaction
   performTransaction: async ({ orderId, paymentMethod }) => {
-    const response = await axiosInstance.post('/api/transaction/create-payment-link', {
+    const response = await axiosInstance.post('/api/transaction/perform-transaction', {
       orderId,
       paymentMethod,
     });
