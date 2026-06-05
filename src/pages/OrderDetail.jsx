@@ -203,6 +203,8 @@ const OrderDetail = () => {
   const [shipment, setShipment] = useState(null);
   const [payingNow, setPayingNow] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [paymentModal, setPaymentModal] = useState(false);
+  const [paymentData, setPaymentData] = useState(null); // { checkoutUrl, qrCode }
 
   const reloadOrder = async () => {
     const response = await getOrderDetailApi(id);
@@ -244,41 +246,69 @@ const OrderDetail = () => {
     fetchData();
   }, [id]);
 
-  // Thanh toán ngay (cho đơn chưa thanh toán)
-  const handlePayNow = async (method = 'VNPAY') => {
+  // === VNPay (ẩn — giữ lại để bật khi cần) ===
+  // const handlePayNowVNPay = async () => {
+  //   try {
+  //     setPayingNow(true);
+  //     const res = await transactionApi.performTransaction({ orderId: id, paymentMethod: 'VNPAY' });
+  //     const txData = res?.data || res;
+  //     const paymentUrl = txData?.checkoutUrl || txData?.paymentUrl || txData?.paymentLink;
+  //     if (paymentUrl) { window.location.href = paymentUrl; return; }
+  //     notification.warning({ message: 'Không nhận được link VNPay' });
+  //   } catch (err) {
+  //     notification.error({ message: 'VNPay thất bại', description: err?.response?.data?.message || 'Lỗi.' });
+  //   } finally { setPayingNow(false); }
+  // };
+
+  // Thanh toán PayOS (active)
+  const handlePayNow = async () => {
     try {
       setPayingNow(true);
       const res = await transactionApi.performTransaction({
         orderId: id,
-        paymentMethod: method,
+        paymentMethod: 'PAYOS',
       });
-      console.log('Perform transaction response:', res);
       const txData = res?.data || res;
+      const checkoutUrl = txData?.checkoutUrl || txData?.paymentUrl || txData?.paymentLink;
+      const qrCode = txData?.qrCode || txData?.qrCodeUrl || null;
 
-      const paymentUrl = txData?.checkoutUrl || txData?.paymentUrl || txData?.paymentLink;
-      if (method === 'VNPAY' && paymentUrl) {
-        window.location.href = paymentUrl;
-        return;
+      if (checkoutUrl || qrCode) {
+        setPaymentData({ checkoutUrl, qrCode });
+        setPaymentModal(true);
+      } else {
+        notification.warning({
+          message: 'Không nhận được link thanh toán',
+          description: 'Vui lòng thử lại hoặc liên hệ hỗ trợ.',
+        });
       }
-
-      // CASH / COD → reload trang
-      notification.success({
-        message: method === 'CASH' ? 'Đã chọn COD' : 'Thanh toán thành công',
-        description: method === 'CASH'
-          ? 'Đơn COD — thanh toán khi nhận hàng.'
-          : 'Đơn hàng đã được xác nhận thanh toán.',
-        placement: 'topRight',
-      });
-      window.location.reload();
     } catch (err) {
       console.error('Payment error:', err);
       notification.error({
-        message: 'Thanh toán thất bại',
-        description: err?.response?.data?.message || err?.response?.data?.title || 'Có lỗi xảy ra khi thanh toán.',
-        placement: 'topRight',
+        message: 'Tạo link thanh toán thất bại',
+        description: err?.response?.data?.message || err?.response?.data?.data || 'Có lỗi xảy ra.',
       });
     } finally {
       setPayingNow(false);
+    }
+  };
+
+  const handleCheckPaymentStatus = async () => {
+    try {
+      await reloadOrder();
+      // Sau reload, nếu đã paid thì đóng modal
+      const freshRes = await getOrderDetailApi(id);
+      const freshData = freshRes?.data || freshRes;
+      const freshInvoice = freshData?.invoice;
+      if ((freshInvoice?.paymentStatus || '').toUpperCase() === 'PAID') {
+        setPaymentModal(false);
+        setPaymentData(null);
+        notification.success({ message: 'Thanh toán thành công!', description: 'Đơn hàng đã được xác nhận.' });
+        window.location.reload();
+      } else {
+        notification.info({ message: 'Chưa nhận được thanh toán', description: 'Vui lòng hoàn tất thanh toán trên PayOS rồi bấm kiểm tra lại.' });
+      }
+    } catch {
+      notification.error({ message: 'Kiểm tra thất bại' });
     }
   };
 
@@ -719,11 +749,7 @@ const OrderDetail = () => {
                     <div className="flex justify-between">
                       <span className="text-gray-500">Phương thức</span>
                       <span className="font-medium text-gray-800">
-                        {isCod ? 'Tiền mặt (COD)'
-                          : txMethod.toUpperCase() === 'PAYOS' ? 'Thanh toán online'
-                          : txMethod.toUpperCase() === 'VNPAY' ? 'VNPay'
-                          : txMethod.toUpperCase() === 'CASH' ? 'Tiền mặt (COD)'
-                          : txMethod || '—'}
+                        PayOS (Chuyển khoản)
                       </span>
                     </div>
                   )}
@@ -732,8 +758,6 @@ const OrderDetail = () => {
                     <span className={`font-medium text-xs px-2 py-0.5 rounded-full ${
                       isInvoicePaid || txStatus === 'PAID' || txStatus === 'SUCCESS'
                         ? 'bg-emerald-50 text-emerald-700'
-                        : isCod
-                        ? 'bg-sky-50 text-sky-700'
                         : txStatus === 'PENDING' || (invoice && !isInvoicePaid)
                         ? 'bg-amber-50 text-amber-700'
                         : txStatus === 'CANCELLED' || txStatus === 'FAILED'
@@ -741,7 +765,6 @@ const OrderDetail = () => {
                         : 'bg-gray-100 text-gray-600'
                     }`}>
                       {isInvoicePaid || txStatus === 'PAID' || txStatus === 'SUCCESS' ? 'Đã thanh toán'
-                        : isCod ? 'COD · thu khi giao'
                         : txStatus === 'PENDING' || (invoice && !isInvoicePaid) ? 'Chờ thanh toán'
                         : txStatus === 'CANCELLED' ? 'Đã hủy'
                         : txStatus === 'FAILED' ? 'Thất bại'
@@ -782,11 +805,11 @@ const OrderDetail = () => {
               </div>
             )}
 
-            {/* Thanh toán ngay — chỉ hiện khi chưa thanh toán */}
-            {!isInvoicePaid && !isCod && orderStatus.toUpperCase() === 'PENDING' && (
+            {/* Thanh toán PayOS — chỉ hiện khi chưa thanh toán */}
+            {!isInvoicePaid && orderStatus.toUpperCase() === 'PENDING' && (
               <div className="pt-4 border-t border-gray-100 space-y-2">
                 <button
-                  onClick={() => handlePayNow('VNPAY')}
+                  onClick={handlePayNow}
                   disabled={payingNow}
                   className="w-full py-3 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
@@ -796,18 +819,12 @@ const OrderDetail = () => {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Đang xử lý...
+                      Đang tạo link...
                     </>
                   ) : (
-                    <>
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
-                      </svg>
-                      Thanh toán qua VNPay
-                    </>
+                    'Thanh toán qua PayOS'
                   )}
                 </button>
-                {/* Đã xóa nút COD — hệ thống không hỗ trợ thanh toán khi nhận hàng */}
                 {canCancelOrder && (
                   <button
                     onClick={handleCancelOrder}
@@ -823,7 +840,67 @@ const OrderDetail = () => {
           </div>
         </div>
       </div>
+
+      {/* PayOS QR Modal */}
+      <PayOSModal
+        open={paymentModal}
+        data={paymentData}
+        onCheck={handleCheckPaymentStatus}
+        onClose={() => setPaymentModal(false)}
+      />
     </div>
+  );
+};
+
+// ─── PayOS Payment QR Modal ─────────────────────────────────────────
+const PayOSModal = ({ open, data, onCheck, onClose }) => {
+  if (!data) return null;
+  return (
+    <Modal
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      centered
+      width={440}
+      title="Thanh toán qua PayOS"
+      destroyOnClose
+    >
+      <div className="text-center space-y-4 py-2">
+        {data.qrCode && (
+          <div className="flex justify-center">
+            <img
+              src={data.qrCode}
+              alt="QR thanh toán PayOS"
+              className="w-56 h-56 rounded-xl border border-gray-200 shadow-sm"
+            />
+          </div>
+        )}
+        <p className="text-sm text-gray-600">
+          Quét mã QR bằng ứng dụng ngân hàng hoặc ví điện tử để thanh toán
+        </p>
+        {data.checkoutUrl && (
+          <a
+            href={data.checkoutUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-block px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors"
+          >
+            Mở trang thanh toán PayOS
+          </a>
+        )}
+        <div className="pt-3 border-t border-gray-100">
+          <button
+            onClick={onCheck}
+            className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-colors cursor-pointer"
+          >
+            Tôi đã thanh toán — Kiểm tra
+          </button>
+          <p className="text-xs text-gray-400 mt-2">
+            Bấm nút trên sau khi hoàn tất chuyển khoản để hệ thống xác nhận
+          </p>
+        </div>
+      </div>
+    </Modal>
   );
 };
 
