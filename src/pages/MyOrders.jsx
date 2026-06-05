@@ -49,6 +49,7 @@ const ORDER_STATUS_CONFIG = {
   PAID: { label: 'Đã thanh toán', className: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
   CONFIRMED: { label: 'Đã xác nhận', className: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
   PROCESSING: { label: 'Đang xử lý', className: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' },
+  FINISHED: { label: 'Chờ giao hàng', className: 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200' },
   SHIPPING: { label: 'Đang vận chuyển', className: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200' },
   COMPLETED: { label: 'Hoàn thành', className: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
   CANCELLED: { label: 'Đã hủy', className: 'bg-red-50 text-red-700 ring-1 ring-red-200' },
@@ -87,10 +88,9 @@ const SourceTypeBadge = ({ sourceType }) => {
 // ─── FILTER TABS — filter bằng API query status
 const FILTER_TABS = [
   { value: 'all', label: 'Tất cả', status: null },
-  { value: 'created', label: 'Chờ thanh toán', status: 'CREATED' },
-  { value: 'confirmed', label: 'Đã xác nhận', status: 'CONFIRMED' },
+  { value: 'pending', label: 'Chờ thanh toán', status: 'PENDING' },
   { value: 'processing', label: 'Đang xử lý', status: 'PROCESSING' },
-  { value: 'shipping', label: 'Đang vận chuyển', status: 'SHIPPING' },
+  { value: 'finished', label: 'Chờ giao hàng', status: 'FINISHED' },
   { value: 'completed', label: 'Hoàn thành', status: 'COMPLETED' },
   { value: 'cancelled', label: 'Đã hủy', status: 'CANCELLED' },
 ];

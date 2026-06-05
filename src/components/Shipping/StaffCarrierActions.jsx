@@ -24,6 +24,7 @@ import {
   confirmShipmentDeliveredApi,
   getShipmentLabelApi,
   syncCarrierShipmentApi,
+  cancelShipmentApi,
 } from '../../api/shipmentApi';
 import { completeOrderApi } from '../../api/orderApi';
 import { shipmentStatusMap, normStatus } from '../../utils/staffOrderConstants';
@@ -303,6 +304,25 @@ export default function StaffCarrierActions({
     }
   };
 
+  const handleCancelShipment = async () => {
+    if (!shipmentId) return;
+    setCreating(true);
+    try {
+      await cancelShipmentApi(shipmentId, { reason: 'Staff hủy vận đơn' });
+      message.success('Đã hủy vận đơn');
+      await load();
+      onUpdated?.();
+    } catch (e) {
+      message.error(apiErrorMessage(e, 'Không thể hủy vận đơn. GHN có thể từ chối hủy ở trạng thái hiện tại.'));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const isShipmentProblem = ['FAILED', 'RETURNING', 'RETURNED', 'LOST_OR_DAMAGED'].includes(status);
+  const canCancelGhn = isGhnShipment && carrierOrderCode
+    && !['DELIVERED', 'CANCELLED', 'RETURNED', 'LOST_OR_DAMAGED'].includes(status);
+
   const statusTag = shipmentStatusMap[status];
 
   const ghnCreateBlock = canCreateGhn ? (
@@ -410,23 +430,40 @@ export default function StaffCarrierActions({
             </div>
           )}
 
-          <Descriptions column={1} size="small" bordered>
+          <Descriptions column={2} size="small" bordered>
             <Descriptions.Item label="Trạng thái đơn">
               <Tag>{os || '—'}</Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="Đơn vị VC">{carrier || '—'}</Descriptions.Item>
             <Descriptions.Item label="Trạng thái VC">
               {statusTag ? (
                 <Tag color={statusTag.color}>{statusTag.label}</Tag>
               ) : (
-                status || '—'
+                status || 'Chưa có'
               )}
             </Descriptions.Item>
-            <Descriptions.Item label="Mã vận đơn">{displayedTrackingCode || '—'}</Descriptions.Item>
-            <Descriptions.Item label="Tracking">{tracking || '—'}</Descriptions.Item>
-            <Descriptions.Item label="Số dòng hàng">
-              {Array.isArray(orderItems) ? orderItems.length : '—'}
+            <Descriptions.Item label="Đơn vị VC">
+              {(() => {
+                const c = String(carrier || '').toUpperCase();
+                if (c === 'GHN' || isGhnShipment) return <Tag color="orange">GHN</Tag>;
+                if (c === 'MANUAL' || c === '') return <Tag>Thủ công</Tag>;
+                return <Tag>{carrier}</Tag>;
+              })()}
             </Descriptions.Item>
+            <Descriptions.Item label="Mã vận đơn">
+              {displayedTrackingCode ? (
+                <Text copyable strong style={{ fontFamily: 'monospace' }}>{displayedTrackingCode}</Text>
+              ) : '—'}
+            </Descriptions.Item>
+            {(() => {
+              const fee = pick(shipment, 'shippingFee', 'ShippingFee');
+              return fee > 0 ? (
+                <Descriptions.Item label="Phí vận chuyển">
+                  <Text strong style={{ color: '#4f46e5' }}>
+                    {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(fee)}
+                  </Text>
+                </Descriptions.Item>
+              ) : null;
+            })()}
           </Descriptions>
 
           {!shipmentId && (
@@ -452,12 +489,28 @@ export default function StaffCarrierActions({
 
           {!isCompleted && isGhnShipment && carrierOrderCode && (
             <Space direction="vertical" size={6} style={{ width: '100%' }}>
-              <Alert
-                type="info"
-                showIcon
-                message="Đơn GHN — trạng thái cập nhật tự động qua GHN."
-                description="Không nhập trạng thái thủ công. Dùng nút bên dưới để đồng bộ hoặc in vận đơn."
-              />
+              {isShipmentProblem && (
+                <Alert
+                  type="error"
+                  showIcon
+                  message={`Vấn đề vận chuyển: ${statusTag?.label || status}`}
+                  description={
+                    status === 'FAILED' ? 'Giao hàng thất bại. Liên hệ GHN hoặc đồng bộ lại trạng thái.'
+                    : status === 'RETURNING' ? 'Hàng đang trên đường hoàn về kho.'
+                    : status === 'RETURNED' ? 'Hàng đã hoàn về kho thành công.'
+                    : status === 'LOST_OR_DAMAGED' ? 'Hàng bị thất lạc hoặc hư hỏng. Liên hệ GHN để khiếu nại.'
+                    : 'Vui lòng đồng bộ trạng thái từ GHN.'
+                  }
+                />
+              )}
+              {!isShipmentProblem && (
+                <Alert
+                  type="info"
+                  showIcon
+                  message="Đơn GHN — trạng thái cập nhật tự động qua GHN."
+                  description="Không nhập trạng thái thủ công. Dùng nút bên dưới để đồng bộ hoặc in vận đơn."
+                />
+              )}
               <Space wrap>
                 <Button icon={<ReloadOutlined />} loading={creating} onClick={handleSyncGhn}>
                   Đồng bộ trạng thái GHN
@@ -465,6 +518,19 @@ export default function StaffCarrierActions({
                 <Button icon={<LinkOutlined />} loading={creating} onClick={handlePrintLabel}>
                   In vận đơn
                 </Button>
+                {canCancelGhn && (
+                  <Popconfirm
+                    title="Hủy vận đơn GHN?"
+                    description="GHN sẽ hủy đơn vận chuyển. Hành động không thể hoàn tác nếu shipper đã lấy hàng."
+                    okText="Hủy vận đơn"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={handleCancelShipment}
+                  >
+                    <Button danger loading={creating}>
+                      Hủy vận đơn
+                    </Button>
+                  </Popconfirm>
+                )}
               </Space>
             </Space>
           )}

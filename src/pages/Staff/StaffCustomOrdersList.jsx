@@ -90,7 +90,7 @@ const StaffCustomOrdersList = () => {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Cổng tiếp nhận Yêu cầu Thiết kế</h1>
-          <p className="text-gray-500 text-sm mt-1">Danh sách yêu cầu thiết kế từ hệ thống Mainflow 2</p>
+          <p className="text-gray-500 text-sm mt-1">Danh sách yêu cầu thiết kế riêng từ khách hàng</p>
         </div>
         <Link
           to="/staff/dashboard"

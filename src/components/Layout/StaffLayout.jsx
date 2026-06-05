@@ -7,7 +7,7 @@ const { Sider, Content } = AntLayout;
 
 const MENU = [
   { path: '/staff/dashboard', label: 'Bàn làm việc', icon: '📋' },
-  { path: '/staff/custom-orders', label: 'Custom Mainflow2', icon: '💬' },
+  { path: '/staff/custom-orders', label: 'Đơn thiết kế riêng', icon: '💬' },
   { path: '/staff/production-queue', label: 'Hàng đợi SX', icon: '🖨️' },
   { path: '/staff/shop-orders', label: 'Đơn shop & vận chuyển', icon: '🛒' },
   { path: '/staff/templates', label: 'Mẫu thiết kế', icon: '🎨' },

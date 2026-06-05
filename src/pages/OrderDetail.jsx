@@ -414,9 +414,12 @@ const OrderDetail = () => {
     || txStatusRaw === 'SUCCESS'
     || ['PROCESSING', 'FINISHED', 'COMPLETED'].includes((order.orderStatus || order.status || '').toUpperCase());
   const isCod = resolveOrderIsCod(invoice, transaction);
-  const totalAmount = order.totalPrice ?? order.totalAmount ?? order.total ?? invoice?.totalAmount ?? 0;
-  const shippingFee = orderShipment.shippingFee ?? order.shippingFee ?? 0;
-  const subTotal = order.subTotal ?? order.subtotal ?? Math.max(0, totalAmount - shippingFee);
+  const invoiceTotal = invoice?.totalAmount ?? invoice?.TotalAmount ?? 0;
+  const invoiceSubTotal = invoice?.subTotal ?? invoice?.SubTotal ?? 0;
+  const invoiceShipFee = invoice?.shippingFee ?? invoice?.ShippingFee ?? 0;
+  const totalAmount = invoiceTotal > 0 ? invoiceTotal : (order.totalPrice ?? order.totalAmount ?? order.total ?? 0);
+  const shippingFee = invoiceShipFee > 0 ? invoiceShipFee : (orderShipment.shippingFee ?? order.shippingFee ?? 0);
+  const subTotal = invoiceSubTotal > 0 ? invoiceSubTotal : (order.subTotal ?? order.subtotal ?? Math.max(0, totalAmount - shippingFee));
   const taxAmount = order.tax ?? order.taxAmount ?? 0;
   const sourceType = order.sourceType || '';
   const shipmentStatus = orderShipment.shipmentStatus || shipment?.shipmentStatus || '';
@@ -641,54 +644,129 @@ const OrderDetail = () => {
                   <div className="w-1 h-6 bg-indigo-600 rounded-full" />
                   <h2 className="text-lg font-bold text-gray-900">Thông tin vận chuyển</h2>
                 </div>
-                {shipment.shippedDate && (
-                  <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-bold uppercase tracking-wider">
-                    Đã xuất kho
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const ss = (shipmentStatus || shipment.shipmentStatus || '').toUpperCase();
+                    const ssConfig = {
+                      PREPARING: { label: 'Đang đóng gói', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+                      READY_FOR_PICKUP: { label: 'Chờ lấy hàng', cls: 'bg-orange-50 text-orange-700 border-orange-200' },
+                      IN_TRANSIT: { label: 'Đang giao', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+                      DELIVERED: { label: 'Đã giao', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+                      FAILED: { label: 'Giao thất bại', cls: 'bg-red-50 text-red-700 border-red-200' },
+                      RETURNING: { label: 'Đang hoàn hàng', cls: 'bg-orange-50 text-orange-700 border-orange-200' },
+                      RETURNED: { label: 'Đã hoàn hàng', cls: 'bg-purple-50 text-purple-700 border-purple-200' },
+                      LOST_OR_DAMAGED: { label: 'Thất lạc / Hư hỏng', cls: 'bg-red-50 text-red-700 border-red-200' },
+                      CANCELLED: { label: 'Đã hủy', cls: 'bg-gray-100 text-gray-600 border-gray-200' },
+                    };
+                    const c = ssConfig[ss];
+                    return c ? (
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${c.cls}`}>{c.label}</span>
+                    ) : null;
+                  })()}
+                  {(() => {
+                    const carrier = (shipment.carrier || shipment.carrierName || '').toUpperCase();
+                    if (carrier === 'GHN') return (
+                      <span className="px-2 py-1 bg-orange-50 text-orange-700 rounded-lg text-[10px] font-bold border border-orange-200">
+                        GHN
+                      </span>
+                    );
+                    if (carrier === 'MANUAL') return (
+                      <span className="px-2 py-1 bg-gray-50 text-gray-600 rounded-lg text-[10px] font-bold border border-gray-200">
+                        Thủ công
+                      </span>
+                    );
+                    return null;
+                  })()}
+                </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Mã vận đơn (Tracking)</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-mono font-bold text-gray-900 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
-                        {shipment.trackingNumber || 'Đang cập nhật...'}
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Đơn vị vận chuyển</p>
+                    <p className="text-sm font-semibold text-gray-700">
+                      {(() => {
+                        const carrier = (shipment.carrier || shipment.carrierName || '').toUpperCase();
+                        if (carrier === 'GHN') return 'Giao Hàng Nhanh (GHN)';
+                        if (carrier === 'MANUAL') return 'Giao hàng Nova3D';
+                        return shipment.carrierName || 'Đang cập nhật';
+                      })()}
+                    </p>
+                  </div>
+                  {(shipment.carrierOrderCode || shipment.trackingNumber) && (
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                        {shipment.carrierOrderCode ? 'Mã vận đơn GHN' : 'Mã vận đơn'}
+                      </p>
+                      <p className="text-sm font-mono font-bold text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100 inline-block">
+                        {shipment.carrierOrderCode || shipment.trackingNumber}
                       </p>
                     </div>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Đơn vị vận chuyển</p>
-                    <p className="text-sm font-semibold text-gray-700">{shipment.carrierName || 'Giao hàng nhanh'}</p>
-                  </div>
-                  {shipment.carrierOrderCode && (
+                  )}
+                  {shipment.trackingNumber && shipment.carrierOrderCode && shipment.trackingNumber !== shipment.carrierOrderCode && (
                     <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Mã vận đơn GHN</p>
-                      <p className="text-sm font-mono font-bold text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100 inline-block">
-                        {shipment.carrierOrderCode}
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Tracking Number</p>
+                      <p className="text-sm font-mono text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 inline-block">
+                        {shipment.trackingNumber}
                       </p>
                     </div>
                   )}
                 </div>
 
                 <div className="space-y-4 border-l border-gray-50 pl-6">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Ngày gửi hàng</p>
-                      <p className="text-sm text-gray-700">{formatDate(shipment.shippedDate) || 'Chưa gửi'}</p>
-                    </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Ngày gửi hàng</p>
+                    <p className="text-sm text-gray-700">{formatDate(shipment.shippedDate) || 'Chưa gửi'}</p>
                   </div>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Ngày nhận (Dự kiến)</p>
-                      <p className="text-sm text-gray-700 font-bold text-indigo-600">{formatDate(shipment.deliveredDate) || 'Đang cập nhật'}</p>
-                    </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Ngày nhận (Dự kiến)</p>
+                    <p className="text-sm font-bold text-indigo-600">{formatDate(shipment.deliveredDate) || 'Đang cập nhật'}</p>
                   </div>
+                  {shippingFee > 0 && (
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Phí vận chuyển</p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(shippingFee)}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {shipment.shippedDate && (
+              {/* Shipment problem alerts */}
+              {(() => {
+                const ss = (shipmentStatus || shipment.shipmentStatus || '').toUpperCase();
+                if (ss === 'FAILED') return (
+                  <div className="mt-4 p-3 bg-red-50 rounded-xl border border-red-200 text-sm text-red-700 flex items-start gap-2">
+                    <ExclamationIcon />
+                    <div>
+                      <p className="font-semibold">Giao hàng thất bại</p>
+                      <p className="text-xs mt-0.5">Đơn hàng không giao được. Vui lòng liên hệ hỗ trợ.</p>
+                    </div>
+                  </div>
+                );
+                if (ss === 'RETURNING') return (
+                  <div className="mt-4 p-3 bg-orange-50 rounded-xl border border-orange-200 text-sm text-orange-700 flex items-start gap-2">
+                    <ExclamationIcon />
+                    <div>
+                      <p className="font-semibold">Đang hoàn hàng</p>
+                      <p className="text-xs mt-0.5">Hàng đang được chuyển hoàn về kho.</p>
+                    </div>
+                  </div>
+                );
+                if (ss === 'LOST_OR_DAMAGED') return (
+                  <div className="mt-4 p-3 bg-red-50 rounded-xl border border-red-200 text-sm text-red-700 flex items-start gap-2">
+                    <ExclamationIcon />
+                    <div>
+                      <p className="font-semibold">Thất lạc / Hư hỏng</p>
+                      <p className="text-xs mt-0.5">Hàng bị thất lạc hoặc hư hỏng trong quá trình vận chuyển. Shop sẽ liên hệ bạn sớm nhất.</p>
+                    </div>
+                  </div>
+                );
+                return null;
+              })()}
+
+              {shipment.shippedDate && !['FAILED', 'RETURNING', 'RETURNED', 'LOST_OR_DAMAGED', 'CANCELLED'].includes((shipmentStatus || shipment.shipmentStatus || '').toUpperCase()) && (
                 <div className="mt-6 pt-5 border-t border-gray-50 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">

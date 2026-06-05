@@ -52,6 +52,10 @@ export function resolveCustomerOrderDisplayStatus(
   if (os === 'CANCELLED') return { key: 'CANCELLED', label: 'Đã hủy' };
   if (os === 'COMPLETED') return { key: 'COMPLETED', label: 'Hoàn thành' };
   if (ss === 'DELIVERED') return { key: 'COMPLETED', label: 'Đã giao hàng' };
+  if (ss === 'LOST_OR_DAMAGED') return { key: 'FAILED', label: 'Thất lạc / Hư hỏng' };
+  if (ss === 'RETURNING') return { key: 'SHIPPING', label: 'Đang hoàn hàng' };
+  if (ss === 'RETURNED') return { key: 'CANCELLED', label: 'Đã hoàn hàng' };
+  if (ss === 'FAILED') return { key: 'FAILED', label: 'Giao hàng thất bại' };
   if (ss === 'IN_TRANSIT') return { key: 'SHIPPING', label: 'Đang giao hàng' };
 
   if (customMfg) {
@@ -100,6 +104,8 @@ export function buildCustomerTrackingSteps(
       isFailed: true,
     }];
   }
+
+  const isShipmentProblem = ['FAILED', 'RETURNING', 'RETURNED', 'LOST_OR_DAMAGED', 'CANCELLED'].includes(ss);
 
   const paid = Boolean(isInvoicePaid);
   const customMfg = orderHasCustomManufacturing(items);
@@ -176,22 +182,41 @@ export function buildCustomerTrackingSteps(
     });
   }
 
-  steps.push(
-    {
-      key: 'shipping',
-      label: 'Đang vận chuyển',
-      description: 'Đơn đã bàn giao cho đơn vị vận chuyển.',
-      done: delivered,
-      isCurrent: inTransit,
-    },
-    {
+  steps.push({
+    key: 'shipping',
+    label: 'Đang vận chuyển',
+    description: 'Đơn đã bàn giao cho đơn vị vận chuyển.',
+    done: delivered || isShipmentProblem,
+    isCurrent: inTransit && !isShipmentProblem,
+  });
+
+  // Nếu shipment có vấn đề: thêm step cảnh báo
+  if (isShipmentProblem) {
+    const problemLabels = {
+      FAILED: { label: 'Giao hàng thất bại', desc: 'Đơn vị vận chuyển không giao được. Shop sẽ liên hệ bạn.' },
+      RETURNING: { label: 'Đang hoàn hàng', desc: 'Hàng đang trên đường hoàn về kho.' },
+      RETURNED: { label: 'Đã hoàn hàng', desc: 'Hàng đã hoàn về kho. Shop sẽ liên hệ bạn để xử lý.' },
+      LOST_OR_DAMAGED: { label: 'Thất lạc / Hư hỏng', desc: 'Hàng bị thất lạc hoặc hư hỏng. Shop sẽ liên hệ giải quyết.' },
+      CANCELLED: { label: 'Đã hủy vận chuyển', desc: 'Vận đơn đã bị hủy.' },
+    };
+    const p = problemLabels[ss] || { label: ss, desc: '' };
+    steps.push({
+      key: 'shipment_problem',
+      label: p.label,
+      description: p.desc,
+      done: true,
+      isCurrent: true,
+      isFailed: true,
+    });
+  } else {
+    steps.push({
       key: 'completed',
       label: 'Đã giao hàng',
       description: 'Khách đã nhận hàng thành công.',
       done: delivered,
       isCurrent: delivered && os !== 'COMPLETED',
-    },
-  );
+    });
+  }
 
   const anyCurrent = steps.some((s) => s.isCurrent);
   if (!anyCurrent && !delivered) {
@@ -260,8 +285,13 @@ function normalizeShipment(shipment) {
     carrier: shipment.carrier ?? shipment.Carrier ?? shipment.carrierName ?? shipment.CarrierName,
     carrierName: shipment.carrierName ?? shipment.CarrierName ?? shipment.carrier ?? shipment.Carrier,
     carrierOrderCode: shipment.carrierOrderCode ?? shipment.CarrierOrderCode,
+    carrierLabelUrl: shipment.carrierLabelUrl ?? shipment.CarrierLabelUrl,
+    carrierStatus: shipment.carrierStatus ?? shipment.CarrierStatus,
     trackingNumber: shipment.trackingNumber ?? shipment.TrackingNumber ?? shipment.trackingNo,
     shipmentStatus: shipment.shipmentStatus ?? shipment.ShipmentStatus ?? shipment.status ?? shipment.Status,
+    shippingFee: shipment.shippingFee ?? shipment.ShippingFee ?? 0,
+    shippedDate: shipment.shippedDate ?? shipment.ShippedDate,
+    deliveredDate: shipment.deliveredDate ?? shipment.DeliveredDate ?? shipment.estimatedDeliveryTime ?? shipment.EstimatedDeliveryTime,
   };
 }
 
