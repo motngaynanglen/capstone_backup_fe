@@ -136,7 +136,6 @@ const CustomOrderRequestDesign = () => {
               accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.svg,image/*"
               multiple
               onChange={handleImageChange}
-              required
               disabled={uploadingImages}
               className="hidden"
               id="image-upload"
