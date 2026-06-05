@@ -25,6 +25,7 @@ import {
   confirmShipmentDeliveredApi,
   syncCarrierShipmentApi,
   cancelShipmentApi,
+  simulateGhnStatusApi,
 } from '../../api/shipmentApi';
 import { completeOrderApi } from '../../api/orderApi';
 import { shipmentStatusMap, normStatus } from '../../utils/staffOrderConstants';
@@ -302,6 +303,24 @@ export default function StaffCarrierActions({
     }
   };
 
+  const handleSimulateGhn = async (ghnStatus) => {
+    if (!carrierOrderCode) {
+      message.warning('Chưa có mã vận đơn GHN.');
+      return;
+    }
+    setCreating(true);
+    try {
+      await simulateGhnStatusApi(carrierOrderCode, ghnStatus);
+      message.success(`Đã giả lập trạng thái GHN: ${ghnStatus}`);
+      await load();
+      onUpdated?.();
+    } catch (e) {
+      message.error(apiErrorMessage(e, 'Giả lập trạng thái thất bại'));
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const isShipmentProblem = ['FAILED', 'RETURNING', 'RETURNED', 'LOST_OR_DAMAGED'].includes(status);
 
   const statusTag = shipmentStatusMap[status];
@@ -498,6 +517,30 @@ export default function StaffCarrierActions({
                 <Button icon={<ReloadOutlined />} loading={creating} onClick={handleSyncGhn}>
                   Đồng bộ trạng thái GHN
                 </Button>
+              </Space>
+              <Divider style={{ margin: '8px 0' }} />
+              <Alert
+                type="warning"
+                showIcon
+                message="GHN Sandbox — Giả lập trạng thái"
+                description="Đang dùng GHN dev. Chọn trạng thái bên dưới để giả lập quá trình giao hàng."
+                style={{ marginBottom: 4 }}
+              />
+              <Space wrap>
+                {status === 'READY_FOR_PICKUP' && (
+                  <Popconfirm title="Giả lập: shipper đã lấy hàng?" onConfirm={() => handleSimulateGhn('delivering')}>
+                    <Button loading={creating} style={{ borderColor: '#6366f1', color: '#6366f1' }}>
+                      Giả lập → Đang giao
+                    </Button>
+                  </Popconfirm>
+                )}
+                {(status === 'READY_FOR_PICKUP' || status === 'IN_TRANSIT') && (
+                  <Popconfirm title="Giả lập: giao hàng thành công?" onConfirm={() => handleSimulateGhn('delivered')}>
+                    <Button loading={creating} type="primary" style={{ backgroundColor: '#16a34a', borderColor: '#16a34a' }}>
+                      Giả lập → Giao thành công
+                    </Button>
+                  </Popconfirm>
+                )}
               </Space>
             </Space>
           )}

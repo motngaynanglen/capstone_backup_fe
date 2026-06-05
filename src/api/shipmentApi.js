@@ -107,6 +107,15 @@ export const syncCarrierShipmentApi = async (id) => {
   return response.data;
 };
 
+// [DEV] Giả lập trạng thái GHN qua webhook nội bộ
+export const simulateGhnStatusApi = async (orderCode, status) => {
+  const response = await axiosInstance.post('/api/shipment/webhook/ghn', {
+    OrderCode: orderCode,
+    Status: status,
+  });
+  return response.data;
+};
+
 export const CARRIER_LABELS = {
   GHN: 'Giao Hàng Nhanh (GHN)',
   MANUAL: 'Tự giao / thủ công',
