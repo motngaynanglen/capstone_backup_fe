@@ -26,6 +26,12 @@ const feedbackApi = {
     return response.data;
   },
 
+  // Public: feedback theo design variant
+  byVariant: async (variantId, params = {}) => {
+    const response = await axiosInstance.post(`/api/feedback/variant/${variantId}`, params);
+    return response.data;
+  },
+
   // Lấy danh sách feedback (Manager/Staff) - có phân trang và search
   query: async (params) => {
     // params: { search, pageNumber, pageSize }

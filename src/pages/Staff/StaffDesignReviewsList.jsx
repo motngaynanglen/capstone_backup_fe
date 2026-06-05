@@ -224,7 +224,7 @@ const StaffDesignReviewsList = () => {
                   <td className="px-6 py-4">
                     <div>
                       <p className="font-semibold text-gray-800">{work.title}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{work.id} • Item: {work.orderItemId}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{work.code || work.name || '—'}</p>
                       <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">
                         {work.sourceType.replace('_', ' ')}
                       </span>

@@ -41,20 +41,23 @@ const StarsDisplay = ({ rating }) => (
   </div>
 );
 
-const FeedbackCommentsList = ({ templateId, title = 'Đánh giá từ khách hàng' }) => {
+const FeedbackCommentsList = ({ templateId, variantId, title = 'Đánh giá từ khách hàng' }) => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const targetId = variantId || templateId;
+  const fetchMethod = variantId ? 'byVariant' : 'byTemplate';
+
   useEffect(() => {
-    if (!templateId) return undefined;
+    if (!targetId) return undefined;
     let cancelled = false;
 
     (async () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await feedbackApi.byTemplate(templateId, { pageNumber: 1, pageSize: 50 });
+        const res = await feedbackApi[fetchMethod](targetId, { pageNumber: 1, pageSize: 50 });
         const raw = res?.data ?? res;
         const list = Array.isArray(raw) ? raw.map(normalizeFeedback) : [];
         if (!cancelled) setItems(list);
@@ -70,9 +73,9 @@ const FeedbackCommentsList = ({ templateId, title = 'Đánh giá từ khách hà
     })();
 
     return () => { cancelled = true; };
-  }, [templateId]);
+  }, [targetId, fetchMethod]);
 
-  if (!templateId) return null;
+  if (!targetId) return null;
 
   const avgRating = items.length
     ? (items.reduce((s, f) => s + f.rating, 0) / items.length).toFixed(1)

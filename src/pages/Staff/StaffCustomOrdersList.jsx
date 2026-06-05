@@ -209,7 +209,7 @@ const StaffCustomOrdersList = () => {
               filteredRequests.map(req => (
                 <tr key={req.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
-                    <span className="font-mono font-medium text-gray-800" title={req.id}>{req.id.split('-')[0]}...</span>
+                    <span className="font-mono font-medium text-gray-800">{req.code || req.name || '—'}</span>
                   </td>
                   <td className="px-4 py-3">
                     <p className="text-gray-800 font-medium max-w-[200px] truncate" title={req.title}>{req.title || 'Không có tiêu đề'}</p>

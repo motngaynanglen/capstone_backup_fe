@@ -201,7 +201,7 @@ const StaffCustomOrderDetail = () => {
         </Link>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.title}</p>
-          <p style={{ margin: 0, fontSize: 11, color: '#9ca3af', fontFamily: 'monospace' }}>#{order.id?.slice(0, 8)}</p>
+          <p style={{ margin: 0, fontSize: 11, color: '#9ca3af', fontFamily: 'monospace' }}>#{order.code || order.name || '—'}</p>
         </div>
         <span style={{ padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, ...statusColor(order.status) }}>
           {STATUS_LABEL[order.status] || order.status}

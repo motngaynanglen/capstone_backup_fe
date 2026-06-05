@@ -120,10 +120,10 @@ export default function StaffShopOrders() {
       width: 140,
       ellipsis: true,
       render: (_, r) => (
-        <Tooltip title={r.code || r.id}>
+        <Tooltip title={r.code || '—'}>
           <Button type="link" style={{ padding: 0, maxWidth: 120 }} onClick={() => openDetail(r.id)}>
             <Text strong ellipsis style={{ maxWidth: 112 }} className="font-mono text-xs">
-              {r.code || shortId(r.id)}
+              {r.code || '—'}
             </Text>
           </Button>
         </Tooltip>

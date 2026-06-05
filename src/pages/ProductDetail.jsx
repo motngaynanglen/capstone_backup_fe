@@ -376,12 +376,11 @@ const ProductDetail = () => {
           </Row>
         </Card>
 
-        {product.designTemplateId && (
-          <FeedbackCommentsList
-            templateId={product.designTemplateId}
-            title="Đánh giá & nhận xét"
-          />
-        )}
+        <FeedbackCommentsList
+          variantId={product.id}
+          templateId={product.designTemplateId}
+          title="Đánh giá & nhận xét"
+        />
       </div>
     </div>
   );

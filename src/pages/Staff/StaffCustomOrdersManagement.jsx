@@ -229,7 +229,7 @@ const StaffCustomOrdersManagement = () => {
               filteredOrders.map((order) => (
                 <tr key={order.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
-                    <span className="font-mono font-medium text-gray-800">{order.id}</span>
+                    <span className="font-mono font-medium text-gray-800">{order.code || order.name || '—'}</span>
                   </td>
                   <td className="px-4 py-3">
                     <div>

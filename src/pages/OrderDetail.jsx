@@ -381,7 +381,7 @@ const OrderDetail = () => {
   const orderStatus = order.orderStatus || order.status || 'PENDING';
   const orderItems = order.items || order.orderItems || [];
   const orderNote = order.note || '';
-  const orderCode = order.code || order.orderCode || id;
+  const orderCode = order.code || order.orderCode || '—';
   const createdDate = order.createdAt || order.created || order.date || '';
   const orderShipment = order.shipment || shipment || {};
   const shippingAddress = order.shippingAddress || orderShipment.shippingAddress || (

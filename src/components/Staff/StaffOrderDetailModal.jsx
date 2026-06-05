@@ -202,7 +202,7 @@ export default function StaffOrderDetailModal({ open, orderId, onClose, onUpdate
 
   return (
     <Modal
-      title={order ? `Đơn hàng #${order.code || shortId(order.id)}` : 'Chi tiết đơn hàng'}
+      title={order ? `Đơn hàng #${order.code || (order.code || '—')}` : 'Chi tiết đơn hàng'}
       open={open}
       onCancel={onClose}
       width={900}
@@ -258,7 +258,7 @@ export default function StaffOrderDetailModal({ open, orderId, onClose, onUpdate
           )}
 
           <Descriptions bordered size="small" column={2}>
-            <Descriptions.Item label="Mã đơn">{order.code || shortId(order.id)}</Descriptions.Item>
+            <Descriptions.Item label="Mã đơn">{order.code || (order.code || '—')}</Descriptions.Item>
             <Descriptions.Item label="Trạng thái đơn hàng">{renderOrderStatus(order.orderStatus)}</Descriptions.Item>
             <Descriptions.Item label="Trạng thái vận chuyển">
               {shipmentStatus ? renderShipmentStatus(shipmentStatus) : <Tag>Chưa có</Tag>}

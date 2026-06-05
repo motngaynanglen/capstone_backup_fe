@@ -250,7 +250,7 @@ const MyOrders = () => {
               <tbody className="divide-y divide-gray-50">
                 {orders.map(order => {
                   const orderId = order.id || order.orderId;
-                  const orderCode = order.code || order.orderCode || orderId;
+                  const orderCode = order.code || order.orderCode || '—';
                   const orderDate = order.createdAt || order.created || order.date;
                   const orderStatus = order.status || order.orderStatus || 'CREATED';
                   const orderTotal = order.totalPrice ?? order.totalAmount ?? order.total ?? 0;

@@ -110,10 +110,10 @@ const MyCustomOrders = () => {
             <tbody className="divide-y divide-gray-200">
               {orders.map(order => (
                 <tr key={order.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm font-medium text-gray-800">
-                    <span title={order.id}>{order.id.split('-')[0]}...</span>
+                  <td className="px-6 py-4 text-sm font-medium text-gray-800 font-mono">
+                    {order.code || order.name || '—'}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{order.title}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{order.title || order.name}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">
                     {new Date(order.created).toLocaleDateString('vi-VN')}
                   </td>
