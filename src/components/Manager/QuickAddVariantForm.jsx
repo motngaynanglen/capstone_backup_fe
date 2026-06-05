@@ -1,12 +1,14 @@
 import React, { useEffect } from 'react';
-import { Form, Input, InputNumber, Select, Button, Row, Col, Switch, Tag } from 'antd';
+import { Form, Input, InputNumber, Select, Button, Row, Col, Switch, Tag, Divider } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
 /**
- * Form thêm biến thể nhanh trong dòng mở rộng của bảng.
- * Phải là component file riêng — tránh remount khi parent re-render.
+ * Form thêm biến thể nhanh — inline trong bảng mở rộng.
+ * Gửi đủ field BE yêu cầu: code, name, materialId, price, stockQuantity,
+ * sizeScale, isAllowPreOrder, estimatedWeightPerUnit, estimatedPrintTimePerUnit,
+ * markupPercentage, minimumStockLevel, catalogStatus, description.
  */
 const QuickAddVariantForm = ({ template, materials, submitting, onRegisterForm, onSubmit }) => {
   const [form] = Form.useForm();
@@ -34,11 +36,21 @@ const QuickAddVariantForm = ({ template, materials, submitting, onRegisterForm, 
         form={form}
         layout="vertical"
         onFinish={() => onSubmit(template, form)}
-        initialValues={{ sizeScale: 1, stockQuantity: 0, isAllowPreOrder: true }}
+        initialValues={{
+          sizeScale: 1,
+          stockQuantity: 0,
+          isAllowPreOrder: true,
+          markupPercentage: 0,
+          estimatedWeightPerUnit: 0,
+          estimatedPrintTimePerUnit: 0,
+          minimumStockLevel: 0,
+          catalogStatus: 'DRAFT',
+        }}
       >
+        {/* Hàng 1: Thông tin cơ bản */}
         <Row gutter={[12, 0]}>
           <Col xs={24} sm={8}>
-            <Form.Item name="materialId" label="Vật liệu" rules={[{ required: true }]}>
+            <Form.Item name="materialId" label="Vật liệu" rules={[{ required: true, message: 'Chọn vật liệu' }]}>
               <Select
                 placeholder="Chọn chất liệu"
                 showSearch
@@ -54,17 +66,21 @@ const QuickAddVariantForm = ({ template, materials, submitting, onRegisterForm, 
             </Form.Item>
           </Col>
           <Col xs={24} sm={8}>
-            <Form.Item name="code" label="Mã SKU" rules={[{ required: true }]}>
+            <Form.Item name="code" label="Mã SKU" rules={[{ required: true, message: 'Nhập mã' }]}>
               <Input placeholder={`${template.code}-PLA`} autoComplete="off" />
             </Form.Item>
           </Col>
           <Col xs={24} sm={8}>
-            <Form.Item name="name" label="Tên hiển thị" rules={[{ required: true }]}>
+            <Form.Item name="name" label="Tên hiển thị" rules={[{ required: true, message: 'Nhập tên' }]}>
               <Input placeholder="VD: Bản tiêu chuẩn PLA" autoComplete="off" />
             </Form.Item>
           </Col>
-          <Col xs={12} sm={6}>
-            <Form.Item name="price" label="Giá (VNĐ)" rules={[{ required: true }]}>
+        </Row>
+
+        {/* Hàng 2: Giá & Tồn kho */}
+        <Row gutter={[12, 0]}>
+          <Col xs={12} sm={4}>
+            <Form.Item name="price" label="Giá (VNĐ)" rules={[{ required: true, message: 'Nhập giá' }]}>
               <InputNumber
                 className="w-full"
                 min={0}
@@ -74,22 +90,54 @@ const QuickAddVariantForm = ({ template, materials, submitting, onRegisterForm, 
               />
             </Form.Item>
           </Col>
-          <Col xs={12} sm={6}>
-            <Form.Item name="stockQuantity" label="Tồn" rules={[{ required: true }]}>
+          <Col xs={12} sm={4}>
+            <Form.Item name="stockQuantity" label="Tồn kho" rules={[{ required: true }]}>
               <InputNumber className="w-full" min={0} controls />
             </Form.Item>
           </Col>
-          <Col xs={12} sm={6}>
-            <Form.Item name="sizeScale" label="Scale">
-              <InputNumber className="w-full" min={0} step={0.1} controls />
+          <Col xs={12} sm={4}>
+            <Form.Item name="estimatedWeightPerUnit" label="Cân nặng (g)">
+              <InputNumber className="w-full" min={0} controls placeholder="0" />
             </Form.Item>
           </Col>
-          <Col xs={12} sm={6} className="flex items-end">
-            <Form.Item name="isAllowPreOrder" label="Pre-order" valuePropName="checked" className="w-full">
+          <Col xs={12} sm={4}>
+            <Form.Item name="estimatedPrintTimePerUnit" label="Thời gian in (phút)">
+              <InputNumber className="w-full" min={0} controls placeholder="0" />
+            </Form.Item>
+          </Col>
+          <Col xs={12} sm={4}>
+            <Form.Item name="markupPercentage" label="Markup %">
+              <InputNumber className="w-full" min={0} max={500} controls />
+            </Form.Item>
+          </Col>
+          <Col xs={12} sm={4}>
+            <Form.Item name="sizeScale" label="Scale">
+              <InputNumber className="w-full" min={0.1} step={0.1} controls />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        {/* Hàng 3: Trạng thái & Submit */}
+        <Row gutter={[12, 0]} align="bottom">
+          <Col xs={12} sm={4}>
+            <Form.Item name="minimumStockLevel" label="Tồn tối thiểu">
+              <InputNumber className="w-full" min={0} controls />
+            </Form.Item>
+          </Col>
+          <Col xs={12} sm={4}>
+            <Form.Item name="catalogStatus" label="Trạng thái">
+              <Select>
+                <Option value="DRAFT">Bản thảo</Option>
+                <Option value="PUBLISHED">Đang bán</Option>
+              </Select>
+            </Form.Item>
+          </Col>
+          <Col xs={12} sm={4}>
+            <Form.Item name="isAllowPreOrder" label="Pre-order" valuePropName="checked">
               <Switch />
             </Form.Item>
           </Col>
-          <Col xs={24} className="flex justify-end">
+          <Col xs={24} sm={12} className="flex items-end justify-end pb-6">
             <Button type="primary" htmlType="submit" icon={<PlusOutlined />} loading={submitting}>
               Thêm vào cửa hàng
             </Button>

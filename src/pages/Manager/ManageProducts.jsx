@@ -384,7 +384,11 @@ const ManageProducts = () => {
         await designVariantApi.add(buildVariantPayload({ ...values, useTemplateMedia: true }, template.id));
         message.success('Đã thêm biến thể');
         activeForm.resetFields();
-        activeForm.setFieldsValue({ sizeScale: 1, stockQuantity: 0, isAllowPreOrder: true });
+        activeForm.setFieldsValue({
+          sizeScale: 1, stockQuantity: 0, isAllowPreOrder: true,
+          markupPercentage: 0, estimatedWeightPerUnit: 0, estimatedPrintTimePerUnit: 0,
+          minimumStockLevel: 0, catalogStatus: 'DRAFT',
+        });
         refresh();
       } catch (err) {
         if (err?.errorFields) return;
@@ -567,6 +571,16 @@ const ManageProducts = () => {
           onRegisterForm={registerQuickForm}
           onSubmit={saveQuickVariant}
         />
+
+        <div className="mt-3 flex justify-center">
+          <Button
+            type="dashed"
+            icon={<PlusOutlined />}
+            onClick={() => openVariantDrawer(template, null)}
+          >
+            Thêm chi tiết (file riêng, ảnh, mô tả...)
+          </Button>
+        </div>
       </div>
     );
     },
