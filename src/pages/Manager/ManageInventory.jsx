@@ -17,8 +17,8 @@ const { Option } = Select;
 const { TextArea } = Input;
 
 const TRANSACTION_TYPES = [
-  { value: 'IMPORT', label: 'Nhập kho', color: 'green', icon: <ArrowDownOutlined /> },
-  { value: 'EXPORT', label: 'Xuất kho', color: 'red', icon: <ArrowUpOutlined /> },
+  { value: 'INBOUND', label: 'Nhập kho', color: 'green', icon: <ArrowDownOutlined /> },
+  { value: 'OUTBOUND', label: 'Xuất kho', color: 'red', icon: <ArrowUpOutlined /> },
   { value: 'ADJUSTMENT', label: 'Điều chỉnh', color: 'blue', icon: <SwapOutlined /> },
 ];
 
@@ -134,32 +134,65 @@ const ManageInventory = () => {
   const columns = [
     {
       title: 'STT',
-      width: 55,
+      width: 50,
       render: (_, __, i) => (pagination.current - 1) * pagination.pageSize + i + 1,
     },
     {
       title: 'Loại',
       dataIndex: 'type',
-      width: 130,
+      width: 120,
       render: (type) => {
         const t = typeMap[type];
         return t ? <Tag color={t.color} icon={t.icon}>{t.label}</Tag> : <Tag>{type}</Tag>;
       },
     },
     {
-      title: 'Mã biến thể',
-      dataIndex: 'designVariantId',
+      title: 'Sản phẩm',
+      key: 'variant',
       ellipsis: true,
-      render: (id) => <Text code className="text-xs">{id}</Text>,
+      render: (_, record) => {
+        const v = record.designVariant || record.variant;
+        if (v) {
+          return (
+            <div>
+              <Text strong className="text-sm">{v.name || '—'}</Text>
+              <div><Text type="secondary" className="text-xs font-mono">{v.code || ''}</Text></div>
+              {v.materialName && <Tag className="text-[10px] mt-0.5">{v.materialName}</Tag>}
+            </div>
+          );
+        }
+        return <Text code className="text-xs">{record.designVariantId}</Text>;
+      },
+    },
+    {
+      title: 'Tồn trước',
+      key: 'stockBefore',
+      width: 80,
+      align: 'right',
+      render: (_, record) => {
+        const before = record.stockBefore ?? record.previousStock;
+        return before != null ? before : <Text type="secondary">—</Text>;
+      },
     },
     {
       title: 'Số lượng',
       dataIndex: 'quantity',
-      width: 100,
+      width: 90,
       align: 'right',
       render: (qty, record) => {
-        const color = record.type === 'EXPORT' ? '#ef4444' : record.type === 'IMPORT' ? '#10b981' : '#3b82f6';
-        return <span style={{ color, fontWeight: 600 }}>{record.type === 'EXPORT' ? '-' : '+'}{qty}</span>;
+        const color = record.type === 'OUTBOUND' ? '#ef4444' : record.type === 'INBOUND' ? '#10b981' : '#3b82f6';
+        const sign = record.type === 'OUTBOUND' ? '-' : '+';
+        return <span style={{ color, fontWeight: 600 }}>{sign}{Math.abs(qty)}</span>;
+      },
+    },
+    {
+      title: 'Tồn sau',
+      key: 'stockAfter',
+      width: 80,
+      align: 'right',
+      render: (_, record) => {
+        const after = record.stockAfter ?? record.currentStock;
+        return after != null ? <Text strong>{after}</Text> : <Text type="secondary">—</Text>;
       },
     },
     {
@@ -169,16 +202,13 @@ const ManageInventory = () => {
       render: (note) => note || <Text type="secondary">—</Text>,
     },
     {
-      title: 'Reference',
-      dataIndex: 'referenceId',
-      ellipsis: true,
-      render: (id) => id ? <Text code className="text-xs">{id}</Text> : <Text type="secondary">—</Text>,
-    },
-    {
       title: 'Thời gian',
-      dataIndex: 'createdAt',
-      width: 140,
-      render: (date) => date ? format(new Date(date), 'dd/MM/yyyy HH:mm', { locale: vi }) : '—',
+      dataIndex: 'created',
+      width: 130,
+      render: (date, record) => {
+        const d = date || record.createdAt;
+        return d ? format(new Date(d), 'dd/MM/yyyy HH:mm', { locale: vi }) : '—';
+      },
     },
   ];
 
@@ -210,12 +240,23 @@ const ManageInventory = () => {
       <Card className="mb-4">
         <Row gutter={12} align="middle">
           <Col flex="auto">
-            <Input
-              placeholder="Nhập Design Variant ID để lọc..."
-              value={filterVariantId}
-              onChange={e => setFilterVariantId(e.target.value)}
-              onPressEnter={() => fetchTransactions(1)}
+            <Select
+              showSearch
+              placeholder="Tìm sản phẩm theo tên hoặc mã..."
               allowClear
+              value={filterVariantId || undefined}
+              onChange={v => { setFilterVariantId(v || ''); }}
+              loading={variantLoading}
+              onFocus={() => { if (variantList.length === 0) fetchVariants(); }}
+              optionFilterProp="label"
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={variantList.map(v => ({
+                value: v.id,
+                label: `${v.code || ''} — ${v.name} (${v.materialName || 'N/A'})`,
+              }))}
+              style={{ width: '100%' }}
             />
           </Col>
           <Col>
@@ -302,15 +343,36 @@ const ManageInventory = () => {
               ))}
             </Select>
           </Form.Item>
-          <Form.Item
-            name="quantity"
-            label="Số lượng"
-            rules={[{ required: true, message: 'Vui lòng nhập số lượng' }]}
-          >
-            <InputNumber min={1} style={{ width: '100%' }} placeholder="0" />
-          </Form.Item>
-          <Form.Item name="note" label="Ghi chú">
-            <TextArea rows={3} placeholder="Lý do nhập/xuất/điều chỉnh..." />
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.type !== cur.type}>
+            {({ getFieldValue }) => {
+              const txType = getFieldValue('type');
+              return (
+                <>
+                  <Form.Item
+                    name="quantity"
+                    label="Số lượng"
+                    rules={[{ required: true, message: 'Vui lòng nhập số lượng' }]}
+                    extra={txType === 'ADJUSTMENT' ? 'Nhập số âm để giảm, số dương để tăng.' : undefined}
+                  >
+                    <InputNumber
+                      min={txType === 'ADJUSTMENT' ? -99999 : 1}
+                      style={{ width: '100%' }}
+                      placeholder="0"
+                    />
+                  </Form.Item>
+                  <Form.Item
+                    name="note"
+                    label="Ghi chú"
+                    rules={txType === 'INBOUND' ? [{ required: true, message: 'Ghi chú nhập kho là bắt buộc' }] : []}
+                  >
+                    <TextArea
+                      rows={3}
+                      placeholder={txType === 'INBOUND' ? 'Bắt buộc — mô tả lý do nhập kho' : 'Lý do nhập/xuất/điều chỉnh...'}
+                    />
+                  </Form.Item>
+                </>
+              );
+            }}
           </Form.Item>
         </Form>
       </Modal>

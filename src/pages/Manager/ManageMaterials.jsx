@@ -233,10 +233,13 @@ const ManageMaterials = () => {
     }
   };
 
-  const handleDeleteTag = async (id) => {
+  const handleDeleteTag = async (id, tag) => {
+    const count = tag?.templateCount || 0;
     Modal.confirm({
       title: 'Xóa thẻ phân loại?',
-      content: 'Bạn có chắc chắn muốn xóa thẻ này không?',
+      content: count > 0
+        ? `Thẻ "${tag?.name}" đang được gắn với ${count} sản phẩm mẫu. Xóa tag sẽ gỡ tag khỏi tất cả sản phẩm. Tiếp tục?`
+        : `Bạn có chắc chắn muốn xóa thẻ "${tag?.name || ''}"?`,
       okText: 'Xóa',
       okType: 'danger',
       cancelText: 'Hủy',
@@ -395,15 +398,20 @@ const ManageMaterials = () => {
               </div>
               <div className="flex flex-wrap gap-2 mb-4">
                 {tags.map(tag => (
-                  <Tag 
-                    key={tag.id} 
-                    color="geekblue" 
-                    closable 
-                    onClose={(e) => { e.preventDefault(); handleDeleteTag(tag.id); }}
+                  <Tag
+                    key={tag.id}
+                    color="geekblue"
+                    closable
+                    onClose={(e) => { e.preventDefault(); handleDeleteTag(tag.id, tag); }}
                     className="py-1 px-3 text-sm cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => openEditTagModal(tag)}
                   >
                     {tag.name}
+                    {tag.templateCount > 0 && (
+                      <span className="ml-1 bg-blue-100 text-blue-700 text-[10px] px-1.5 rounded-full">
+                        {tag.templateCount}
+                      </span>
+                    )}
                   </Tag>
                 ))}
                 {tags.length === 0 && !loadingTags && <Text type="secondary">Chưa có thẻ nào.</Text>}
