@@ -74,8 +74,10 @@ const ShippingCarrierSelect = ({
       if (seq !== requestSeq.current) return;
 
       const ghnList = Array.isArray(res?.data) ? res.data : [];
-      // Luôn thêm option giao hàng thủ công Nova3D
-      const list = [...ghnList, MANUAL_CARRIER];
+      // Server đã trả option MANUAL (phí tham chiếu theo GHN). Chỉ tự thêm
+      // option thủ công local khi server không trả để tránh nhân đôi.
+      const hasManual = ghnList.some((q) => q.carrier === 'MANUAL');
+      const list = hasManual ? ghnList : [...ghnList, MANUAL_CARRIER];
       setQuotes(list);
 
       if (list.length > 0) {
