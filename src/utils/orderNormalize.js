@@ -149,8 +149,10 @@ export function buildCustomerTrackingSteps(
   } else {
     steps.push({
       key: 'paid',
-      label: 'Đã thanh toán',
-      description: 'Thanh toán đã được xác nhận — đưa vào hàng đợi sản xuất.',
+      label: 'Chờ thanh toán',
+      completedLabel: 'Đã thanh toán',
+      description: 'Vui lòng hoàn tất thanh toán để đơn hàng được xử lý.',
+      completedDescription: 'Thanh toán đã được xác nhận — đưa vào hàng đợi sản xuất.',
       done: paid,
       isCurrent: !paid && os === 'PENDING' && !shopProcessing,
     });
