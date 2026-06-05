@@ -22,6 +22,8 @@ import {
   markShipmentReadyApi,
   markShipmentInTransitApi,
   confirmShipmentDeliveredApi,
+  getShipmentLabelApi,
+  syncCarrierShipmentApi,
 } from '../../api/shipmentApi';
 import { completeOrderApi } from '../../api/orderApi';
 import { shipmentStatusMap, normStatus } from '../../utils/staffOrderConstants';
@@ -150,6 +152,8 @@ export default function StaffCarrierActions({
   const carrierOrderCode =
     pick(shipment, 'carrierOrderCode', 'CarrierOrderCode')
     ?? pick(summary, 'carrierOrderCode', 'CarrierOrderCode');
+  const carrierCode = String(pick(shipment, 'carrier', 'Carrier') ?? pick(summary, 'carrier', 'Carrier') ?? '').toUpperCase();
+  const isGhnShipment = carrierCode === 'GHN' || (Boolean(carrierOrderCode) && carrierCode !== 'MANUAL');
   const displayedTrackingCode = carrierOrderCode || tracking;
   const labelUrl = pick(shipment, 'carrierLabelUrl', 'CarrierLabelUrl');
   const shipmentId = pick(shipment, 'id', 'Id') ?? pick(summary, 'id', 'Id');
@@ -258,6 +262,47 @@ export default function StaffCarrierActions({
     }
   };
 
+  const handleSyncGhn = async () => {
+    if (!shipmentId) {
+      message.warning('Chưa có vận đơn để đồng bộ.');
+      return;
+    }
+    setCreating(true);
+    try {
+      await syncCarrierShipmentApi(shipmentId);
+      message.success('Đã đồng bộ trạng thái từ GHN');
+      await load();
+      onUpdated?.();
+    } catch (e) {
+      message.error(apiErrorMessage(e, 'Không đồng bộ được trạng thái GHN'));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handlePrintLabel = async () => {
+    if (!shipmentId) return;
+    if (labelUrl) {
+      window.open(labelUrl, '_blank', 'noopener');
+      return;
+    }
+    setCreating(true);
+    try {
+      const res = await getShipmentLabelApi(shipmentId);
+      const url = res?.data?.labelUrl || res?.data?.LabelUrl;
+      if (url) {
+        window.open(url, '_blank', 'noopener');
+      } else {
+        message.warning('Chưa lấy được phiếu in từ GHN.');
+      }
+      await load();
+    } catch (e) {
+      message.error(apiErrorMessage(e, 'Không lấy được phiếu in vận đơn'));
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const statusTag = shipmentStatusMap[status];
 
   const ghnCreateBlock = canCreateGhn ? (
@@ -291,24 +336,28 @@ export default function StaffCarrierActions({
           </div>
         </div>
       )}
-      <Space wrap align="center">
-        <Text>Khối lượng (gram):</Text>
-        <InputNumber
-          min={100}
-          max={50000}
-          step={100}
-          value={weightGrams}
-          onChange={(v) => setWeightGrams(v ?? 500)}
-        />
-        <Popconfirm
-          title="Tạo vận đơn GHN?"
-          description="Đơn phải ở trạng thái FINISHED. GHN sẽ nhận thông tin giao hàng từ đơn."
-          onConfirm={handleCreateGhn}
-        >
-          <Button type="primary" icon={<TruckOutlined />} loading={creating}>
-            Tạo vận đơn GHN
-          </Button>
-        </Popconfirm>
+      <Space direction="vertical" size={8} style={{ width: '100%' }}>
+        <Space wrap align="center">
+          <Text>Khối lượng (gram):</Text>
+          <InputNumber
+            min={100}
+            max={50000}
+            step={100}
+            value={weightGrams}
+            onChange={(v) => setWeightGrams(v ?? 500)}
+          />
+        </Space>
+        <Space wrap align="center">
+          <Popconfirm
+            title="Tạo vận đơn GHN?"
+            description="Đơn phải ở trạng thái FINISHED. GHN sẽ nhận thông tin giao hàng từ đơn."
+            onConfirm={handleCreateGhn}
+          >
+            <Button type="primary" icon={<TruckOutlined />} loading={creating}>
+              Tạo vận đơn GHN
+            </Button>
+          </Popconfirm>
+        </Space>
       </Space>
     </>
   ) : null;
@@ -401,6 +450,25 @@ export default function StaffCarrierActions({
             />
           )}
 
+          {!isCompleted && isGhnShipment && carrierOrderCode && (
+            <Space direction="vertical" size={6} style={{ width: '100%' }}>
+              <Alert
+                type="info"
+                showIcon
+                message="Đơn GHN — trạng thái cập nhật tự động qua GHN."
+                description="Không nhập trạng thái thủ công. Dùng nút bên dưới để đồng bộ hoặc in vận đơn."
+              />
+              <Space wrap>
+                <Button icon={<ReloadOutlined />} loading={creating} onClick={handleSyncGhn}>
+                  Đồng bộ trạng thái GHN
+                </Button>
+                <Button icon={<LinkOutlined />} loading={creating} onClick={handlePrintLabel}>
+                  In vận đơn
+                </Button>
+              </Space>
+            </Space>
+          )}
+
           {!isCompleted && shipmentId && status === 'PREPARING' && allItemsFinished && (
             <Button
               type="primary"
@@ -412,7 +480,7 @@ export default function StaffCarrierActions({
             </Button>
           )}
 
-          {!isCompleted && shipmentId && status === 'READY_FOR_PICKUP' && (
+          {!isCompleted && shipmentId && status === 'READY_FOR_PICKUP' && !isGhnShipment && (
             <Space direction="vertical" size={10} style={{ width: '100%' }}>
               <Alert
                 type="info"
@@ -462,7 +530,7 @@ export default function StaffCarrierActions({
             </Space>
           )}
 
-          {!isCompleted && status === 'IN_TRANSIT' && (
+          {!isCompleted && status === 'IN_TRANSIT' && !isGhnShipment && (
             <Popconfirm
               title="Xác nhận giao thành công?"
               onConfirm={handleConfirmDelivered}

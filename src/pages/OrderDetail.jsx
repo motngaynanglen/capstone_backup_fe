@@ -662,6 +662,14 @@ const OrderDetail = () => {
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Đơn vị vận chuyển</p>
                     <p className="text-sm font-semibold text-gray-700">{shipment.carrierName || 'Giao hàng nhanh'}</p>
                   </div>
+                  {shipment.carrierOrderCode && (
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Mã vận đơn GHN</p>
+                      <p className="text-sm font-mono font-bold text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100 inline-block">
+                        {shipment.carrierOrderCode}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4 border-l border-gray-50 pl-6">

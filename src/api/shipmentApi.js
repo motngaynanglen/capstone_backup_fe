@@ -95,6 +95,18 @@ export const createCarrierShipmentApi = async (orderId, payload) => {
   return response.data;
 };
 
+// 7. [Staff/Manager] Lấy phiếu in (printA5) cho vận đơn GHN
+export const getShipmentLabelApi = async (id) => {
+  const response = await axiosInstance.get(`/api/shipment/${id}/label`);
+  return response.data;
+};
+
+// 8. [Staff/Manager] Đồng bộ trạng thái từ đơn vị vận chuyển (GHN)
+export const syncCarrierShipmentApi = async (id) => {
+  const response = await axiosInstance.post(`/api/shipment/${id}/sync-carrier`);
+  return response.data;
+};
+
 export const CARRIER_LABELS = {
   GHN: 'Giao Hàng Nhanh (GHN)',
   MANUAL: 'Tự giao / thủ công',
