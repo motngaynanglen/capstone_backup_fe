@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message } from 'antd';
 import { createDesignRequest, uploadFile } from '../api/mainflow2Api';
+import ServiceOptionPicker from '../components/Mainflow2/ServiceOptionPicker';
 
 const CustomOrderRequestDesign = () => {
   const navigate = useNavigate();
@@ -12,8 +13,9 @@ const CustomOrderRequestDesign = () => {
     title: '',
     images: [],
     imageUrls: [],
-    description: ''
+    description: '',
   });
+  const [serviceSelections, setServiceSelections] = useState([]);
 
   const handleImageChange = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -153,6 +155,11 @@ const CustomOrderRequestDesign = () => {
             className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:border-indigo-600"
             placeholder="Vui lòng mô tả chi tiết về mẫu thiết kế bạn mong muốn. Bao gồm kích thước, phong cách, màu sắc, và các yêu cầu cụ thể khác..."
           />
+        </div>
+
+        <div className="mb-6">
+          <label className="block mb-3 font-medium text-gray-800">Chọn gói dịch vụ</label>
+          <ServiceOptionPicker value={serviceSelections} onChange={setServiceSelections} />
         </div>
 
         <div className="flex gap-4">

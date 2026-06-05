@@ -1,18 +1,39 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Table, Tag, Button, Modal, Form, Input, Select, Popconfirm, App, Tooltip, Switch, Tabs, Space, InputNumber } from 'antd';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Card, Table, Tag, Button, Modal, Form, Input, Select, Popconfirm, App,
+  Tooltip, Switch, Space, InputNumber, Row, Col, Typography, Empty,
+} from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
   getAllServiceOptionsApi, createServiceOptionApi, updateServiceOptionApi,
   activateServiceOptionApi, deactivateServiceOptionApi, deleteServiceOptionApi,
-  queryServicePackagesApi, createServicePackageApi
 } from '../../api/serviceApi';
+
+const { Text } = Typography;
+
+const GROUP_CODES = [
+  { value: 'DESIGN_PACKAGE', label: 'DESIGN_PACKAGE — Gói thiết kế' },
+  { value: 'COMPLEXITY', label: 'COMPLEXITY — Độ phức tạp' },
+  { value: 'DEADLINE', label: 'DEADLINE — Thời hạn' },
+  { value: 'DELIVERABLE', label: 'DELIVERABLE — Sản phẩm giao' },
+  { value: 'PRINTABILITY', label: 'PRINTABILITY — Khả năng in' },
+  { value: 'MODEL_SCOPE', label: 'MODEL_SCOPE — Phạm vi mô hình' },
+  { value: 'REVISION', label: 'REVISION — Lượt hiệu chỉnh' },
+  { value: 'NEW_SCOPE', label: 'NEW_SCOPE — Phạm vi mới' },
+];
+
+const SELECTION_TYPES = [
+  { value: 'SINGLE', label: 'SINGLE — Chọn 1 (radio)' },
+  { value: 'MULTIPLE', label: 'MULTIPLE — Chọn nhiều (checkbox)' },
+  { value: 'QUANTITY', label: 'QUANTITY — Số lượng (stepper)' },
+  { value: 'ADDON', label: 'ADDON — Bật/tắt (toggle)' },
+];
+
+const formatVnd = (n) => n != null ? `${Number(n).toLocaleString('vi-VN')}₫` : '—';
 
 const AdminServices = () => {
   const { message } = App.useApp();
 
-  // ==========================================
-  // SERVICE OPTIONS STATE
-  // ==========================================
   const [options, setOptions] = useState([]);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [optionModal, setOptionModal] = useState(false);
@@ -21,373 +42,275 @@ const AdminServices = () => {
   const [optionSubmitLoading, setOptionSubmitLoading] = useState(false);
   const [optionForm] = Form.useForm();
 
-  // ==========================================
-  // SERVICE PACKAGES STATE
-  // ==========================================
-  const [packages, setPackages] = useState([]);
-  const [packagesLoading, setPackagesLoading] = useState(false);
-  const [packageModal, setPackageModal] = useState(false);
-  const [packageSubmitLoading, setPackageSubmitLoading] = useState(false);
-  const [packageForm] = Form.useForm();
+  useEffect(() => { fetchOptions(); }, []);
 
-  useEffect(() => {
-    fetchOptions();
-    fetchPackages();
-  }, []);
-
-  // ==========================================
-  // SERVICE OPTIONS CRUD
-  // ==========================================
   const fetchOptions = async () => {
     setOptionsLoading(true);
     try {
       const result = await getAllServiceOptionsApi();
       setOptions(result.data || []);
-    } catch (error) {
+    } catch {
       message.error('Không thể tải danh sách tùy chọn.');
     } finally {
       setOptionsLoading(false);
     }
   };
 
-  const handleOpenAddOption = () => {
+  // Group by GroupCode
+  const groupedOptions = useMemo(() => {
+    const groups = {};
+    options.forEach((opt) => {
+      const gc = opt.groupCode || 'OTHER';
+      if (!groups[gc]) groups[gc] = { groupCode: gc, groupName: opt.groupName || gc, options: [] };
+      groups[gc].options.push(opt);
+    });
+    Object.values(groups).forEach((g) =>
+      g.options.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+    );
+    return Object.values(groups);
+  }, [options]);
+
+  const handleOpenAdd = () => {
     setOptionMode('add');
     setEditingOptionId(null);
     optionForm.resetFields();
+    optionForm.setFieldsValue({ sortOrder: 0, isActive: true, minQuantity: 1 });
     setOptionModal(true);
   };
 
-  const handleOpenEditOption = (record) => {
+  const handleOpenEdit = (record) => {
     setOptionMode('edit');
     setEditingOptionId(record.id);
     optionForm.setFieldsValue({
+      code: record.code,
       name: record.name,
-      optionType: record.optionType,
+      description: record.description,
+      groupCode: record.groupCode,
+      groupName: record.groupName,
+      selectionType: record.selectionType,
       defaultPrice: record.defaultPrice,
+      minQuantity: record.minQuantity,
+      maxQuantity: record.maxQuantity,
+      adjustmentRoundDelta: record.adjustmentRoundDelta,
+      sortOrder: record.sortOrder,
+      isActive: record.isActive,
     });
     setOptionModal(true);
   };
 
-  const handleSubmitOption = async (values) => {
+  const handleSaveOption = async (values) => {
     setOptionSubmitLoading(true);
     try {
+      const payload = {
+        ...values,
+        code: (values.code || '').toUpperCase(),
+      };
+
       if (optionMode === 'add') {
-        await createServiceOptionApi({
-          code: '',
-          name: values.name,
-          optionType: values.optionType,
-          defaultPrice: values.defaultPrice
-        });
-        message.success('Tạo tùy chọn thành công!');
+        await createServiceOptionApi(payload);
+        message.success('Đã tạo tùy chọn dịch vụ');
       } else {
-        await updateServiceOptionApi(editingOptionId, {
-          name: values.name,
-          optionType: values.optionType,
-          defaultPrice: values.defaultPrice
-        });
-        message.success('Cập nhật tùy chọn thành công!');
+        await updateServiceOptionApi(editingOptionId, payload);
+        message.success('Đã cập nhật');
       }
       setOptionModal(false);
       fetchOptions();
-    } catch (error) {
-      message.error(error.response?.data?.message || 'Có lỗi xảy ra.');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Thao tác thất bại');
     } finally {
       setOptionSubmitLoading(false);
     }
   };
 
-  const handleToggleOptionActive = async (id, currentStatus) => {
+  const handleToggle = async (record) => {
     try {
-      if (currentStatus) {
-        await deactivateServiceOptionApi(id);
-        message.success('Đã ngưng tùy chọn!');
+      if (record.isActive) {
+        await deactivateServiceOptionApi(record.id);
       } else {
-        await activateServiceOptionApi(id);
-        message.success('Đã kích hoạt tùy chọn!');
+        await activateServiceOptionApi(record.id);
       }
+      message.success('Đã thay đổi trạng thái');
       fetchOptions();
-    } catch (error) {
-      message.error('Thao tác thất bại.');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Thất bại');
     }
   };
 
-  const handleDeleteOption = async (id) => {
+  const handleDelete = async (id) => {
     try {
       await deleteServiceOptionApi(id);
-      message.success('Đã xóa tùy chọn!');
+      message.success('Đã xóa');
       fetchOptions();
-    } catch (error) {
-      message.error('Lỗi khi xóa.');
+    } catch (err) {
+      const msg = err?.response?.data?.message || '';
+      if (/order|đơn hàng|đã được/i.test(msg)) {
+        message.warning('Không thể xóa — tùy chọn đã được dùng trong đơn hàng. Hãy vô hiệu hóa.');
+      } else {
+        message.error(msg || 'Xóa thất bại');
+      }
     }
   };
 
-  // ==========================================
-  // SERVICE PACKAGES CRUD
-  // ==========================================
-  const fetchPackages = async () => {
-    setPackagesLoading(true);
-    try {
-      const result = await queryServicePackagesApi({
-        search: '',
-        service: null,
-        sortBy: 'Created',
-        sortDescending: true
-      });
-      setPackages(result.data?.items || result.data || []);
-    } catch (error) {
-      message.error('Không thể tải danh sách gói dịch vụ.');
-    } finally {
-      setPackagesLoading(false);
-    }
-  };
-
-  const handleOpenAddPackage = () => {
-    packageForm.resetFields();
-    setPackageModal(true);
-  };
-
-  const handleSubmitPackage = async (values) => {
-    setPackageSubmitLoading(true);
-    try {
-      await createServicePackageApi({
-        code: values.code,
-        name: values.name,
-        serviceType: values.serviceType,
-        basePrice: values.basePrice,
-        description: values.description,
-        options: []
-      });
-      message.success('Tạo gói dịch vụ thành công!');
-      setPackageModal(false);
-      fetchPackages();
-    } catch (error) {
-      message.error(error.response?.data?.message || 'Có lỗi xảy ra.');
-    } finally {
-      setPackageSubmitLoading(false);
-    }
-  };
-
-  // ==========================================
-  // TABLE COLUMNS
-  // ==========================================
   const optionColumns = [
-    { title: 'Mã', dataIndex: 'code', key: 'code', render: (val) => <span style={{ fontWeight: 600 }}>{val || '—'}</span> },
-    { title: 'Tên tùy chọn', dataIndex: 'name', key: 'name' },
+    { title: 'Mã', dataIndex: 'code', width: 120, render: (v) => <Text code>{v || '—'}</Text> },
+    { title: 'Tên', dataIndex: 'name', ellipsis: true },
     {
-      title: 'Loại',
-      dataIndex: 'optionType',
-      key: 'optionType',
-      render: (type) => <Tag color={type === 'ADDON' ? 'purple' : 'cyan'}>{type}</Tag>
+      title: 'Kiểu chọn', dataIndex: 'selectionType', width: 110,
+      render: (t) => <Tag color={t === 'SINGLE' ? 'blue' : t === 'QUANTITY' ? 'orange' : t === 'MULTIPLE' ? 'cyan' : 'purple'}>{t}</Tag>,
     },
+    { title: 'Giá', dataIndex: 'defaultPrice', width: 120, align: 'right', render: formatVnd },
     {
-      title: 'Giá mặc định',
-      dataIndex: 'defaultPrice',
-      key: 'defaultPrice',
-      align: 'right',
-      render: (price) => price != null ? `${Number(price).toLocaleString('vi-VN')}₫` : '—'
+      title: 'Lượt sửa', dataIndex: 'adjustmentRoundDelta', width: 80, align: 'center',
+      render: (v) => v > 0 ? <Tag color="purple">+{v}</Tag> : '—',
     },
+    { title: 'Thứ tự', dataIndex: 'sortOrder', width: 70, align: 'center' },
     {
-      title: 'Trạng thái',
-      key: 'isActive',
-      render: (_, record) => (
-        <Tag color={record.isActive ? 'green' : 'default'}>
-          {record.isActive ? 'Hoạt động' : 'Ngưng'}
-        </Tag>
-      )
-    },
-    {
-      title: 'Hành động',
-      key: 'actions',
-      align: 'center',
+      title: '', key: 'actions', width: 140, align: 'center',
       render: (_, record) => (
         <Space size="small">
-          <Tooltip title={record.isActive ? 'Ngưng' : 'Kích hoạt'}>
-            <Switch
-              size="small"
-              checked={record.isActive}
-              onChange={() => handleToggleOptionActive(record.id, record.isActive)}
-            />
-          </Tooltip>
-          <Tooltip title="Sửa">
-            <Button type="text" icon={<EditOutlined className="text-blue-600" />} onClick={() => handleOpenEditOption(record)} />
-          </Tooltip>
-          <Popconfirm title="Xóa tùy chọn?" onConfirm={() => handleDeleteOption(record.id)} okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
-            <Tooltip title="Xóa">
-              <Button type="text" danger icon={<DeleteOutlined />} />
-            </Tooltip>
+          <Switch size="small" checked={record.isActive} onChange={() => handleToggle(record)} />
+          <Button type="text" icon={<EditOutlined />} onClick={() => handleOpenEdit(record)} />
+          <Popconfirm title="Xóa tùy chọn?" onConfirm={() => handleDelete(record.id)} okText="Xóa" okType="danger">
+            <Button type="text" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
-      )
-    }
-  ];
-
-  const packageColumns = [
-    { title: 'Mã', dataIndex: 'code', key: 'code', render: (val) => <span style={{ fontWeight: 600 }}>{val || '—'}</span> },
-    { title: 'Tên gói', dataIndex: 'name', key: 'name' },
-    {
-      title: 'Loại dịch vụ',
-      dataIndex: 'serviceType',
-      key: 'serviceType',
-      render: (type) => <Tag color={type === 'DESIGN' ? 'blue' : 'orange'}>{type}</Tag>
+      ),
     },
-    {
-      title: 'Giá cơ bản',
-      dataIndex: 'basePrice',
-      key: 'basePrice',
-      align: 'right',
-      render: (price) => price != null ? `${Number(price).toLocaleString('vi-VN')}₫` : '—'
-    },
-    {
-      title: 'Mô tả',
-      dataIndex: 'description',
-      key: 'description',
-      ellipsis: true,
-      render: (desc) => desc || '—'
-    },
-    {
-      title: 'Ngày tạo',
-      dataIndex: 'created',
-      key: 'created',
-      render: (date) => date ? new Date(date).toLocaleDateString('vi-VN') : '—'
-    }
-  ];
-
-  const tabItems = [
-    {
-      key: 'options',
-      label: '⚙️ Tùy chọn dịch vụ (Service Options)',
-      children: (
-        <>
-          <div className="flex justify-end mb-4">
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenAddOption}>
-              Thêm tùy chọn
-            </Button>
-          </div>
-          <Table
-            columns={optionColumns}
-            dataSource={options}
-            rowKey="id"
-            loading={optionsLoading}
-            pagination={false}
-          />
-        </>
-      )
-    },
-    {
-      key: 'packages',
-      label: '📦 Gói dịch vụ (Service Packages)',
-      children: (
-        <>
-          <div className="flex justify-end mb-4">
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenAddPackage}>
-              Thêm gói dịch vụ
-            </Button>
-          </div>
-          <Table
-            columns={packageColumns}
-            dataSource={packages}
-            rowKey="id"
-            loading={packagesLoading}
-            pagination={false}
-          />
-        </>
-      )
-    }
   ];
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Quản lý Dịch vụ</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 m-0">Quản lý Dịch vụ</h1>
+          <Text type="secondary">Tùy chọn dịch vụ thiết kế & in 3D — nhóm theo GroupCode</Text>
+        </div>
+        <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenAdd}>
+          Thêm tùy chọn
+        </Button>
       </div>
 
-      <Card className="shadow-sm rounded-lg border-0">
-        <Tabs items={tabItems} size="large" />
-      </Card>
+      {groupedOptions.length === 0 && !optionsLoading ? (
+        <Card><Empty description="Chưa có tùy chọn dịch vụ nào" /></Card>
+      ) : (
+        groupedOptions.map((group) => (
+          <Card
+            key={group.groupCode}
+            title={<span>{group.groupName} <Tag className="ml-2">{group.groupCode}</Tag></span>}
+            size="small"
+            className="mb-4 shadow-sm"
+          >
+            <Table
+              dataSource={group.options}
+              columns={optionColumns}
+              rowKey="id"
+              pagination={false}
+              size="small"
+              loading={optionsLoading}
+            />
+          </Card>
+        ))
+      )}
 
-      {/* Modal Thêm/Sửa Service Option */}
+      {/* Modal Thêm/Sửa */}
       <Modal
-        title={optionMode === 'add' ? 'Thêm tùy chọn dịch vụ' : 'Cập nhật tùy chọn'}
+        title={optionMode === 'add' ? 'Tạo tùy chọn dịch vụ' : 'Sửa tùy chọn dịch vụ'}
         open={optionModal}
         onCancel={() => setOptionModal(false)}
-        footer={null}
+        onOk={() => optionForm.submit()}
+        confirmLoading={optionSubmitLoading}
+        width={640}
         destroyOnClose
       >
-        <Form form={optionForm} layout="vertical" onFinish={handleSubmitOption} className="mt-4">
-          <Form.Item name="name" label="Tên tùy chọn" rules={[{ required: true, message: 'Nhập tên' }]}>
-            <Input placeholder="VD: Đánh bóng, Sơn PU..." />
-          </Form.Item>
-          <div className="grid grid-cols-2 gap-4">
-            <Form.Item name="optionType" label="Loại" rules={[{ required: true, message: 'Chọn loại' }]}>
-              <Select
-                placeholder="Chọn loại"
-                options={[
-                  { value: 'ADDON', label: 'ADDON' },
-                  { value: 'CONFIG', label: 'CONFIG' },
-                ]}
-              />
-            </Form.Item>
-            <Form.Item name="defaultPrice" label="Giá mặc định" rules={[{ required: true, message: 'Nhập giá' }]}>
-              <InputNumber
-                style={{ width: '100%' }}
-                placeholder="VD: 50000"
-                formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(value) => value.replace(/,/g, '')}
-                addonAfter="₫"
-              />
-            </Form.Item>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button onClick={() => setOptionModal(false)}>Hủy</Button>
-            <Button type="primary" htmlType="submit" loading={optionSubmitLoading}>
-              {optionMode === 'add' ? 'Tạo mới' : 'Lưu'}
-            </Button>
-          </div>
-        </Form>
-      </Modal>
+        <Form form={optionForm} layout="vertical" onFinish={handleSaveOption} className="mt-2">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="code" label="Mã (Code)" rules={[{ required: true }]}
+                extra="Tự động uppercase khi lưu">
+                <Input placeholder="VD: PKG_BASIC" style={{ textTransform: 'uppercase' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="name" label="Tên" rules={[{ required: true }]}>
+                <Input placeholder="VD: Gói thiết kế cơ bản" />
+              </Form.Item>
+            </Col>
+          </Row>
 
-      {/* Modal Thêm Service Package */}
-      <Modal
-        title="Thêm gói dịch vụ"
-        open={packageModal}
-        onCancel={() => setPackageModal(false)}
-        footer={null}
-        destroyOnClose
-      >
-        <Form form={packageForm} layout="vertical" onFinish={handleSubmitPackage} className="mt-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Form.Item name="code" label="Mã gói" rules={[{ required: true }]}>
-              <Input placeholder="VD: P1, P2..." />
-            </Form.Item>
-            <Form.Item name="serviceType" label="Loại dịch vụ" rules={[{ required: true }]}>
-              <Select
-                placeholder="Chọn loại"
-                options={[
-                  { value: 'DESIGN', label: 'Thiết kế (DESIGN)' },
-                  { value: 'PRINTING', label: 'In 3D (PRINTING)' },
-                ]}
-              />
-            </Form.Item>
-          </div>
-          <Form.Item name="name" label="Tên gói" rules={[{ required: true }]}>
-            <Input placeholder="VD: Gói cơ bản, Gói cao cấp..." />
-          </Form.Item>
-          <Form.Item name="basePrice" label="Giá cơ bản" rules={[{ required: true }]}>
-            <InputNumber
-              style={{ width: '100%' }}
-              placeholder="VD: 200000"
-              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(value) => value.replace(/,/g, '')}
-              addonAfter="₫"
-            />
-          </Form.Item>
           <Form.Item name="description" label="Mô tả">
-            <Input.TextArea rows={3} placeholder="Mô tả gói dịch vụ..." />
+            <Input.TextArea rows={2} />
           </Form.Item>
-          <div className="flex justify-end gap-2">
-            <Button onClick={() => setPackageModal(false)}>Hủy</Button>
-            <Button type="primary" htmlType="submit" loading={packageSubmitLoading}>Tạo mới</Button>
-          </div>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="groupCode" label="Nhóm (GroupCode)" rules={[{ required: true }]}>
+                <Select options={GROUP_CODES} placeholder="Chọn nhóm..." />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="groupName" label="Tên nhóm">
+                <Input placeholder="VD: Gói thiết kế" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="selectionType" label="Kiểu chọn" rules={[{ required: true }]}>
+                <Select options={SELECTION_TYPES} placeholder="Chọn kiểu..." />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="defaultPrice" label="Giá mặc định (VNĐ)" rules={[{ required: true }]}>
+                <InputNumber min={0} className="w-full"
+                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(v) => v?.replace(/,/g, '')}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* Min/Max Quantity — chỉ hiện khi QUANTITY */}
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.selectionType !== cur.selectionType}>
+            {({ getFieldValue }) => getFieldValue('selectionType') === 'QUANTITY' && (
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="minQuantity" label="Min Quantity" initialValue={1}>
+                    <InputNumber min={1} className="w-full" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="maxQuantity" label="Max Quantity">
+                    <InputNumber min={1} className="w-full" />
+                  </Form.Item>
+                </Col>
+              </Row>
+            )}
+          </Form.Item>
+
+          {/* AdjustmentRoundDelta — chỉ hiện khi REVISION */}
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.groupCode !== cur.groupCode}>
+            {({ getFieldValue }) => getFieldValue('groupCode') === 'REVISION' && (
+              <Form.Item name="adjustmentRoundDelta" label="Số lượt hiệu chỉnh"
+                rules={[{ required: true, message: 'Bắt buộc cho nhóm REVISION' }]}
+                extra="Số lượt sửa tăng thêm khi khách chọn option này">
+                <InputNumber min={1} className="w-full" />
+              </Form.Item>
+            )}
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="sortOrder" label="Thứ tự hiển thị" initialValue={0}>
+                <InputNumber min={0} className="w-full" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="isActive" label="Trạng thái" valuePropName="checked" initialValue={true}>
+                <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
     </div>

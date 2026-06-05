@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import shippingAddressApi from '../api/shippingAddressApi';
 import { checkoutOrderApi, performTransactionApi } from '../api/orderApi';
+import axiosInstance from '../api/axiosInstance';
 import { useCart } from '../contexts/CartContext';
 import { notification } from 'antd';
 import ShippingCarrierSelect from '../components/Shipping/ShippingCarrierSelect';
@@ -77,10 +78,15 @@ const Checkout = () => {
   // (A) state.cartItems  → mảng item từ ProductCatalog "Mua ngay" hoặc ShoppingCart "Tiến hành thanh toán"
   // (B) state.designWorkId + designWorkSourceType (CUSTOM_FILE_PRINT_MF2 / CUSTOM_QUOTE_MF2 / AI_GENERATED) → từ /custom-orders/:id sau khi APPROVED
   // (C) legacy single product (state.product, state.quantity, state.material, state.sourceType)
+  const checkoutMode = location.state?.checkoutMode || 'NORMAL';
+
   const initialCartItems = useMemo(() => {
     const st = location.state || {};
     if (Array.isArray(st.cartItems) && st.cartItems.length > 0) {
-      return st.cartItems;
+      return st.cartItems.map((item) => ({
+        ...item,
+        isDraft: st.checkoutMode === 'DRAFT' || !!item.technicalDraftId,
+      }));
     }
     if (st.designWorkId) {
       return [{
@@ -282,23 +288,43 @@ const Checkout = () => {
         shippingAddressId = toGuidString(rawAddrId, 'Địa chỉ giao hàng');
       }
 
-      const orderPayload = {
-        shippingAddressId,
-        shippingFee: effectiveShippingFee,
-        shippingCarrier: ENABLE_GHN_SHIPPING ? (shippingCarrier || 'MANUAL') : 'MANUAL',
-        note: formData.note || '',
-        items: cartItems.map((it) => {
-          const base = { sourceType: it.sourceType || 'IN_STOCK', quantity: Number(it.quantity) || 1 };
-          if (it.variantId) base.designVariantId = toGuidString(it.variantId, 'Sản phẩm');
-          if (it.designWorkId) base.designWorkId = toGuidString(it.designWorkId, 'Thiết kế');
-          if (!base.designVariantId && !base.designWorkId) {
-            throw new Error('Thiếu ID sản phẩm. Vui lòng chọn lại từ Cửa hàng.');
-          }
-          return base;
-        }),
-      };
+      const isDraftCheckout = checkoutMode === 'DRAFT' || cartItems.some((it) => it.isDraft || it.technicalDraftId);
+      let orderRes;
 
-      const orderRes = await checkoutOrderApi(orderPayload);
+      if (isDraftCheckout) {
+        // Luồng Print on Demand — checkout từ TechnicalDraft
+        const draftPayload = {
+          shippingAddressId,
+          note: formData.note || '',
+          items: cartItems.map((it) => ({
+            technicalDraftId: toGuidString(it.technicalDraftId, 'Bản nháp kỹ thuật'),
+            quantity: Number(it.quantity) || 1,
+          })),
+        };
+        orderRes = await axiosInstance.post('/api/order/checkout-draft', draftPayload);
+      } else {
+        // Luồng thường (InStock / PreOrder)
+        // BE CheckoutCommand: { ShippingAddressId, SourceType (level đơn), Note?, Items: [{ DesignVariantId, Quantity }] }
+        // SourceType lấy từ item đầu tiên (cả đơn phải cùng sourceType)
+        const sourceType = cartItems[0]?.sourceType?.toUpperCase() || 'IN_STOCK';
+
+        const orderPayload = {
+          shippingAddressId,
+          sourceType,
+          note: formData.note || '',
+          items: cartItems.map((it) => {
+            const designVariantId = toGuidString(it.variantId || it.id, 'Sản phẩm');
+            if (!designVariantId) {
+              throw new Error('Thiếu ID sản phẩm. Vui lòng chọn lại từ Cửa hàng.');
+            }
+            return {
+              designVariantId,
+              quantity: Number(it.quantity) || 1,
+            };
+          }),
+        };
+        orderRes = await checkoutOrderApi(orderPayload);
+      }
       const orderData = orderRes?.data || orderRes;
       const rawOrderId = orderData?.orderId || orderData?.OrderId || orderData?.id || orderData?.Id;
       const orderId = toGuidString(rawOrderId, 'Đơn hàng');
@@ -579,6 +605,12 @@ const Checkout = () => {
         <div className="lg:col-span-1">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sticky top-24 space-y-5">
             <h2 className="text-lg font-bold text-gray-900">Đơn hàng của bạn</h2>
+            {cartItems.some((it) => it.isDraft || it.technicalDraftId) && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3 text-xs text-amber-700">
+                <strong>Lưu ý:</strong> Giá sản phẩm in theo yêu cầu sẽ được tính lại theo giá vật liệu hiện tại tại thời điểm đặt.
+                Giá hiển thị ở đây là giá ước tính.
+              </div>
+            )}
             <div className="space-y-3 pb-4 border-b border-gray-100">
               {cartItems.map((it, idx) => (
                 <div key={idx} className="flex items-center gap-3">
