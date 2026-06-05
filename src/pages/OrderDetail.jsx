@@ -410,7 +410,12 @@ const OrderDetail = () => {
       : {}
   );
   const invoice = order.invoice || null;
-  const isInvoicePaid = (invoice?.paymentStatus || '').toUpperCase() === 'PAID';
+  const invoicePaymentStatus = (invoice?.paymentStatus || invoice?.PaymentStatus || '').toUpperCase();
+  const txStatusRaw = (transaction?.transactionStatus || transaction?.status || '').toUpperCase();
+  // Đơn đã thanh toán nếu: invoice PAID, hoặc transaction SUCCESS, hoặc order đã qua PENDING (PROCESSING/FINISHED/COMPLETED)
+  const isInvoicePaid = invoicePaymentStatus === 'PAID'
+    || txStatusRaw === 'SUCCESS'
+    || ['PROCESSING', 'FINISHED', 'COMPLETED'].includes((order.orderStatus || order.status || '').toUpperCase());
   const isCod = resolveOrderIsCod(invoice, transaction);
   const totalAmount = order.totalPrice ?? order.totalAmount ?? order.total ?? invoice?.totalAmount ?? 0;
   const shippingFee = orderShipment.shippingFee ?? order.shippingFee ?? 0;

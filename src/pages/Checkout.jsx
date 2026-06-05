@@ -43,7 +43,7 @@ const PAYMENT_METHODS = [
 
 // TODO: GHN temporarily hidden until BE shipping quote/carrier endpoints are restored.
 const ENABLE_GHN_SHIPPING = false;
-const DEFAULT_SHIPPING_FEE = 30000;
+const DEFAULT_SHIPPING_FEE = 0; // Tạm miễn phí vận chuyển
 
 const formatPrice = (price) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
@@ -585,7 +585,7 @@ const Checkout = () => {
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-sm font-semibold text-gray-900">Giao hàng Nova3D</p>
                 <p className="text-sm text-gray-500 mt-1">
-                  Giao Hàng Nhanh đang được ẩn tạm thời. Phí vận chuyển mặc định là {formatPrice(DEFAULT_SHIPPING_FEE)}.
+                  Miễn phí vận chuyển.
                 </p>
               </div>
             )}
