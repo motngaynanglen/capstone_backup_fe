@@ -16,19 +16,10 @@ const transactionApi = {
     return response.data;
   },
 
-  // Lấy giao dịch theo orderId — dùng query filter
+  // Lấy giao dịch theo orderId — BE: GET /api/transaction/{orderId}/detail-by-order-id
   getByOrderId: async (orderId) => {
-    try {
-      const response = await axiosInstance.post('/api/transaction/query', {
-        orderId,
-        pageNumber: 1,
-        pageSize: 1,
-      });
-      const list = response.data?.data || [];
-      return { data: list[0] || null };
-    } catch {
-      return { data: null };
-    }
+    const response = await axiosInstance.get(`/api/transaction/${orderId}/detail-by-order-id`);
+    return response.data;
   },
 
   // Hủy giao dịch — BE: PATCH /api/transaction/{id}/cancel

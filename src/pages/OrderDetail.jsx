@@ -294,21 +294,41 @@ const OrderDetail = () => {
 
   const handleCheckPaymentStatus = async () => {
     try {
-      await reloadOrder();
-      // Sau reload, nếu đã paid thì đóng modal
-      const freshRes = await getOrderDetailApi(id);
-      const freshData = freshRes?.data || freshRes;
-      const freshInvoice = freshData?.invoice;
-      if ((freshInvoice?.paymentStatus || '').toUpperCase() === 'PAID') {
+      // Gọi API lấy thông tin giao dịch theo orderId
+      const txRes = await transactionApi.getByOrderId(id);
+      const txData = txRes?.data || txRes;
+      const status = (txData?.transactionStatus || '').toUpperCase();
+
+      if (status === 'SUCCESS') {
         setPaymentModal(false);
         setPaymentData(null);
-        notification.success({ message: 'Thanh toán thành công!', description: 'Đơn hàng đã được xác nhận.' });
+        notification.success({
+          message: 'Thanh toán thành công!',
+          description: `Đơn hàng đã được xác nhận. Mã giao dịch: ${txData?.internalCode || ''}`,
+        });
+        // Reload để cập nhật trạng thái đơn hàng
         window.location.reload();
+      } else if (status === 'PENDING') {
+        notification.info({
+          message: 'Chưa nhận được thanh toán',
+          description: 'Vui lòng hoàn tất thanh toán trên PayOS rồi bấm kiểm tra lại. Hệ thống cần vài giây để xác nhận.',
+        });
+      } else if (status === 'FAILED' || status === 'CANCELLED') {
+        notification.error({
+          message: 'Giao dịch thất bại',
+          description: txData?.note || 'Giao dịch đã bị hủy hoặc thất bại. Vui lòng thử thanh toán lại.',
+        });
       } else {
-        notification.info({ message: 'Chưa nhận được thanh toán', description: 'Vui lòng hoàn tất thanh toán trên PayOS rồi bấm kiểm tra lại.' });
+        notification.warning({
+          message: 'Không xác định trạng thái',
+          description: `Trạng thái: ${status || 'Không rõ'}. Liên hệ hỗ trợ nếu đã chuyển khoản.`,
+        });
       }
-    } catch {
-      notification.error({ message: 'Kiểm tra thất bại' });
+    } catch (err) {
+      notification.error({
+        message: 'Kiểm tra thất bại',
+        description: err?.response?.data?.message || 'Không thể kiểm tra trạng thái thanh toán.',
+      });
     }
   };
 
