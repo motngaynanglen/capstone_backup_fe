@@ -24,7 +24,6 @@ import {
   markShipmentReadyApi,
   markShipmentInTransitApi,
   confirmShipmentDeliveredApi,
-  syncCarrierShipmentApi,
   cancelShipmentApi,
   simulateGhnStatusApi,
 } from '../../api/shipmentApi';
@@ -241,24 +240,6 @@ export default function StaffCarrierActions({
       onUpdated?.();
     } catch (e) {
       message.error(apiErrorMessage(e, 'Không thể hoàn thành đơn hàng. BE có thể đang chặn theo rule nghiệp vụ.'));
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const handleSyncGhn = async () => {
-    if (!shipmentId) {
-      message.warning('Chưa có vận đơn để đồng bộ.');
-      return;
-    }
-    setCreating(true);
-    try {
-      await syncCarrierShipmentApi(shipmentId);
-      message.success('Đã đồng bộ trạng thái từ GHN');
-      await load();
-      onUpdated?.();
-    } catch (e) {
-      message.error(apiErrorMessage(e, 'Không đồng bộ được trạng thái GHN'));
     } finally {
       setCreating(false);
     }
@@ -548,15 +529,9 @@ export default function StaffCarrierActions({
                   type="info"
                   showIcon
                   message="Đơn GHN — trạng thái cập nhật tự động qua GHN."
-                  description="Không nhập trạng thái thủ công. Dùng nút bên dưới để đồng bộ hoặc in vận đơn."
+                  description="Không nhập trạng thái thủ công. Trạng thái được cập nhật tự động qua webhook."
                 />
               )}
-              <Space wrap>
-                <Button icon={<ReloadOutlined />} loading={creating} onClick={handleSyncGhn}>
-                  Đồng bộ trạng thái GHN
-                </Button>
-              </Space>
-              <Divider style={{ margin: '8px 0' }} />
               <Alert
                 type="warning"
                 showIcon

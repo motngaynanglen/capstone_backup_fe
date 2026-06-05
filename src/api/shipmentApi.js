@@ -101,12 +101,6 @@ export const getShipmentLabelApi = async (id) => {
   return response.data;
 };
 
-// 8. [Staff/Manager] Đồng bộ trạng thái từ đơn vị vận chuyển (GHN)
-export const syncCarrierShipmentApi = async (id) => {
-  const response = await axiosInstance.post(`/api/shipment/${id}/sync-carrier`);
-  return response.data;
-};
-
 // [DEV] Giả lập trạng thái GHN qua webhook nội bộ
 export const simulateGhnStatusApi = async (orderCode, status) => {
   const response = await axiosInstance.post('/api/shipment/webhook/ghn', {
