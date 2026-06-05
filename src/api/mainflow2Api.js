@@ -159,7 +159,55 @@ async function getDesignWorkMessagesSafe(designWorkId) {
   }
 }
 
+function normalizeDesignWork(work, messages = []) {
+  const rawStatus = work?.status || work?.Status;
+  const statusMap = {
+    SKETCHING: 'SUBMITTED',
+    PENDING: 'SUBMITTED',
+    IN_PROGRESS: 'ASSIGNED',
+    REVIEWING: 'QUOTED',
+    COMPLETED: 'APPROVED',
+    CANCELLED: 'CANCELLED',
+  };
+
+  return {
+    ...work,
+    id: work?.id || work?.Id,
+    title: work?.title || work?.Title || work?.name || work?.Name,
+    name: work?.name || work?.Name,
+    code: work?.code || work?.Code || work?.name || work?.Name,
+    status: statusMap[rawStatus] || rawStatus,
+    designWorkStatus: rawStatus,
+    isLocked: work?.isLocked ?? work?.IsLocked ?? false,
+    baseImageUrl: work?.baseImageUrl || work?.BaseImageUrl,
+    resultDraftId: work?.resultDraftId || work?.ResultDraftId,
+    selections: work?.selections || work?.Selections || [],
+    subRevisions: work?.subRevisions || work?.SubRevisions || [],
+    designServiceOrderId: work?.designServiceOrderId || work?.DesignServiceOrderId,
+    designServiceOrderCode: work?.designServiceOrderCode || work?.DesignServiceOrderCode,
+    designServiceOrderStatus: work?.designServiceOrderStatus || work?.DesignServiceOrderStatus,
+    designServicePaymentStatus: work?.designServicePaymentStatus || work?.DesignServicePaymentStatus,
+    designServiceTotalAmount: work?.designServiceTotalAmount || work?.DesignServiceTotalAmount,
+    messages,
+  };
+}
+
 export const getDesignRequestDetail = async (id) => {
+  try {
+    const detailRes = await axiosInstance.get(`/api/design-work/${id}/detail`);
+    const detail = detailRes.data?.data || detailRes.data;
+    const messages = await getDesignWorkMessagesSafe(id);
+    return {
+      ...detailRes.data,
+      data: normalizeDesignWork(detail, messages),
+      statusCode: detailRes.data?.statusCode || 200,
+    };
+  } catch (error) {
+    if (error?.response?.status && error.response.status !== 404 && error.response.status !== 405) {
+      throw error;
+    }
+  }
+
   // Thử query với search = id (BE sẽ filter)
   // Hoặc dùng query all rồi find — nhưng BE không có GET detail endpoint
   // Workaround: query tất cả rồi tìm theo id

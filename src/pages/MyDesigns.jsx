@@ -109,6 +109,16 @@ const MyDesigns = () => {
                     <div className="text-lg font-bold text-indigo-600 mt-2">
                       {formatPrice(draft.unitPrice || draft.price)}
                     </div>
+                    <Button
+                      type="primary"
+                      block
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        navigate(`/my-designs/${draft.id}`);
+                      }}
+                    >
+                      Xem chi tiet
+                    </Button>
                   </div>
                 </Card>
               </Col>

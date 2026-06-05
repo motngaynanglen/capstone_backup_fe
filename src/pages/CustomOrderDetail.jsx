@@ -1,14 +1,17 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Spin, message, Modal, Button } from 'antd';
-import { getDesignRequestDetail, approveQuote, cancelDesignRequest, postDesignRequestMessage, uploadFile } from '../api/mainflow2Api';
-import { cancelOrderApi } from '../api/orderApi';
+import { getDesignRequestDetail, approveQuote, cancelDesignRequest, postDesignRequestMessage, uploadFile, lockDesignWork } from '../api/mainflow2Api';
+import { cancelOrderApi, checkoutDesignApi } from '../api/orderApi';
+import technicalDraftApi from '../api/technicalDraftApi';
+import { getActiveServiceOptionsApi } from '../api/serviceApi';
 import { useAuth } from '../contexts/AuthContext';
 import useMainflow2Realtime from '../hooks/useMainflow2Realtime';
 import QuoteMessageCard from '../components/Mainflow2/QuoteMessageCard';
 import ChatMessageBubble, { ChatComposer } from '../components/Mainflow2/ChatMessageBubble';
 import { getMessageAuthorId } from '../components/Mainflow2/messageMetadataUtils';
 import Model3DPreview from '../components/Mainflow2/Model3DPreview';
+import ServiceOptionPicker from '../components/Mainflow2/ServiceOptionPicker';
 
 const CUSTOM_STATUS_STEPS = [
   { key: 'SUBMITTED', label: 'Gửi yêu cầu' },
@@ -61,6 +64,8 @@ const goToDesignCheckout = (navigate, order) => {
 const formatPrice = (price) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
 
+const designServiceSelectionKey = (designWorkId) => `design-service-selections:${designWorkId}`;
+
 const statusColor = (status) => {
   if (status === 'SUBMITTED') return { background: '#f3f4f6', color: '#6b7280' };
   if (status === 'ASSIGNED') return { background: '#eff6ff', color: '#2563eb' };
@@ -78,6 +83,10 @@ const CustomOrderDetail = () => {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [technicalDrafts, setTechnicalDrafts] = useState([]);
+  const [serviceOptions, setServiceOptions] = useState([]);
+  const [pendingServiceSelections, setPendingServiceSelections] = useState([]);
+  const [servicePickerOpen, setServicePickerOpen] = useState(false);
 
   const [chatMessage, setChatMessage] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -105,6 +114,31 @@ const CustomOrderDetail = () => {
   useEffect(() => {
     fetchDetail();
   }, [id]);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(designServiceSelectionKey(id));
+      setPendingServiceSelections(raw ? JSON.parse(raw) : []);
+    } catch {
+      setPendingServiceSelections([]);
+    }
+  }, [id]);
+
+  const fetchTechnicalDrafts = useCallback(async () => {
+    try {
+      const res = await technicalDraftApi.getByDesignWork(id);
+      setTechnicalDrafts(res?.data || []);
+    } catch {
+      setTechnicalDrafts([]);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchTechnicalDrafts();
+    getActiveServiceOptionsApi()
+      .then((res) => setServiceOptions(res?.data || []))
+      .catch(() => setServiceOptions([]));
+  }, [fetchTechnicalDrafts]);
 
   useMainflow2Realtime(id, () => fetchDetail(true));
 
@@ -152,6 +186,131 @@ const CustomOrderDetail = () => {
         } catch { message.error('Lỗi khi duyệt báo giá'); }
         finally { setProcessing(false); }
       }
+    });
+  };
+
+  const paidServiceRows = useMemo(() => {
+    const selections = order?.selections || [];
+    return selections.flatMap((selection) => {
+      const items = selection.serviceSelectedOptions || selection.ServiceSelectedOptions || [];
+      return items.map((item) => ({
+        id: item.serviceOptionId || item.ServiceOptionId || item.id || item.Id,
+        name: item.optionNameSnapshot || item.OptionNameSnapshot || 'Tuy chon dich vu',
+        groupName: item.optionGroupNameSnapshot || item.OptionGroupNameSnapshot || item.optionGroupCodeSnapshot || item.OptionGroupCodeSnapshot,
+        quantity: item.quantity || item.Quantity || 1,
+        price: item.appliedPrice || item.AppliedPrice || 0,
+      }));
+    });
+  }, [order?.selections]);
+
+  const pendingServiceRows = useMemo(() => {
+    return pendingServiceSelections.map((selection) => {
+      const optionId = selection.serviceOptionId || selection.ServiceOptionId;
+      const option = serviceOptions.find((item) => item.id === optionId || item.Id === optionId);
+      return {
+        id: optionId,
+        name: option?.name || option?.Name || optionId,
+        groupName: option?.groupName || option?.GroupName || option?.groupCode || option?.GroupCode,
+        quantity: selection.quantity || selection.Quantity || 1,
+        price: option?.defaultPrice || option?.DefaultPrice || 0,
+      };
+    });
+  }, [pendingServiceSelections, serviceOptions]);
+
+  const serviceRows = paidServiceRows.length > 0 ? paidServiceRows : pendingServiceRows;
+  const serviceTotal = serviceRows.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0);
+  const designFeeOrderId = order?.designServiceOrderId;
+  const designFeePaid = order?.designServicePaymentStatus === 'PAID';
+  const confirmedDraft = technicalDrafts.find((draft) => draft.isConfirmed || draft.IsConfirmed);
+  const hasConfirmedDraft = Boolean(confirmedDraft);
+
+  const handlePendingServiceChange = (items) => {
+    setPendingServiceSelections(items);
+    if (items.length > 0) {
+      sessionStorage.setItem(designServiceSelectionKey(id), JSON.stringify(items));
+    } else {
+      sessionStorage.removeItem(designServiceSelectionKey(id));
+    }
+  };
+
+  const handlePayDesignService = async () => {
+    if (designFeeOrderId) {
+      navigate(`/orders/${designFeeOrderId}`);
+      return;
+    }
+
+    const serviceOptionsPayload = pendingServiceSelections
+      .map((item) => ({
+        ServiceOptionId: item.serviceOptionId || item.ServiceOptionId,
+        Quantity: item.quantity || item.Quantity || 1,
+      }))
+      .filter((item) => item.ServiceOptionId);
+
+    if (serviceOptionsPayload.length === 0) {
+      message.warning('Khong tim thay noi dung dich vu da chon. Vui long tao lai yeu cau hoac lien he nhan vien.');
+      return;
+    }
+
+    try {
+      setProcessing(true);
+      const res = await checkoutDesignApi({
+        DesignWorkId: id,
+        ServiceOptions: serviceOptionsPayload,
+        Note: 'Thanh toan phi dich vu thiet ke',
+      });
+      const newOrderId = res?.data?.id || res?.data?.Id || res?.id || res?.Id;
+      sessionStorage.removeItem(designServiceSelectionKey(id));
+      await fetchDetail(true);
+      if (newOrderId) navigate(`/orders/${newOrderId}`);
+      else message.success('Da tao don phi dich vu thiet ke.');
+    } catch (err) {
+      message.error(err?.response?.data?.message || err?.message || 'Tao don phi thiet ke that bai.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleConfirmTechnicalDraft = (draft) => {
+    Modal.confirm({
+      title: 'Duyet bao gia ky thuat',
+      content: 'Sau khi duyet, ban co the thay thiet ke nay trong Kho do thiet ke va van tiep tuc chat neu can.',
+      okText: 'Duyet bao gia',
+      cancelText: 'Bo qua',
+      onOk: async () => {
+        try {
+          setProcessing(true);
+          await technicalDraftApi.confirm(draft.id || draft.Id);
+          message.success('Bao gia thanh cong.');
+          await fetchTechnicalDrafts();
+          await fetchDetail(true);
+        } catch (err) {
+          message.error(err?.response?.data?.message || err?.message || 'Duyet bao gia that bai.');
+        } finally {
+          setProcessing(false);
+        }
+      },
+    });
+  };
+
+  const handleLockConversation = () => {
+    Modal.confirm({
+      title: 'KHOA CUOC TRO CHUYEN',
+      content: 'Thao tac nay khoa DesignWork va ket thuc luong thiet ke 3D rieng. Ban chi nen khoa sau khi da chot xong voi shop.',
+      okText: 'Khoa cuoc tro chuyen',
+      okType: 'danger',
+      cancelText: 'Bo qua',
+      onOk: async () => {
+        try {
+          setProcessing(true);
+          await lockDesignWork(id);
+          message.success('Da khoa cuoc tro chuyen.');
+          await fetchDetail(true);
+        } catch (err) {
+          message.error(err?.response?.data?.message || err?.message || 'Khoa cuoc tro chuyen that bai.');
+        } finally {
+          setProcessing(false);
+        }
+      },
     });
   };
 
@@ -215,7 +374,7 @@ const CustomOrderDetail = () => {
   const linkedOrderId = order?.orderId;
   const isPaid = order?.linkedPaymentStatus === 'PAID';
   const hasLinkedOrder = Boolean(linkedOrderId);
-  const showPayButtons = order?.status === 'APPROVED' && !hasLinkedOrder;
+  const showPayButtons = order?.status === 'APPROVED' && !hasLinkedOrder && order?.latestQuotedPrice != null;
   const showAwaitingPayment = hasLinkedOrder && !isPaid;
   const showProduction = hasLinkedOrder && isPaid;
   const fileVersions = order?.versions || order?.quoteFileVersions || [];
@@ -262,6 +421,12 @@ const CustomOrderDetail = () => {
         <span style={{ padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, ...headerStatusStyle }}>
           {headerStatusLabel}
         </span>
+        {hasConfirmedDraft && !order.isLocked && (
+          <button onClick={handleLockConversation} disabled={processing}
+            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #dc2626', background: '#dc2626', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
+            KHOA CUOC TRO CHUYEN
+          </button>
+        )}
         {showProduction && linkedOrderId && (
           <Link
             to={`/orders/${linkedOrderId}`}
@@ -333,7 +498,11 @@ const CustomOrderDetail = () => {
           </div>
 
           {/* Composer */}
-          {order.status === 'CANCELLED' ? (
+          {order.isLocked ? (
+            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#6b7280', fontSize: 13, fontWeight: 600 }}>
+              Cuoc tro chuyen da duoc khoa.
+            </div>
+          ) : order.status === 'CANCELLED' ? (
             <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#dc2626', fontSize: 13, fontWeight: 500 }}>
               Yêu cầu đã bị hủy.
             </div>
@@ -377,7 +546,7 @@ const CustomOrderDetail = () => {
               </Button>
               <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Bấm để thanh toán — shop sẽ bắt đầu sản xuất và gửi hàng cho bạn.</p>
             </div>
-          ) : order.status === 'APPROVED' ? (
+          ) : order.status === '__APPROVED_CHAT_BLOCK_DISABLED__' ? (
             <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#6b7280', fontSize: 13 }}>
               Yêu cầu đã duyệt. Liên hệ shop nếu cần hỗ trợ đơn hàng.
             </div>
@@ -441,6 +610,102 @@ const CustomOrderDetail = () => {
               )}
             </ul>
           </div>
+
+          {/* Design service fee */}
+          <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
+            <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>
+              Phi dich vu thiet ke
+            </p>
+            {serviceRows.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {serviceRows.map((item) => (
+                  <div key={item.id} style={{ padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, background: '#f9fafb' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#111827' }}>{item.name}</div>
+                    <div style={{ fontSize: 11, color: '#6b7280' }}>
+                      {item.groupName || 'Dich vu'} x {item.quantity}
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#4f46e5' }}>
+                      {formatPrice(Number(item.price || 0) * Number(item.quantity || 1))}
+                    </div>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 800 }}>
+                  <span>Tong</span>
+                  <span>{formatPrice(order.designServiceTotalAmount || serviceTotal)}</span>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p style={{ margin: '0 0 10px', fontSize: 12, color: '#9ca3af' }}>Chua co noi dung dich vu da chon.</p>
+                {!designFeeOrderId && (
+                  <Button block onClick={() => setServicePickerOpen(true)}>
+                    Chon dich vu thiet ke
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {!designFeePaid ? (
+              <Button
+                type="primary"
+                block
+                loading={processing}
+                style={{ marginTop: 12, background: '#4f46e5', borderColor: '#4f46e5', fontWeight: 700 }}
+                onClick={handlePayDesignService}
+                disabled={!designFeeOrderId && pendingServiceSelections.length === 0}
+              >
+                {designFeeOrderId ? 'Thanh toan phi dich vu thiet ke' : 'Tao don thanh toan phi thiet ke'}
+              </Button>
+            ) : (
+              <div style={{ marginTop: 12, color: '#059669', fontSize: 12, fontWeight: 700 }}>
+                Da thanh toan phi dich vu thiet ke
+              </div>
+            )}
+          </div>
+
+          {/* Technical drafts */}
+          {technicalDrafts.length > 0 && (
+            <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
+              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>
+                Bao gia ky thuat
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {technicalDrafts.map((draft) => {
+                  const draftId = draft.id || draft.Id;
+                  const isConfirmedDraft = draft.isConfirmed || draft.IsConfirmed;
+                  const unitPrice = draft.unitPrice ?? draft.UnitPrice ?? draft.finalPrice ?? draft.FinalPrice ?? draft.price ?? draft.Price;
+                  return (
+                    <div key={draftId} style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 10 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: '#111827' }}>
+                        {draft.name || draft.designWorkName || draft.DesignWorkName || 'Bao gia'}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                        {draft.materialName || draft.MaterialName || 'Vat lieu'} - {draft.estimatedWeightPerUnit || draft.EstimatedWeightPerUnit || 0}g
+                      </div>
+                      <div style={{ fontSize: 16, color: '#065f46', fontWeight: 800, marginTop: 6 }}>
+                        {formatPrice(unitPrice)}
+                      </div>
+                      {isConfirmedDraft ? (
+                        <div style={{ marginTop: 8, color: '#059669', fontSize: 12, fontWeight: 800 }}>
+                          Bao gia thanh cong
+                        </div>
+                      ) : (
+                        <Button
+                          block
+                          type="primary"
+                          loading={processing}
+                          style={{ marginTop: 8, background: '#059669', borderColor: '#059669', fontWeight: 700 }}
+                          onClick={() => handleConfirmTechnicalDraft(draft)}
+                        >
+                          Duyet bao gia
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Quote summary + approve button */}
           {order.latestQuotedPrice != null && (
@@ -522,6 +787,17 @@ const CustomOrderDetail = () => {
           </div>
         </div>
       </div>
+      <Modal
+        open={servicePickerOpen}
+        title="Chon dich vu thiet ke"
+        onCancel={() => setServicePickerOpen(false)}
+        onOk={() => setServicePickerOpen(false)}
+        okText="Luu lua chon"
+        cancelText="Dong"
+        width={760}
+      >
+        <ServiceOptionPicker value={pendingServiceSelections} onChange={handlePendingServiceChange} />
+      </Modal>
     </div>
   );
 };

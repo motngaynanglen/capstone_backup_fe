@@ -27,6 +27,7 @@ import CustomOrderRequestDesign from "../pages/CustomOrderRequestDesign";
 import CustomOrderAIGenerate from "../pages/CustomOrderAIGenerate";
 import MyCustomOrders from "../pages/MyCustomOrders";
 import MyDesigns from "../pages/MyDesigns";
+import MyDesignDetail from "../pages/MyDesignDetail";
 import CustomOrderDetail from "../pages/CustomOrderDetail";
 import Preview3D from "../pages/Preview3D";
 import FeedbackForm from "../pages/FeedbackForm";
@@ -485,6 +486,16 @@ const AppRouter = () => {
             <Layout>
               <PrivateRoute>
                 <MyDesigns />
+              </PrivateRoute>
+            </Layout>
+          }
+        />
+        <Route
+          path="/my-designs/:draftId"
+          element={
+            <Layout>
+              <PrivateRoute>
+                <MyDesignDetail />
               </PrivateRoute>
             </Layout>
           }

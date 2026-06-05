@@ -42,6 +42,12 @@ const technicalDraftApi = {
     return response.data;
   },
 
+  // BE: PATCH /api/technical-draft/{id}/confirm
+  confirm: async (id) => {
+    const response = await axiosInstance.patch(`/api/technical-draft/${id}/confirm`);
+    return response.data;
+  },
+
   // BE: POST /api/technical-draft
   create: async (data) => {
     const response = await axiosInstance.post('/api/technical-draft', data);

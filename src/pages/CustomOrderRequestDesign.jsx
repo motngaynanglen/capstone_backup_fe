@@ -11,6 +11,8 @@ const getDesignWorkId = (response) => {
   return data?.id || data?.Id || data?.designWorkId || data?.DesignWorkId || null;
 };
 
+const designServiceSelectionKey = (designWorkId) => `design-service-selections:${designWorkId}`;
+
 const fileErrorMessage = ({ file, error }) =>
   `${file?.name || 'file'}: ${error?.response?.data?.message || error?.message || 'Upload failed'}`;
 
@@ -90,6 +92,11 @@ const CustomOrderRequestDesign = () => {
       return;
     }
 
+    if (serviceSelections.length === 0) {
+      message.warning('Vui long chon it nhat mot tuy chon dich vu thiet ke.');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       const response = await createDesignRequest({
@@ -101,6 +108,9 @@ const CustomOrderRequestDesign = () => {
 
       message.success('Yêu cầu thiết kế đã được gửi.');
       const newId = getDesignWorkId(response);
+      if (newId) {
+        sessionStorage.setItem(designServiceSelectionKey(newId), JSON.stringify(serviceSelections));
+      }
       navigate(newId ? `/custom-orders/${newId}` : '/my-custom-orders');
     } catch (error) {
       console.error(error);
