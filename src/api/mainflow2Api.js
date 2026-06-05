@@ -160,15 +160,66 @@ export const assignStaffToRequest = async (id) => {
   return response.data;
 };
 
+function firstMaterialLine(components = []) {
+  for (const component of components) {
+    const material = (component.materials || []).find((row) => row.materialId && Number(row.grams) > 0);
+    if (material) return material;
+  }
+  return null;
+}
+
+function estimateWeightFromComponents(components = []) {
+  return components.reduce((total, component) => {
+    const quantity = Math.max(1, Number(component.quantity) || 1);
+    const grams = (component.materials || []).reduce((sum, row) => sum + (Number(row.grams) || 0), 0);
+    return total + grams * quantity;
+  }, 0);
+}
+
+async function resolveLatestVersionId(designWorkId, preferredId) {
+  if (preferredId) return preferredId;
+  const response = await axiosInstance.get(`/api/design-version/design-work/${designWorkId}`);
+  const versions = response.data?.data || response.data || [];
+  const latest = Array.isArray(versions) ? versions[0] : null;
+  const latestId = latest?.id || latest?.Id;
+  if (!latestId) {
+    throw new Error('Khong tim thay phien ban thiet ke de tao technical draft.');
+  }
+  return latestId;
+}
+
 // ─── Staff: Gửi báo giá ─────────────────────────────────────────────────
-// BE: POST /api/technical-draft/add
-// Body: { DesignWorkId, PricePerGram?, Weight?, MaterialId?, ... }
-export const submitQuote = async (id, payload) => {
+// BE: POST /api/technical-draft
+// Body: CreateTechnicalDraftCommand
+export const submitQuote = async (id, payload = {}) => {
+  const materialLine = firstMaterialLine(payload.components || []);
   const body = {
-    DesignWorkId: id,
-    ...payload,
+    DesignVersionHistoryId: await resolveLatestVersionId(
+      id,
+      payload.designVersionHistoryId || payload.DesignVersionHistoryId,
+    ),
+    MaterialId: payload.materialId || payload.MaterialId || materialLine?.materialId,
+    InfillDensity: Number(payload.infillDensity ?? payload.InfillDensity ?? 20),
+    LayerHeight: Number(payload.layerHeight ?? payload.LayerHeight ?? 0.2),
+    EstimatedWeightPerUnit: Number(
+      payload.estimatedWeightPerUnit
+        ?? payload.EstimatedWeightPerUnit
+        ?? estimateWeightFromComponents(payload.components || []),
+    ),
+    EstimatedPrintTimePerUnit: payload.estimatedPrintTimePerUnit ?? payload.EstimatedPrintTimePerUnit ?? null,
+    UnitPrice: payload.unitPrice ?? payload.UnitPrice ?? payload.quotedPrice ?? null,
+    MarkupPercentage: Number(payload.markupPercentage ?? payload.MarkupPercentage ?? 0),
+    TechnicalNote: payload.technicalNote || payload.TechnicalNote || payload.staffNote || '',
   };
-  const response = await axiosInstance.post('/api/technical-draft/add', body);
+
+  if (!body.MaterialId) {
+    throw new Error('Vui long chon vat lieu de tao technical draft.');
+  }
+  if (!body.EstimatedWeightPerUnit || body.EstimatedWeightPerUnit <= 0) {
+    throw new Error('Khoi luong technical draft phai lon hon 0.');
+  }
+
+  const response = await axiosInstance.post('/api/technical-draft', body);
   return response.data;
 };
 

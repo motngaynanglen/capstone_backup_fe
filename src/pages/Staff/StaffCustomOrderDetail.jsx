@@ -42,6 +42,11 @@ const statusColor = (status) => {
   return { background: '#fef2f2', color: '#dc2626' };
 };
 
+const isSuccessResponse = (res) =>
+  res?.statusCode === 200 ||
+  res?.success === true ||
+  ['SUCCESS', 'CREATED', 'UPDATED'].includes(String(res?.code || '').toUpperCase());
+
 const StaffCustomOrderDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -135,7 +140,7 @@ const StaffCustomOrderDetail = () => {
     try {
       setProcessing(true);
       const res = await submitQuote(id, payload);
-      if (res?.statusCode === 200) {
+      if (isSuccessResponse(res)) {
         message.success('Báo giá thành công!');
         setQuoteModalOpen(false);
         fetchDetail();

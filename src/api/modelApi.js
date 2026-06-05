@@ -185,11 +185,7 @@ export const generateModelFromImage = async (imageFile) => {
 
 /** @deprecated OpenRouter flow. */
 export const generateModelOpenRouter = async (prompt, imageFile) => {
-  const formData = new FormData();
-  formData.append('Prompt', prompt);
-  formData.append('Image', imageFile);
-  const response = await axiosInstance.post('/api/model-generate/openrouter', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
-  return response.data;
+  void prompt;
+  void imageFile;
+  throw new Error('OpenRouter generate flow is disabled because the backend does not expose this endpoint. Use generateAndUploadGlbFromImage instead.');
 };

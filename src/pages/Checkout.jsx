@@ -5,8 +5,11 @@ import { checkoutOrderApi, performTransactionApi } from '../api/orderApi';
 import axiosInstance from '../api/axiosInstance';
 import { useCart } from '../contexts/CartContext';
 import { notification } from 'antd';
+import transactionApi from '../api/transactionApi';
 import ShippingCarrierSelect from '../components/Shipping/ShippingCarrierSelect';
 import GhnLocationPicker from '../components/Shipping/GhnLocationPicker';
+import { Modal } from 'antd';
+import { QRCodeSVG } from 'qrcode.react';
 
 const PackageIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5">
@@ -36,9 +39,10 @@ const PlusIcon = () => (
   </svg>
 );
 
-// Chỉ hỗ trợ thanh toán online qua PayOS — không hỗ trợ COD
+// Phương thức thanh toán — VNPay mặc định, PayOS tùy chọn
 const PAYMENT_METHODS = [
-  { value: 'VNPAY', label: 'Thanh toán online (PayOS)', description: 'Hỗ trợ QR, thẻ ngân hàng, ví điện tử' },
+  { value: 'VNPAY', label: 'VNPay', description: 'Chuyển hướng sang cổng thanh toán VNPay (thẻ ngân hàng, ví điện tử)', icon: '🏦' },
+  { value: 'PAYOS', label: 'PayOS', description: 'Quét mã QR để thanh toán (⚠️ thanh toán bằng tiền thật)', icon: '📱', warning: true },
 ];
 
 // TODO: GHN temporarily hidden until BE shipping quote/carrier endpoints are restored.
@@ -147,6 +151,11 @@ const Checkout = () => {
   const [shippingCarrier, setShippingCarrier] = useState('');
   const [shippingFee, setShippingFee] = useState(0);
   const [shippingQuoteReady, setShippingQuoteReady] = useState(false);
+  // PayOS QR modal (hiển thị ngay sau checkout nếu chọn PayOS)
+  const [paymentModal, setPaymentModal] = useState(false);
+  const [paymentData, setPaymentData] = useState(null);
+  const [checkoutOrderId, setCheckoutOrderId] = useState(null);
+  const [checkoutOrderCode, setCheckoutOrderCode] = useState(null);
 
   const subtotal = cartItems.reduce((s, it) => s + Number(it.price || 0) * Number(it.quantity || 1), 0);
   const effectiveShippingFee = ENABLE_GHN_SHIPPING && shippingQuoteReady
@@ -355,6 +364,7 @@ const Checkout = () => {
 
       const tx = txRes?.data || txRes;
       const paymentUrl = tx?.paymentLink || tx?.checkoutUrl || tx?.paymentUrl;
+      const qrCode = tx?.qrCode || tx?.qrCodeUrl || null;
 
       try { clearCart(); } catch { /* ignore */ }
 
@@ -365,14 +375,23 @@ const Checkout = () => {
         duration: 2,
       });
 
-      const returnTo = location.state?.returnTo;
-      if (formData.paymentMethod === 'VNPAY' && paymentUrl) {
-        console.info('[Payment] Chuyển cổng thanh toán:', formData.paymentMethod, paymentUrl);
+      if (formData.paymentMethod === 'PAYOS' && (paymentUrl || qrCode)) {
+        // PayOS: hiển thị QR modal ngay tại trang checkout
+        setCheckoutOrderId(orderId);
+        setCheckoutOrderCode(orderCode);
+        setPaymentData({ checkoutUrl: paymentUrl, qrCode });
+        setPaymentModal(true);
+      } else if (formData.paymentMethod === 'VNPAY' && paymentUrl) {
+        // VNPay: chuyển hướng sang cổng thanh toán
+        console.info('[Payment] Chuyển cổng VNPay:', paymentUrl);
         window.location.href = paymentUrl;
-      } else if (returnTo) {
-        navigate(returnTo);
       } else {
-        navigate('/order-confirmation', { state: { orderId, orderCode } });
+        const returnTo = location.state?.returnTo;
+        if (returnTo) {
+          navigate(returnTo);
+        } else {
+          navigate('/order-confirmation', { state: { orderId, orderCode } });
+        }
       }
     } catch (error) {
       console.error('Checkout error:', error);
@@ -553,14 +572,53 @@ const Checkout = () => {
               <div className="w-1 h-6 bg-indigo-600 rounded-full"></div>
               <h2 className="text-lg font-bold text-gray-900">Phương thức thanh toán</h2>
             </div>
-            <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
-              </svg>
-              <div>
-                <p className="font-medium text-sm text-gray-900 m-0">Thanh toán online qua PayOS</p>
-                <p className="text-xs text-gray-500 m-0 mt-0.5">Hỗ trợ QR, thẻ ngân hàng, ví điện tử</p>
-              </div>
+            <div className="space-y-3">
+              {PAYMENT_METHODS.map((method) => (
+                <label
+                  key={method.value}
+                  className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all duration-150 ${
+                    formData.paymentMethod === method.value
+                      ? method.warning
+                        ? 'border-amber-400 bg-amber-50'
+                        : 'border-indigo-500 bg-indigo-50'
+                      : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value={method.value}
+                    checked={formData.paymentMethod === method.value}
+                    onChange={handleChange}
+                    className="w-4 h-4 mt-0.5 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{method.icon}</span>
+                      <span className="font-semibold text-sm text-gray-900">{method.label}</span>
+                      {method.value === 'VNPAY' && (
+                        <span className="text-[10px] font-medium text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">
+                          Mặc định
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{method.description}</p>
+                    {method.warning && formData.paymentMethod === method.value && (
+                      <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-700 bg-amber-100 rounded-lg px-2.5 py-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5 flex-shrink-0">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                        </svg>
+                        <span className="font-medium">Lưu ý: PayOS thanh toán bằng tiền thật!</span>
+                      </div>
+                    )}
+                  </div>
+                  {formData.paymentMethod === method.value && (
+                    <span className={method.warning ? 'text-amber-500' : 'text-indigo-600'}>
+                      <CheckCircleIcon />
+                    </span>
+                  )}
+                </label>
+              ))}
             </div>
           </div>
 
@@ -676,7 +734,126 @@ const Checkout = () => {
           </div>
         </div>
       </form>
+
+      {/* PayOS QR Modal — hiện khi chọn PayOS */}
+      <CheckoutPayOSModal
+        open={paymentModal}
+        data={paymentData}
+        orderId={checkoutOrderId}
+        orderCode={checkoutOrderCode}
+        onClose={() => { setPaymentModal(false); setPaymentData(null); }}
+        navigate={navigate}
+      />
     </div>
+  );
+};
+
+// ─── PayOS Payment QR Modal (giống OrderDetail) ─────────────────────
+const CheckoutPayOSModal = ({ open, data, orderId, orderCode, onClose, navigate }) => {
+  const [checking, setChecking] = useState(false);
+
+  if (!data) return null;
+
+  const isQrUrl = data.qrCode && (data.qrCode.startsWith('http') || data.qrCode.startsWith('data:'));
+
+  const handleCheckStatus = async () => {
+    try {
+      setChecking(true);
+      const txRes = await transactionApi.getByOrderId(orderId);
+      const txData = txRes?.data || txRes;
+      const status = (txData?.transactionStatus || '').toUpperCase();
+
+      if (status === 'SUCCESS') {
+        onClose();
+        notification.success({
+          message: 'Thanh toán thành công!',
+          description: `Đơn hàng ${orderCode || ''} đã được xác nhận.`,
+        });
+        navigate(`/order/${orderId}`);
+      } else if (status === 'PENDING') {
+        notification.info({
+          message: 'Chưa nhận được thanh toán',
+          description: 'Vui lòng hoàn tất thanh toán trên PayOS rồi bấm kiểm tra lại.',
+        });
+      } else if (status === 'FAILED' || status === 'CANCELLED') {
+        notification.error({
+          message: 'Giao dịch thất bại',
+          description: txData?.note || 'Giao dịch đã bị hủy hoặc thất bại.',
+        });
+      } else {
+        notification.warning({
+          message: 'Không xác định trạng thái',
+          description: `Trạng thái: ${status || 'Không rõ'}`,
+        });
+      }
+    } catch (err) {
+      notification.error({
+        message: 'Kiểm tra thất bại',
+        description: err?.response?.data?.message || 'Không thể kiểm tra trạng thái.',
+      });
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onCancel={() => {
+        onClose();
+        navigate(`/order/${orderId}`);
+      }}
+      footer={null}
+      centered
+      width={440}
+      title="Thanh toán qua PayOS"
+      destroyOnClose
+    >
+      <div className="text-center space-y-4 py-2">
+        {data.qrCode && (
+          <div className="flex justify-center">
+            {isQrUrl ? (
+              <img src={data.qrCode} alt="QR thanh toán" className="w-56 h-56 rounded-xl border border-gray-200 shadow-sm" />
+            ) : (
+              <div className="p-3 bg-white rounded-xl border border-gray-200 shadow-sm inline-block">
+                <QRCodeSVG value={data.qrCode} size={208} level="M" includeMargin={false} />
+              </div>
+            )}
+          </div>
+        )}
+        <div className="flex items-center gap-1.5 justify-center text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 border border-amber-200">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5 flex-shrink-0">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+          </svg>
+          <span className="font-medium">PayOS thanh toán bằng tiền thật!</span>
+        </div>
+        <p className="text-sm text-gray-600">
+          Quét mã QR bằng ứng dụng ngân hàng hoặc ví điện tử để thanh toán
+        </p>
+        {data.checkoutUrl && (
+          <a
+            href={data.checkoutUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-block px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors"
+          >
+            Mở trang thanh toán PayOS
+          </a>
+        )}
+        <div className="pt-3 border-t border-gray-100">
+          <button
+            onClick={handleCheckStatus}
+            disabled={checking}
+            className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {checking ? 'Đang kiểm tra...' : 'Tôi đã thanh toán — Kiểm tra'}
+          </button>
+          <p className="text-xs text-gray-400 mt-2">
+            Bấm nút trên sau khi hoàn tất chuyển khoản để hệ thống xác nhận
+          </p>
+        </div>
+      </div>
+    </Modal>
   );
 };
 

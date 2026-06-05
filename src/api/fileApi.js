@@ -1,25 +1,11 @@
 import axiosInstance from './axiosInstance';
 
-/**
- * Upload flow dùng Presigned URL (Backblaze B2):
- *   1. GET /api/app-support/presigned-{image|model}-url?fileName=... → { UploadUrl, FileUrl }
- *   2. PUT file lên UploadUrl (trực tiếp B2 từ browser, không qua BE)
- *   3. Trả về FileUrl (public URL trên B2)
- *
- * QUAN TRỌNG — Content-Type:
- *   BE ký presigned URL với Content-Type cố định theo extension (xem S3StorageService.cs).
- *   FE PHẢI gửi PUT với ĐÚNG Content-Type đó, nếu không B2 trả 403 SignatureDoesNotMatch.
- */
+export const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'];
+export const MODEL_EXTENSIONS = ['glb', 'stl', 'obj', 'fbx', '3mf'];
 
-const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'];
-const MODEL_EXTENSIONS = ['glb', 'stl', 'obj', 'fbx', '3mf'];
+const MAX_UPLOAD_SIZE_BYTES = 20 * 1024 * 1024;
 
-/**
- * Content-Type map — PHẢI KHỚP với BE S3StorageService._allowedExtensions.
- * Nếu BE chưa có extension nào trong này → cần thêm vào BE trước khi FE dùng.
- */
 const EXTENSION_CONTENT_TYPE = {
-  // Ảnh
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
   png: 'image/png',
@@ -27,7 +13,6 @@ const EXTENSION_CONTENT_TYPE = {
   gif: 'image/gif',
   bmp: 'image/bmp',
   svg: 'image/svg+xml',
-  // Model 3D
   glb: 'model/gltf-binary',
   stl: 'application/vnd.ms-pki.stl',
   obj: 'application/x-tgif',
@@ -39,77 +24,99 @@ function getFileExtension(fileName) {
   return (fileName || '').split('.').pop().toLowerCase();
 }
 
-function isImageFile(fileName) {
+export function isImageFile(fileName) {
   return IMAGE_EXTENSIONS.includes(getFileExtension(fileName));
 }
 
-function isModelFile(fileName) {
+export function isModelFile(fileName) {
   return MODEL_EXTENSIONS.includes(getFileExtension(fileName));
 }
 
-/**
- * Lấy Content-Type khớp chính xác với BE đã ký trong presigned URL.
- */
-function getSignedContentType(fileName) {
-  const ext = getFileExtension(fileName);
-  return EXTENSION_CONTENT_TYPE[ext] || 'application/octet-stream';
+export function getSignedContentType(fileName) {
+  return EXTENSION_CONTENT_TYPE[getFileExtension(fileName)] || 'application/octet-stream';
 }
 
-/**
- * Lấy presigned upload URL từ BE.
- */
-async function getPresignedUrl(fileName) {
-  const ext = getFileExtension(fileName);
-  const isModel = isModelFile(fileName);
-  const endpoint = isModel
+function buildSafeFileName(fileName) {
+  const fallbackName = fileName || 'upload.bin';
+  const normalized = fallbackName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return normalized || 'upload.bin';
+}
+
+function apiErrorMessage(error, fallback) {
+  const body = error?.response?.data;
+  const msg = body?.data || body?.message || body?.Message || error?.message;
+  return typeof msg === 'string' && msg.trim() ? msg : fallback;
+}
+
+function validateUploadFile(file, expectedType = 'any') {
+  if (!file) {
+    throw new Error('Chua chon file de upload.');
+  }
+
+  if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+    throw new Error(`File "${file.name}" vuot qua gioi han 20MB.`);
+  }
+
+  const ext = getFileExtension(file.name);
+  const supported = [...IMAGE_EXTENSIONS, ...MODEL_EXTENSIONS];
+  if (!supported.includes(ext)) {
+    throw new Error(`Dinh dang .${ext || '?'} chua duoc ho tro. Ho tro: ${supported.join(', ')}.`);
+  }
+
+  if (expectedType === 'image' && !isImageFile(file.name)) {
+    throw new Error(`File "${file.name}" khong phai anh hop le. Ho tro: ${IMAGE_EXTENSIONS.join(', ')}.`);
+  }
+
+  if (expectedType === 'model' && !isModelFile(file.name)) {
+    throw new Error(`File "${file.name}" khong phai model 3D hop le. Ho tro: ${MODEL_EXTENSIONS.join(', ')}.`);
+  }
+}
+
+export async function getPresignedUrl(fileName) {
+  const endpoint = isModelFile(fileName)
     ? '/api/app-support/presigned-model-url'
     : '/api/app-support/presigned-image-url';
 
-  const response = await axiosInstance.get(endpoint, {
-    params: { fileName },
-  });
+  try {
+    const response = await axiosInstance.get(endpoint, { params: { fileName } });
+    const data = response.data?.data || response.data;
+    const uploadUrl = data?.uploadUrl || data?.UploadUrl;
+    const fileUrl = data?.fileUrl || data?.FileUrl;
 
-  const data = response.data?.data || response.data;
-  const uploadUrl = data?.uploadUrl || data?.UploadUrl;
-  const fileUrl = data?.fileUrl || data?.FileUrl;
+    if (!uploadUrl || !fileUrl) {
+      throw new Error(`Backend khong tra ve UploadUrl/FileUrl cho "${fileName}".`);
+    }
 
-  if (!uploadUrl) {
-    throw new Error(`Không lấy được presigned URL cho file "${fileName}" (ext: .${ext})`);
+    return { uploadUrl, fileUrl };
+  } catch (error) {
+    throw new Error(apiErrorMessage(error, `Khong lay duoc presigned URL cho "${fileName}".`));
   }
-
-  return { uploadUrl, fileUrl };
 }
 
-/**
- * PUT file trực tiếp lên B2 bằng presigned URL.
- * Content-Type PHẢI khớp chính xác với BE đã ký.
- */
 async function putFileToB2(uploadUrl, file, signedFileName) {
   const contentType = getSignedContentType(signedFileName);
-
   const response = await fetch(uploadUrl, {
     method: 'PUT',
-    headers: {
-      'Content-Type': contentType,
-    },
+    headers: { 'Content-Type': contentType },
     body: file,
   });
 
   if (!response.ok) {
     const errText = await response.text().catch(() => '');
-    throw new Error(`Upload lên B2 thất bại (${response.status}): ${errText}`);
+    const reason = errText ? `: ${errText}` : '';
+    throw new Error(`Upload len B2 that bai (${response.status})${reason}`);
   }
 }
 
-/**
- * Upload file công khai.
- * Flow: getPresignedUrl → PUT trực tiếp lên B2 → trả FileUrl
- */
 export async function uploadPublicFile(file) {
-  const timestamp = Date.now();
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const uniqueFileName = `${timestamp}_${safeName}`;
+  validateUploadFile(file);
 
+  const uniqueFileName = `${Date.now()}_${buildSafeFileName(file.name)}`;
   const { uploadUrl, fileUrl } = await getPresignedUrl(uniqueFileName);
   await putFileToB2(uploadUrl, file, uniqueFileName);
 
@@ -124,16 +131,12 @@ export async function uploadPublicFile(file) {
 }
 
 export async function uploadImageFile(file) {
-  if (!isImageFile(file.name)) {
-    throw new Error(`File "${file.name}" không phải ảnh hợp lệ. Hỗ trợ: ${IMAGE_EXTENSIONS.join(', ')}`);
-  }
+  validateUploadFile(file, 'image');
   return uploadPublicFile(file);
 }
 
 export async function uploadModelFile(file) {
-  if (!isModelFile(file.name)) {
-    throw new Error(`File "${file.name}" không phải model 3D hợp lệ. Hỗ trợ: ${MODEL_EXTENSIONS.join(', ')}`);
-  }
+  validateUploadFile(file, 'model');
   return uploadPublicFile(file);
 }
 
@@ -142,4 +145,24 @@ export function extractUploadUrl(res) {
   return data?.url || data?.publicUrl || data?.fileUrl || null;
 }
 
-export { getPresignedUrl, isImageFile, isModelFile };
+export async function uploadFiles(files, { expectedType = 'any' } = {}) {
+  const results = [];
+  const errors = [];
+
+  for (const file of Array.from(files || [])) {
+    try {
+      const response = expectedType === 'image'
+        ? await uploadImageFile(file)
+        : expectedType === 'model'
+          ? await uploadModelFile(file)
+          : await uploadPublicFile(file);
+      const url = extractUploadUrl(response);
+      if (!url) throw new Error(`Server khong tra ve URL cho "${file.name}".`);
+      results.push({ file, url, response });
+    } catch (error) {
+      errors.push({ file, error });
+    }
+  }
+
+  return { results, errors };
+}

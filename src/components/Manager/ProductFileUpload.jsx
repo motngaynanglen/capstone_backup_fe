@@ -47,12 +47,14 @@ const ProductFileUpload = ({
     const ext = `.${(file.name.split('.').pop() || '').toLowerCase()}`;
     const allowed = accept
       .split(',')
-      .map((a) => {
-        const t = a.trim().toLowerCase();
-        return t.startsWith('.') ? t : `.${t}`;
-      })
+      .map((a) => a.trim().toLowerCase())
       .filter(Boolean);
-    if (allowed.length > 0 && !allowed.includes(ext)) {
+    const acceptsFile = allowed.some((rule) => {
+      if (rule.startsWith('.')) return rule === ext;
+      if (rule.endsWith('/*')) return file.type?.toLowerCase().startsWith(rule.slice(0, -1));
+      return file.type?.toLowerCase() === rule;
+    });
+    if (allowed.length > 0 && !acceptsFile) {
       message.error(`Chỉ chấp nhận: ${allowedLabel || accept}`);
       return;
     }

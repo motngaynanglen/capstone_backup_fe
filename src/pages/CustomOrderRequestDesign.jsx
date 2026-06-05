@@ -1,8 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message } from 'antd';
-import { createDesignRequest, uploadFile } from '../api/mainflow2Api';
+import { createDesignRequest } from '../api/mainflow2Api';
+import { uploadFiles } from '../api/fileApi';
 import ServiceOptionPicker from '../components/Mainflow2/ServiceOptionPicker';
+
+const getDesignWorkId = (response) => {
+  const data = response?.data ?? response;
+  if (typeof data === 'string') return data;
+  return data?.id || data?.Id || data?.designWorkId || data?.DesignWorkId || null;
+};
+
+const fileErrorMessage = ({ file, error }) =>
+  `${file?.name || 'file'}: ${error?.response?.data?.message || error?.message || 'Upload failed'}`;
 
 const CustomOrderRequestDesign = () => {
   const navigate = useNavigate();
@@ -17,74 +27,84 @@ const CustomOrderRequestDesign = () => {
   });
   const [serviceSelections, setServiceSelections] = useState([]);
 
-  const handleImageChange = async (e) => {
-    const files = Array.from(e.target.files || []);
+  useEffect(() => {
+    return () => {
+      imagePreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [imagePreviewUrls]);
+
+  const handleImageChange = async (event) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
     if (files.length === 0) return;
-    setFormData((f) => ({ ...f, images: files }));
-    setImagePreviewUrls(files.map((f) => URL.createObjectURL(f)));
+
+    imagePreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+    setImagePreviewUrls(files.map((file) => URL.createObjectURL(file)));
+    setFormData((current) => ({ ...current, images: files, imageUrls: [] }));
     setUploadingImages(true);
+
     try {
-      const urls = [];
-      for (const file of files) {
-        const res = await uploadFile(file);
-        const data = res?.data || res;
-        const publicUrl = data?.publicUrl || data?.url;
-        if (!publicUrl) throw new Error(`Không lấy được URL cho ${file.name}`);
-        urls.push(publicUrl);
+      const { results, errors } = await uploadFiles(files, { expectedType: 'image' });
+      const urls = results.map((item) => item.url);
+
+      setFormData((current) => ({
+        ...current,
+        images: results.map((item) => item.file),
+        imageUrls: urls,
+      }));
+
+      if (urls.length > 0) {
+        message.success(`Đã upload ${urls.length}/${files.length} ảnh.`);
       }
-      setFormData((f) => ({ ...f, images: files, imageUrls: urls }));
-      message.success(`Đã tải ${urls.length} ảnh lên server`);
-    } catch (err) {
-      console.error(err);
-      message.error(err?.response?.data?.message || err.message || 'Upload ảnh thất bại');
-      setFormData((f) => ({ ...f, imageUrls: [] }));
+
+      if (errors.length > 0) {
+        message.error({
+          content: `Có ${errors.length} ảnh upload thất bại. ${fileErrorMessage(errors[0])}`,
+          duration: 6,
+        });
+      }
     } finally {
       setUploadingImages(false);
     }
   };
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((current) => ({ ...current, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formData.title || !formData.description) {
-      message.warning('Vui lòng nhập đầy đủ tiêu đề và mô tả!');
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!formData.title.trim() || !formData.description.trim()) {
+      message.warning('Vui lòng nhập đầy đủ tiêu đề và mô tả.');
       return;
     }
 
-    if (formData.images.length > 0 && formData.imageUrls.length !== formData.images.length) {
-      message.warning('Ảnh đang upload — vui lòng đợi hoàn tất.');
+    if (uploadingImages) {
+      message.warning('Ảnh đang upload, vui lòng đợi hoàn tất.');
+      return;
+    }
+
+    if (formData.imageUrls.length === 0) {
+      message.warning('Vui lòng upload ít nhất một ảnh tham khảo.');
       return;
     }
 
     try {
       setIsSubmitting(true);
-      const payload = {
-        title: formData.title,
-        requirementBrief: formData.description,
+      const response = await createDesignRequest({
+        title: formData.title.trim(),
+        requirementBrief: formData.description.trim(),
         initialIdeaImageUrls: formData.imageUrls,
-      };
+        serviceOptions: serviceSelections,
+      });
 
-      const res = await createDesignRequest(payload);
-      if (res && res.statusCode === 200) {
-        message.success('Yêu cầu thiết kế đã được gửi!');
-        const newId = res?.data;
-        if (newId && typeof newId === 'string') {
-          navigate(`/custom-orders/${newId}`);
-        } else {
-          navigate('/my-custom-orders');
-        }
-      } else {
-        message.error(res?.message || 'Có lỗi xảy ra khi tạo yêu cầu!');
-      }
+      message.success('Yêu cầu thiết kế đã được gửi.');
+      const newId = getDesignWorkId(response);
+      navigate(newId ? `/custom-orders/${newId}` : '/my-custom-orders');
     } catch (error) {
       console.error(error);
-      message.error('Có lỗi xảy ra, vui lòng thử lại sau.');
+      message.error(error?.response?.data?.message || error?.response?.data?.data || error?.message || 'Tạo yêu cầu thất bại.');
     } finally {
       setIsSubmitting(false);
     }
@@ -92,7 +112,7 @@ const CustomOrderRequestDesign = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-8 py-8">
-      <h1 className="text-3xl font-bold mb-8 text-gray-800">Yêu cầu Dịch vụ Thiết kế</h1>
+      <h1 className="text-3xl font-bold mb-8 text-gray-800">Yêu cầu dịch vụ thiết kế</h1>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-8">
         <div className="mb-6">
@@ -104,7 +124,7 @@ const CustomOrderRequestDesign = () => {
             onChange={handleChange}
             required
             className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:border-indigo-600"
-            placeholder="Ví dụ: Thiết kế nhân vật anh hùng mini..."
+            placeholder="Ví dụ: Thiết kế nhân vật mini..."
           />
         </div>
 
@@ -113,7 +133,7 @@ const CustomOrderRequestDesign = () => {
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-600 transition-colors">
             <input
               type="file"
-              accept="image/*"
+              accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.svg,image/*"
               multiple
               onChange={handleImageChange}
               required
@@ -121,23 +141,25 @@ const CustomOrderRequestDesign = () => {
               className="hidden"
               id="image-upload"
             />
-            <label htmlFor="image-upload" className="cursor-pointer">
-              <div className="text-4xl mb-4">🖼️</div>
+            <label htmlFor="image-upload" className={uploadingImages ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}>
+              <div className="text-4xl mb-4">Ảnh</div>
               <p className="text-gray-600">
                 {uploadingImages
-                  ? 'Đang tải ảnh lên server...'
+                  ? 'Đang upload ảnh...'
                   : formData.imageUrls.length > 0
-                    ? `Đã tải ${formData.imageUrls.length} ảnh`
-                    : 'Nhấn để tải lên hình ảnh tham khảo (có thể chọn nhiều ảnh)'}
+                    ? `Đã upload ${formData.imageUrls.length} ảnh`
+                    : 'Bấm để chọn ảnh tham khảo'}
               </p>
-              <p className="text-sm text-gray-500 mt-2">Đội ngũ kỹ thuật sẽ dựa vào ảnh này để thiết kế</p>
+              <p className="text-sm text-gray-500 mt-2">
+                Hỗ trợ JPG, PNG, WEBP, GIF, BMP, SVG. Tối đa 20MB/file.
+              </p>
             </label>
           </div>
           {imagePreviewUrls.length > 0 && (
-            <div className="mt-4 grid grid-cols-4 gap-4">
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
               {imagePreviewUrls.map((src, idx) => (
-                <div key={idx} className="bg-gray-200 h-24 rounded overflow-hidden">
-                  <img src={src} alt={formData.images[idx]?.name || ''} className="w-full h-full object-cover" />
+                <div key={src} className="bg-gray-200 h-24 rounded overflow-hidden border border-gray-200">
+                  <img src={src} alt={formData.images[idx]?.name || 'preview'} className="w-full h-full object-cover" />
                 </div>
               ))}
             </div>
@@ -153,12 +175,12 @@ const CustomOrderRequestDesign = () => {
             rows="8"
             required
             className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:border-indigo-600"
-            placeholder="Vui lòng mô tả chi tiết về mẫu thiết kế bạn mong muốn. Bao gồm kích thước, phong cách, màu sắc, và các yêu cầu cụ thể khác..."
+            placeholder="Mô tả kích thước, phong cách, màu sắc, yêu cầu riêng..."
           />
         </div>
 
         <div className="mb-6">
-          <label className="block mb-3 font-medium text-gray-800">Chọn gói dịch vụ</label>
+          <label className="block mb-3 font-medium text-gray-800">Chọn tùy chọn dịch vụ</label>
           <ServiceOptionPicker value={serviceSelections} onChange={setServiceSelections} />
         </div>
 
@@ -186,4 +208,3 @@ const CustomOrderRequestDesign = () => {
 };
 
 export default CustomOrderRequestDesign;
-

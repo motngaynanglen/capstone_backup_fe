@@ -5,6 +5,12 @@ import { notification } from 'antd';
 import { generateAndUploadGlbFromImage } from '../api/modelApi';
 import { uploadFile, createAiPrintRequest } from '../api/mainflow2Api';
 
+const getDesignWorkId = (response) => {
+  const data = response?.data ?? response;
+  if (typeof data === 'string') return data;
+  return data?.id || data?.Id || data?.designWorkId || data?.DesignWorkId || null;
+};
+
 const SpinnerIcon = () => (
   <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -82,8 +88,8 @@ const CustomOrderAIGenerate = () => {
         modelFileUrl: glbUrl,
         sourceImageUrl: sourceImageUrl || undefined,
       });
-      const designWorkId = res?.data ?? res;
-      if (!designWorkId || typeof designWorkId === 'object') {
+      const designWorkId = getDesignWorkId(res);
+      if (!designWorkId) {
         throw new Error('Không nhận được mã yêu cầu từ server.');
       }
       notification.success({
@@ -213,7 +219,7 @@ const CustomOrderAIGenerate = () => {
         <ol className="list-decimal pl-5 space-y-1">
           <li>AI tạo GLB từ ảnh bạn upload.</li>
           <li>KTV tiếp nhận, báo giá từ file GLB (chat nếu cần).</li>
-          <li>Bạn duyệt giá → thanh toán online (VNPay hoặc COD).</li>
+          <li>Bạn duyệt giá → thanh toán online (VNPay hoặc PayOS).</li>
           <li>In 3D → giao hàng (theo dõi như flow 2).</li>
         </ol>
       </div>

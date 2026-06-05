@@ -52,12 +52,12 @@ export const deleteServiceOptionApi = async (id) => {
 
 // 7. Lấy danh sách gói dịch vụ
 export const queryServicePackagesApi = async (payload) => {
-  const response = await axiosInstance.post('/api/service-package/query', payload);
-  return response.data;
+  void payload;
+  throw new Error('Service package API is disabled because the backend only exposes service-option endpoints.');
 };
 
 // 8. Tạo gói mới
 export const createServicePackageApi = async (payload) => {
-  const response = await axiosInstance.post('/api/service-package/add', payload);
-  return response.data;
+  void payload;
+  throw new Error('Service package API is disabled because the backend only exposes service-option endpoints.');
 };

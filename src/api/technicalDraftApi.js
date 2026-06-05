@@ -1,51 +1,60 @@
 import axiosInstance from './axiosInstance';
 
 const technicalDraftApi = {
-  // Lấy danh sách draft (dùng query vì BE không có /my-drafts)
-  // BE: POST /api/technical-draft/query
-  getMyConfirmed: async () => {
-    const response = await axiosInstance.post('/api/technical-draft/query', {
-      isConfirmed: true,
-      pageSize: 100,
+  // BE: GET /api/technical-draft/my-drafts
+  getMyConfirmed: async (params = {}) => {
+    const response = await axiosInstance.get('/api/technical-draft/my-drafts', {
+      params: {
+        isConfirmed: true,
+        pageSize: 100,
+        ...params,
+      },
     });
     return response.data;
   },
 
+  // BE: GET /api/technical-draft/my-drafts
   getMyDrafts: async (params = {}) => {
-    const response = await axiosInstance.post('/api/technical-draft/query', {
-      pageSize: 100,
-      ...params,
+    const response = await axiosInstance.get('/api/technical-draft/my-drafts', {
+      params: {
+        pageSize: 100,
+        ...params,
+      },
     });
     return response.data;
   },
 
+  // BE: GET /api/technical-draft/design-work/{designWorkId}
   getByDesignWork: async (designWorkId) => {
-    const response = await axiosInstance.post('/api/technical-draft/query', {
-      designWorkId,
-      pageSize: 50,
-    });
+    const response = await axiosInstance.get(`/api/technical-draft/design-work/${designWorkId}`);
     return response.data;
   },
 
-  // Lấy chi tiết một draft
+  // BE: GET /api/technical-draft/version/{versionId}
+  getByVersion: async (versionId) => {
+    const response = await axiosInstance.get(`/api/technical-draft/version/${versionId}`);
+    return response.data;
+  },
+
+  // BE: GET /api/technical-draft/{id}/detail
   getDetail: async (id) => {
     const response = await axiosInstance.get(`/api/technical-draft/${id}/detail`);
     return response.data;
   },
 
-  // Tạo draft mới (staff) — BE: POST /api/technical-draft/add
+  // BE: POST /api/technical-draft
   create: async (data) => {
-    const response = await axiosInstance.post('/api/technical-draft/add', data);
+    const response = await axiosInstance.post('/api/technical-draft', data);
     return response.data;
   },
 
-  // Cập nhật draft (staff, chỉ khi chưa confirmed)
+  // BE: PATCH /api/technical-draft/{id}/update
   update: async (id, data) => {
     const response = await axiosInstance.patch(`/api/technical-draft/${id}/update`, data);
     return response.data;
   },
 
-  // Xóa draft (soft-delete, chỉ khi chưa confirmed)
+  // BE: DELETE /api/technical-draft/{id}/delete
   delete: async (id) => {
     const response = await axiosInstance.delete(`/api/technical-draft/${id}/delete`);
     return response.data;

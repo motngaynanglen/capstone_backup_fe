@@ -6,6 +6,12 @@ import { uploadFile, createCustomFilePrintRequest } from '../api/mainflow2Api';
 
 const ALLOWED_EXT = ['.stl', '.obj'];
 
+const getDesignWorkId = (response) => {
+  const data = response?.data ?? response;
+  if (typeof data === 'string') return data;
+  return data?.id || data?.Id || data?.designWorkId || data?.DesignWorkId || null;
+};
+
 const SpinnerIcon = () => (
   <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -95,8 +101,8 @@ const CustomOrderUpload = () => {
         note: formData.note || undefined,
       };
       const res = await createCustomFilePrintRequest(payload);
-      const designWorkId = res?.data || res;
-      if (!designWorkId || typeof designWorkId === 'object') {
+      const designWorkId = getDesignWorkId(res);
+      if (!designWorkId) {
         throw new Error('Không nhận được DesignWorkId từ server.');
       }
       notification.success({
@@ -237,7 +243,7 @@ const CustomOrderUpload = () => {
         <ol className="list-decimal pl-5 space-y-1 text-indigo-800">
           <li>KTV nhận yêu cầu & kiểm duyệt file (mesh, wall thickness).</li>
           <li>KTV gửi báo giá — bạn chat thương lượng nếu cần.</li>
-          <li>Khi bạn duyệt giá, hệ thống tạo đơn hàng và hướng dẫn thanh toán (VNPay hoặc COD).</li>
+          <li>Khi bạn duyệt giá, hệ thống tạo đơn hàng và hướng dẫn thanh toán (VNPay hoặc PayOS).</li>
           <li>Theo dõi tiến độ in 3D & giao hàng trực tiếp tại "Đơn theo yêu cầu".</li>
         </ol>
       </div>

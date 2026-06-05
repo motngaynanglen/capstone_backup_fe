@@ -184,7 +184,7 @@ const ShippingCarrierSelect = ({
           Đã chọn {selectedCarrier} — phí ship {formatPrice(selectedFee)}
           {collectOnDelivery && (
             <span className="block text-slate-600 mt-1 font-normal">
-              COD: thu tiền hàng + phí ship khi giao — không thanh toán trước online.
+              Thu tiền khi giao đang tắt; hệ thống ưu tiên thanh toán online.
             </span>
           )}
         </p>
