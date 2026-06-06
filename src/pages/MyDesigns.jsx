@@ -37,7 +37,7 @@ const MyDesigns = () => {
           {
             technicalDraftId: draft.id,
             name: `[In theo yêu cầu] ${draft.name || draft.designWorkName || 'Thiết kế'}`,
-            price: draft.unitPrice || draft.price,
+            price: draft.finalPrice || draft.unitPrice || draft.price,
             quantity,
             material: draft.materialName,
             sourceType: 'PRINT_SERVICE',
@@ -91,6 +91,19 @@ const MyDesigns = () => {
                     setSelectedDraft(draft);
                     setQuantity(1);
                   }}
+                  cover={
+                    draft.baseImageUrl ? (
+                      <img
+                        alt={draft.designWorkName || 'Thiết kế'}
+                        src={draft.baseImageUrl}
+                        style={{ height: 160, objectFit: 'cover', background: '#f3f4f6' }}
+                      />
+                    ) : (
+                      <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', color: '#9ca3af', fontSize: 40 }}>
+                        🖨️
+                      </div>
+                    )
+                  }
                 >
                   <div className="space-y-2">
                     <h3 className="font-semibold text-base m-0 line-clamp-2">
@@ -107,7 +120,7 @@ const MyDesigns = () => {
                       <div>Ngày duyệt: {formatDate(draft.confirmedDate || draft.lastModified)}</div>
                     </div>
                     <div className="text-lg font-bold text-indigo-600 mt-2">
-                      {formatPrice(draft.unitPrice || draft.price)}
+                      {formatPrice(draft.finalPrice || draft.unitPrice || draft.price)}
                     </div>
                     <Button
                       type="primary"
@@ -117,7 +130,7 @@ const MyDesigns = () => {
                         navigate(`/my-designs/${draft.id}`);
                       }}
                     >
-                      Xem chi tiet
+                      Xem chi tiết
                     </Button>
                   </div>
                 </Card>

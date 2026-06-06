@@ -26,48 +26,30 @@ import Model3DPreview from "../../components/Mainflow2/Model3DPreview";
  * 4. Báo giá           — done khi REVIEWING+
  * 5. Hoàn tất          — done khi COMPLETED
  */
+const isWorkTypePrint = (order) =>
+  ['PRINT_SERVICE', 'CUSTOM_FILE_PRINT_MF2'].includes(order?.workType || order?.WorkType || '');
+
 function buildStaffTimeline(order) {
   const raw = order?.designWorkStatus || '';
-  const paid = order?.designServicePaid || order?.designServicePaymentStatus === 'PAID';
+  const isPrint = isWorkTypePrint(order);
+  // PRINT_SERVICE has no design fee — treat as always paid
+  const paid = isPrint ? true : (order?.designServicePaid || order?.designServicePaymentStatus === 'PAID');
 
-  // Simplified rank: SKETCHING/PENDING = 0 (chưa tiếp nhận)
   const rankMap = { SKETCHING: 0, PENDING: 0, IN_PROGRESS: 1, REVIEWING: 2, COMPLETED: 3 };
   const rank = rankMap[raw] ?? -1;
 
+  const step2 = isPrint
+    ? { key: 'fileReview', label: rank >= 1 ? 'File đã duyệt' : 'Chờ duyệt file', done: rank >= 1, isCurrent: rank === 0 }
+    : { key: 'paid', label: paid ? 'Đã thanh toán phí TK' : 'Chờ thanh toán phí TK', done: paid, isCurrent: !paid && rank === 0 };
+
   const steps = [
-    {
-      key: 'request',
-      label: 'Gửi yêu cầu',
-      done: true,
-      isCurrent: false,
-    },
-    {
-      key: 'paid',
-      label: paid ? 'Đã thanh toán phí TK' : 'Chờ thanh toán phí TK',
-      done: paid,
-      isCurrent: !paid && rank === 0,
-    },
-    {
-      key: 'assigned',
-      label: rank >= 1 ? 'Đã tiếp nhận' : 'Chờ tiếp nhận',
-      done: rank >= 1,
-      isCurrent: paid && rank === 0,
-    },
-    {
-      key: 'quoted',
-      label: rank >= 2 ? 'Đã báo giá' : 'Báo giá',
-      done: rank >= 2,
-      isCurrent: rank === 1,
-    },
-    {
-      key: 'completed',
-      label: rank >= 3 ? 'Hoàn tất' : 'Chờ duyệt',
-      done: rank >= 3,
-      isCurrent: rank === 2,
-    },
+    { key: 'request', label: 'Gửi yêu cầu', done: true, isCurrent: false },
+    step2,
+    { key: 'assigned', label: rank >= 1 ? 'Đã tiếp nhận' : 'Chờ tiếp nhận', done: rank >= 1, isCurrent: paid && rank === 0 && !step2.isCurrent },
+    { key: 'quoted', label: rank >= 2 ? 'Đã báo giá' : 'Báo giá', done: rank >= 2, isCurrent: rank === 1 },
+    { key: 'completed', label: rank >= 3 ? 'Hoàn tất' : 'Chờ duyệt', done: rank >= 3, isCurrent: rank === 2 },
   ];
 
-  // Ensure exactly one isCurrent when not completed
   if (rank < 3) {
     const hasAnyCurrent = steps.some(s => s.isCurrent);
     if (!hasAnyCurrent) {
@@ -404,6 +386,10 @@ const StaffCustomOrderDetail = () => {
             ? 'Đã đóng'
             : (BE_STATUS_LABEL[order.designWorkStatus] || order.designWorkStatus)}
         </span>
+        {isWorkTypePrint(order)
+          ? <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#dbeafe', color: '#1d4ed8' }}>In theo yêu cầu</span>
+          : <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#ede9fe', color: '#6d28d9' }}>Thiết kế 3D</span>
+        }
         {order.designWorkStatus !== 'COMPLETED' && !order.isLocked && (
           <button onClick={handleCancel} disabled={processing}
             style={{ padding: '4px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
@@ -509,7 +495,8 @@ const StaffCustomOrderDetail = () => {
           {/* Composer — uses real BE designWorkStatus */}
           {(() => {
             const raw = order.designWorkStatus;
-            const paid = order.designServicePaid || order.designServicePaymentStatus === 'PAID';
+            const isPrint = isWorkTypePrint(order);
+            const paid = isPrint ? true : (order.designServicePaid || order.designServicePaymentStatus === 'PAID');
 
             // COMPLETED — locked
             if (raw === 'COMPLETED') {
@@ -542,9 +529,11 @@ const StaffCustomOrderDetail = () => {
                     display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
                   }}>
                     <span style={{ color: paid ? '#059669' : '#b45309', fontSize: 12, flex: 1, minWidth: 200 }}>
-                      {paid
-                        ? <>Khách <b>đã thanh toán</b> phí thiết kế. Trao đổi với khách để làm rõ yêu cầu, sau đó bấm <b>Tiếp nhận</b>.</>
-                        : <>Khách chưa thanh toán phí thiết kế — bạn vẫn có thể trao đổi, nhưng chỉ <b>tiếp nhận được sau khi khách thanh toán</b>.</>
+                      {isPrint
+                        ? <>Khách đã <b>upload file 3D</b>. Xem xét file và bấm <b>Tiếp nhận</b> để bắt đầu báo giá.</>
+                        : paid
+                          ? <>Khách <b>đã thanh toán</b> phí thiết kế. Trao đổi với khách để làm rõ yêu cầu, sau đó bấm <b>Tiếp nhận</b>.</>
+                          : <>Khách chưa thanh toán phí thiết kế — bạn vẫn có thể trao đổi, nhưng chỉ <b>tiếp nhận được sau khi khách thanh toán</b>.</>
                       }
                     </span>
                     {paid && (

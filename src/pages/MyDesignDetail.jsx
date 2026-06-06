@@ -33,9 +33,9 @@ const MyDesignDetail = () => {
     load();
   }, [draftId]);
 
-  const unitPrice = useMemo(() => {
+  const displayPrice = useMemo(() => {
     if (!draft) return 0;
-    return draft.unitPrice ?? draft.finalPrice ?? draft.price ?? 0;
+    return draft.finalPrice ?? draft.displayPrice ?? draft.price ?? 0;
   }, [draft]);
 
   const handleBuyNow = () => {
@@ -44,8 +44,8 @@ const MyDesignDetail = () => {
         cartItems: [
           {
             technicalDraftId: draft.id,
-            name: `[In theo yeu cau] ${draft.name || draft.designWorkName || 'Thiet ke'}`,
-            price: unitPrice,
+            name: `[In theo yêu cầu] ${draft.name || draft.designWorkName || 'Thiết kế'}`,
+            price: displayPrice,
             quantity,
             material: draft.materialName,
             sourceType: 'PRINT_SERVICE',
@@ -69,7 +69,7 @@ const MyDesignDetail = () => {
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-5xl mx-auto px-4">
           <Card>
-            <Empty description="Khong tim thay thiet ke" />
+            <Empty description="Không tìm thấy thiết kế" />
           </Card>
         </div>
       </div>
@@ -83,12 +83,12 @@ const MyDesignDetail = () => {
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex items-center justify-between gap-4 mb-5">
           <div>
-            <Button onClick={() => navigate('/my-designs')} className="mb-3">Quay lai kho do</Button>
-            <h1 className="text-2xl font-bold m-0">{draft.name || draft.designWorkName || 'Chi tiet thiet ke'}</h1>
-            <Text type="secondary">Thiet ke rieng da duyet cua ban</Text>
+            <Button onClick={() => navigate('/my-designs')} className="mb-3">Quay lại kho đồ</Button>
+            <h1 className="text-2xl font-bold m-0">{draft.name || draft.designWorkName || 'Chi tiết thiết kế'}</h1>
+            <Text type="secondary">Thiết kế riêng đã duyệt của bạn</Text>
           </div>
           <Tag color={draft.isConfirmed ? 'green' : 'orange'}>
-            {draft.isConfirmed ? 'Da duyet' : 'Chua duyet'}
+            {draft.isConfirmed ? 'Đã duyệt' : 'Chưa duyệt'}
           </Tag>
         </div>
 
@@ -98,47 +98,47 @@ const MyDesignDetail = () => {
               <Model3DPreview fileUrl={previewUrl} height={420} />
             ) : (
               <div className="h-[420px] bg-gray-100 rounded flex items-center justify-center text-gray-400">
-                Khong co preview
+                Không có preview
               </div>
             )}
           </Card>
 
-          <Card title="Thong tin in">
+          <Card title="Thông tin in">
             <Descriptions bordered size="small" column={1}>
-              <Descriptions.Item label="Vat lieu">
+              <Descriptions.Item label="Vật liệu">
                 {draft.materialName || '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Thoi gian in uoc tinh">
-                {draft.estimatedPrintTimePerUnit ? `${draft.estimatedPrintTimePerUnit} gio` : '-'}
+              <Descriptions.Item label="Thời gian in ước tính">
+                {draft.estimatedPrintTimePerUnit ? `${draft.estimatedPrintTimePerUnit} phút` : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Trong luong uoc tinh">
+              <Descriptions.Item label="Trọng lượng ước tính">
                 {draft.estimatedWeightPerUnit ? `${draft.estimatedWeightPerUnit}g` : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Do day lop in">
+              <Descriptions.Item label="Độ dày lớp in">
                 {draft.layerHeight ? `${draft.layerHeight} mm` : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Mat do in">
+              <Descriptions.Item label="Mật độ in">
                 {draft.infillDensity ? `${draft.infillDensity}%` : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Gia vat lieu co ban/g">
+              <Descriptions.Item label="Giá vật liệu cơ bản/g">
                 {draft.materialBaseCostPerGram != null ? formatPrice(draft.materialBaseCostPerGram) : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Gia dich vu vat lieu/g">
+              <Descriptions.Item label="Giá dịch vụ vật liệu/g">
                 {draft.materialTotalServiceCostPerGram != null ? formatPrice(draft.materialTotalServiceCostPerGram) : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Ngay duyet thiet ke">
+              <Descriptions.Item label="Ngày duyệt thiết kế">
                 {formatDate(draft.confirmedAt || draft.lastModified)}
               </Descriptions.Item>
-              <Descriptions.Item label="Ngay cap nhat gia lan cuoi">
+              <Descriptions.Item label="Ngày cập nhật giá lần cuối">
                 {formatDate(draft.lastPriceUpdatedAt || draft.materialPriceEffectiveDate)}
               </Descriptions.Item>
-              <Descriptions.Item label="Gia tri san pham">
-                <span className="text-lg font-bold text-indigo-600">{formatPrice(unitPrice)}</span>
+              <Descriptions.Item label="Giá sản phẩm">
+                <span className="text-lg font-bold text-indigo-600">{formatPrice(displayPrice)}</span>
               </Descriptions.Item>
             </Descriptions>
 
             <div className="flex items-center gap-3 mt-5">
-              <span className="font-medium">So luong</span>
+              <span className="font-medium">Số lượng</span>
               <InputNumber min={1} max={999} value={quantity} onChange={(value) => setQuantity(value || 1)} />
             </div>
             <Button
@@ -149,10 +149,10 @@ const MyDesignDetail = () => {
               disabled={!draft.isConfirmed}
               onClick={handleBuyNow}
             >
-              Mua ngay - {formatPrice(unitPrice * quantity)}
+              Mua ngay - {formatPrice(displayPrice * quantity)}
             </Button>
             <Text type="secondary" className="block text-xs mt-3">
-              Gia co the duoc BE tinh lai theo cau hinh vat lieu hien tai khi checkout.
+              Giá có thể được tính lại theo cấu hình vật liệu hiện tại khi checkout.
             </Text>
           </Card>
         </div>

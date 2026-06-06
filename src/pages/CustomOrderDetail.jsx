@@ -71,16 +71,25 @@ const beStatusColor = (status) => {
 /**
  * Build customer timeline from real BE designWorkStatus + payment.
  */
+const isWorkTypePrint = (order) =>
+  ['PRINT_SERVICE', 'CUSTOM_FILE_PRINT_MF2'].includes(order?.workType || order?.WorkType || '');
+
 function buildCustomerTimeline(order) {
   const raw = order?.designWorkStatus || '';
-  const paid = order?.designServicePaid || order?.designServicePaymentStatus === 'PAID';
+  const isPrint = isWorkTypePrint(order);
+  // PRINT_SERVICE has no design fee — treat as always paid
+  const paid = isPrint ? true : (order?.designServicePaid || order?.designServicePaymentStatus === 'PAID');
   const rankMap = { SKETCHING: 0, PENDING: 0, IN_PROGRESS: 1, REVIEWING: 2, COMPLETED: 3 };
   const rank = rankMap[raw] ?? -1;
 
+  const step2 = isPrint
+    ? { key: 'fileReview', label: rank >= 1 ? 'File đã duyệt' : 'Chờ duyệt file', done: rank >= 1, isCurrent: rank === 0 }
+    : { key: 'paid', label: paid ? 'Đã thanh toán phí TK' : 'Chờ thanh toán', done: paid, isCurrent: !paid && rank === 0 };
+
   return [
     { key: 'request', label: 'Gửi yêu cầu', done: true, isCurrent: false },
-    { key: 'paid', label: paid ? 'Đã thanh toán phí TK' : 'Chờ thanh toán', done: paid, isCurrent: !paid && rank === 0 },
-    { key: 'assigned', label: rank >= 1 ? 'NV đã nhận' : 'Chờ tiếp nhận', done: rank >= 1, isCurrent: paid && rank === 0 },
+    step2,
+    { key: 'assigned', label: rank >= 1 ? 'NV đã nhận' : 'Chờ tiếp nhận', done: rank >= 1, isCurrent: paid && rank === 0 && !step2.isCurrent },
     { key: 'quoted', label: rank >= 2 ? 'Có báo giá' : 'Chờ báo giá', done: rank >= 2, isCurrent: rank === 1 },
     { key: 'completed', label: rank >= 3 ? 'Đã nghiệm thu' : 'Chờ duyệt', done: rank >= 3, isCurrent: rank === 2 },
   ];
@@ -469,6 +478,7 @@ const CustomOrderDetail = () => {
   const showAwaitingPayment = hasLinkedOrder && !isPaid;
   const showProduction = hasLinkedOrder && isPaid;
   const fileVersions = order?.versions || order?.quoteFileVersions || [];
+  const isPrintService = isWorkTypePrint(order);
 
   const headerStatusLabel = showProduction
       ? (order.linkedOrderStatus === 'FINISHED' || order.linkedShipmentStatus === 'READY_FOR_PICKUP'
@@ -512,6 +522,13 @@ const CustomOrderDetail = () => {
         </div>
         <span style={{ padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, ...headerStatusStyle }}>
           {headerStatusLabel}
+        </span>
+        <span style={{
+          padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+          background: isPrintService ? '#dbeafe' : '#fae8ff',
+          color: isPrintService ? '#1d4ed8' : '#a21caf',
+        }}>
+          {isPrintService ? 'In theo yêu cầu' : 'Thiết kế 3D'}
         </span>
         {showProduction && linkedOrderId && (
           <Link
@@ -686,7 +703,7 @@ const CustomOrderDetail = () => {
           ) : (
             <>
               {/* Re-upload panel khi file bi tu choi (PRINT_SERVICE + SKETCHING) */}
-              {['PRINT_SERVICE', 'CUSTOM_FILE_PRINT_MF2'].includes(order.workType || order.WorkType || order.sourceType || '') && order.designWorkStatus === 'SKETCHING' && designFeePaid && (
+              {isPrintService && order.designWorkStatus === 'SKETCHING' && (
                 <div style={{ flexShrink: 0, background: '#fef2f2', borderTop: '1px solid #fca5a5', padding: '12px 16px' }}>
                   <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: '#dc2626' }}>
                     File cua ban bi tu choi. Vui long upload lai file moi:
@@ -719,7 +736,7 @@ const CustomOrderDetail = () => {
                 onSend={handleSendChat}
                 uploading={uploading}
                 extraLeft={
-                  designFeePaid && !order.isLocked && ['IN_PROGRESS', 'REVIEWING', 'COMPLETED'].includes(order.designWorkStatus) ? (
+                  (isPrintService || designFeePaid) && !order.isLocked && ['IN_PROGRESS', 'REVIEWING', 'COMPLETED'].includes(order.designWorkStatus) ? (
                     <Button
                       onClick={() => setAdjustModalOpen(true)}
                       style={{ flexShrink: 0, background: '#fffbeb', borderColor: '#fde68a', color: '#d97706', fontWeight: 600 }}
@@ -771,7 +788,8 @@ const CustomOrderDetail = () => {
             </ul>
           </div>
 
-          {/* Design service fee */}
+          {/* Design service fee — only for DESIGN_SERVICE */}
+          {!isPrintService && (
           <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
             <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>
               Phi dich vu thiet ke
@@ -822,6 +840,7 @@ const CustomOrderDetail = () => {
               </div>
             )}
           </div>
+          )}
 
           {/* Technical drafts */}
           {technicalDrafts.length > 0 && (
@@ -959,6 +978,7 @@ const CustomOrderDetail = () => {
           </div>
         </div>
       </div>
+      {!isPrintService && (
       <Modal
         open={servicePickerOpen}
         title="Chon dich vu thiet ke"
@@ -970,6 +990,7 @@ const CustomOrderDetail = () => {
       >
         <ServiceOptionPicker value={pendingServiceSelections} onChange={handlePendingServiceChange} />
       </Modal>
+      )}
 
       {/* Adjustment request modal */}
       <Modal

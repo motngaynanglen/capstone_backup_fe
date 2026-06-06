@@ -24,3 +24,5 @@ yarn-error.log*
 
 # esbuild temp
 .esbuild_check/
+/.docs
+/dist
