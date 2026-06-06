@@ -12,28 +12,51 @@ function mapWorkbenchPayload(res) {
   const data = res?.data;
   if (!data) return null;
 
+  const workQueue = pick(data, 'workQueue', 'WorkQueue') || [];
+  const byKey = (key) => {
+    const item = workQueue.find((entry) => (pick(entry, 'key', 'Key')) === key);
+    return pick(item, 'count', 'Count') ?? 0;
+  };
+
   const rawTasks = pick(data, 'tasks', 'Tasks') || [];
-  const tasks = rawTasks.map((t) => ({
-    id: pick(t, 'id', 'Id'),
-    priority: pick(t, 'priority', 'Priority'),
-    severity: pick(t, 'severity', 'Severity'),
-    title: pick(t, 'title', 'Title'),
-    description: pick(t, 'description', 'Description'),
-    count: pick(t, 'count', 'Count'),
-    href: pick(t, 'href', 'Href'),
-    primaryHref: pick(t, 'primaryHref', 'PrimaryHref'),
-    actionLabel: pick(t, 'actionLabel', 'ActionLabel'),
-    items: (pick(t, 'items', 'Items') || []).map((it) => ({
-      key: pick(it, 'key', 'Key'),
-      label: pick(it, 'label', 'Label'),
-      meta: pick(it, 'meta', 'Meta'),
-      href: pick(it, 'href', 'Href'),
-    })),
-  }));
+  const sourceTasks = rawTasks.length > 0 ? rawTasks : workQueue;
+  const tasks = sourceTasks
+    .filter((t) => (pick(t, 'count', 'Count') ?? 0) > 0)
+    .map((t) => {
+      const rawSeverity = (pick(t, 'severity', 'Severity') || 'INFO').toUpperCase();
+      const severity =
+        rawSeverity === 'DANGER' || rawSeverity === 'CRITICAL'
+          ? 'critical'
+          : rawSeverity === 'WARNING'
+            ? 'high'
+            : 'low';
+      const href = pick(t, 'primaryHref', 'PrimaryHref') || pick(t, 'href', 'Href');
+
+      return {
+        id: pick(t, 'id', 'Id') || pick(t, 'key', 'Key'),
+        priority: pick(t, 'priority', 'Priority'),
+        severity,
+        title: pick(t, 'title', 'Title') || pick(t, 'label', 'Label'),
+        description: pick(t, 'description', 'Description'),
+        count: pick(t, 'count', 'Count') ?? 0,
+        href: pick(t, 'href', 'Href'),
+        primaryHref: href,
+        actionLabel: pick(t, 'actionLabel', 'ActionLabel') || 'Mở',
+        items: (pick(t, 'items', 'Items') || []).map((it) => ({
+          key: pick(it, 'key', 'Key'),
+          label: pick(it, 'label', 'Label'),
+          meta: pick(it, 'meta', 'Meta'),
+          href: pick(it, 'href', 'Href'),
+        })),
+      };
+    });
 
   const sla = pick(data, 'sla', 'Sla') || {};
   const counts = pick(data, 'counts', 'Counts') || {};
   const health = pick(data, 'health', 'Health') || {};
+  const critical = tasks.filter((t) => t.severity === 'critical').length;
+  const high = tasks.filter((t) => t.severity === 'high').length;
+  const total = tasks.reduce((sum, t) => sum + (Number(t.count) || 0), 0);
 
   return {
     sla: {
@@ -45,21 +68,27 @@ function mapWorkbenchPayload(res) {
         ?? 24,
     },
     counts: {
-      productionQueueCount: pick(counts, 'productionQueueCount', 'ProductionQueueCount') ?? 0,
-      mf2Submitted: pick(counts, 'mf2Submitted', 'Mf2Submitted') ?? 0,
-      mf2Pending: pick(counts, 'mf2Pending', 'Mf2Pending') ?? 0,
+      productionQueueCount:
+        pick(counts, 'productionQueueCount', 'ProductionQueueCount')
+        ?? byKey('assigned-processing-orders'),
+      mf2Submitted: pick(counts, 'mf2Submitted', 'Mf2Submitted') ?? byKey('mf2-overdue'),
+      mf2Pending:
+        pick(counts, 'mf2Pending', 'Mf2Pending')
+        ?? (byKey('assigned-design-in-progress') + byKey('assigned-design-reviewing')),
       ordersReadyShipment:
         pick(counts, 'ordersReadyShipment', 'OrdersReadyShipment')
         ?? pick(counts, 'ordersReadyGhn', 'OrdersReadyGhn')
-        ?? 0,
+        ?? (byKey('ghn-overdue') + byKey('assigned-finished-orders')),
     },
     health: {
-      critical: pick(health, 'critical', 'Critical') ?? 0,
-      high: pick(health, 'high', 'High') ?? 0,
-      total: pick(health, 'total', 'Total') ?? 0,
-      allClear: pick(health, 'allClear', 'AllClear') ?? true,
+      critical: pick(health, 'critical', 'Critical') ?? critical,
+      high: pick(health, 'high', 'High') ?? high,
+      total: pick(health, 'total', 'Total') ?? total,
+      allClear: pick(health, 'allClear', 'AllClear') ?? (critical === 0 && high === 0),
     },
     tasks,
+    recentOrders: pick(data, 'recentAssignedOrders', 'RecentAssignedOrders') || [],
+    recentDesigns: pick(data, 'recentAssignedDesignWorks', 'RecentAssignedDesignWorks') || [],
   };
 }
 

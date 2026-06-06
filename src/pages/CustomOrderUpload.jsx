@@ -4,7 +4,7 @@ import { notification } from 'antd';
 import materialApi from '../api/materialApi';
 import { uploadFile, createCustomFilePrintRequest } from '../api/mainflow2Api';
 
-const ALLOWED_EXT = ['.stl', '.obj'];
+const ALLOWED_EXT = ['.glb', '.stl', '.obj'];
 
 const getDesignWorkId = (response) => {
   const data = response?.data ?? response;
@@ -132,11 +132,11 @@ const CustomOrderUpload = () => {
 
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 space-y-6">
         <div>
-          <label className="block mb-2 font-medium text-gray-800">File 3D (STL/OBJ)</label>
+          <label className="block mb-2 font-medium text-gray-800">File 3D (GLB/STL/OBJ)</label>
           <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-indigo-500 transition-colors">
             <input
               type="file"
-              accept=".stl,.obj"
+              accept=".glb,.stl,.obj"
               onChange={(e) => handleFile(e.target.files?.[0])}
               className="hidden"
               id="file-upload"

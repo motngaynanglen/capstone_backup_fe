@@ -29,10 +29,13 @@ import {
 import '@google/model-viewer';
 import FeedbackCommentsList from '../components/Feedback/FeedbackCommentsList';
 
+const BUYING_RESTRICTED_MESSAGE =
+  'Chức năng mua hàng chỉ dành cho khách hàng. Vui lòng đăng nhập tài khoản hoặc đăng ký mới.';
+
 const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated, isCustomer } = useAuth();
+  const { isCustomer } = useAuth();
   const { addToCart } = useCart();
 
   const [product, setProduct] = useState(null);
@@ -83,8 +86,8 @@ const ProductDetail = () => {
   });
 
   const handleBuyNow = () => {
-    if (!isAuthenticated) {
-      notification.info({ message: 'Vui lòng đăng nhập để mua hàng' });
+    if (!isCustomer) {
+      notification.info({ message: BUYING_RESTRICTED_MESSAGE });
       navigate('/login');
       return;
     }
@@ -110,8 +113,8 @@ const ProductDetail = () => {
   };
 
   const handlePreOrder = () => {
-    if (!isAuthenticated) {
-      notification.info({ message: 'Vui lòng đăng nhập để đặt trước' });
+    if (!isCustomer) {
+      notification.info({ message: BUYING_RESTRICTED_MESSAGE });
       navigate('/login');
       return;
     }
@@ -393,9 +396,9 @@ const ProductDetail = () => {
                       <div className="flex items-start gap-3">
                         <InfoCircleOutlined className="text-blue-600 text-xl mt-1" />
                         <div>
-                          <div className="font-semibold text-blue-900 mb-1">Tài khoản quản trị</div>
+                          <div className="font-semibold text-blue-900 mb-1">Thông báo</div>
                           <div className="text-sm text-blue-700">
-                            Chức năng mua hàng chỉ dành cho khách hàng. Vui lòng đăng nhập tài khoản Customer.
+                            {BUYING_RESTRICTED_MESSAGE}
                           </div>
                         </div>
                       </div>
