@@ -176,11 +176,11 @@ const CustomOrderDetail = () => {
       .catch(() => setServiceOptions([]));
   }, [fetchTechnicalDrafts]);
 
-  useMainflow2Realtime(id, () => fetchDetail(true));
+  useMainflow2Realtime(id, () => { fetchDetail(true); fetchTechnicalDrafts(); });
 
   const handleRequestAdjustment = async () => {
     if (!adjustContent.trim() && adjustFiles.length === 0) {
-      message.warning('Vui long nhap noi dung hoac dinh kem hinh anh');
+      message.warning('Vui lòng nhập nội dung hoặc đính kèm hình ảnh');
       return;
     }
     try {
@@ -193,13 +193,13 @@ const CustomOrderDetail = () => {
         if (url) imageUrls.push(url);
       }
       await requestAdjustment(id, { content: adjustContent.trim(), imageUrls });
-      message.success('Da gui yeu cau hieu chinh');
+      message.success('Đã gửi yêu cầu hiệu chỉnh');
       setAdjustModalOpen(false);
       setAdjustContent('');
       setAdjustFiles([]);
       fetchDetail(true);
     } catch (err) {
-      message.error(err?.response?.data?.detail || err?.response?.data?.message || 'Loi khi gui yeu cau');
+      message.error(err?.response?.data?.detail || err?.response?.data?.message || 'Lỗi khi gửi yêu cầu');
     } finally {
       setProcessing(false);
     }
@@ -207,7 +207,7 @@ const CustomOrderDetail = () => {
 
   const handleReuploadFiles = async () => {
     if (reuploadFiles.length === 0) {
-      message.warning('Vui long chon file de upload');
+      message.warning('Vui lòng chọn file để tải lên');
       return;
     }
     try {
@@ -219,12 +219,12 @@ const CustomOrderDetail = () => {
         if (url) fileUrls.push(url);
       }
       await addFilesToQuickPrint(id, fileUrls, reuploadNote.trim() || undefined);
-      message.success('Da upload lai file thanh cong');
+      message.success('Đã tải lên lại file thành công');
       setReuploadFiles([]);
       setReuploadNote('');
       fetchDetail(true);
     } catch (err) {
-      message.error(err?.response?.data?.detail || err?.response?.data?.message || 'Loi khi upload file');
+      message.error(err?.response?.data?.detail || err?.response?.data?.message || 'Lỗi khi tải file lên');
     } finally {
       setProcessing(false);
     }
@@ -355,7 +355,7 @@ const CustomOrderDetail = () => {
       const items = selection.serviceSelectedOptions || selection.ServiceSelectedOptions || [];
       return items.map((item) => ({
         id: item.serviceOptionId || item.ServiceOptionId || item.id || item.Id,
-        name: item.optionNameSnapshot || item.OptionNameSnapshot || 'Tuy chon dich vu',
+        name: item.optionNameSnapshot || item.OptionNameSnapshot || 'Tùy chọn dịch vụ',
         groupName: item.optionGroupNameSnapshot || item.OptionGroupNameSnapshot || item.optionGroupCodeSnapshot || item.OptionGroupCodeSnapshot,
         quantity: item.quantity || item.Quantity || 1,
         price: item.appliedPrice || item.AppliedPrice || 0,
@@ -404,7 +404,7 @@ const CustomOrderDetail = () => {
       .filter((item) => item.ServiceOptionId);
 
     if (serviceOptionsPayload.length === 0) {
-      message.warning('Khong tim thay noi dung dich vu da chon. Vui long tao lai yeu cau hoac lien he nhan vien.');
+      message.warning('Không tìm thấy nội dung dịch vụ đã chọn. Vui lòng tạo lại yêu cầu hoặc liên hệ nhân viên.');
       return;
     }
 
@@ -413,15 +413,15 @@ const CustomOrderDetail = () => {
       const res = await checkoutDesignApi({
         DesignWorkId: id,
         ServiceOptions: serviceOptionsPayload,
-        Note: 'Thanh toan phi dich vu thiet ke',
+        Note: 'Thanh toán phí dịch vụ thiết kế',
       });
       const newOrderId = res?.data?.id || res?.data?.Id || res?.id || res?.Id;
       sessionStorage.removeItem(designServiceSelectionKey(id));
       await fetchDetail(true);
       if (newOrderId) navigate(`/orders/${newOrderId}`);
-      else message.success('Da tao don phi dich vu thiet ke.');
+      else message.success('Đã tạo đơn phí dịch vụ thiết kế.');
     } catch (err) {
-      message.error(err?.response?.data?.message || err?.message || 'Tao don phi thiet ke that bai.');
+      message.error(err?.response?.data?.message || err?.message || 'Tạo đơn phí thiết kế thất bại.');
     } finally {
       setProcessing(false);
     }
@@ -493,6 +493,10 @@ const CustomOrderDetail = () => {
   const showProduction = hasLinkedOrder && isPaid;
   const fileVersions = order?.versions || order?.quoteFileVersions || [];
   const isPrintService = isWorkTypePrint(order);
+  const adjustmentSels = order?.selections || [];
+  const adjustmentTotalLimit = adjustmentSels.reduce((s, x) => s + (x.adjustmentRoundLimit || 0), 0);
+  const adjustmentRemaining = adjustmentSels.reduce((s, x) => s + (x.remainingAdjustmentRoundCount || 0), 0);
+  const canAdjust = adjustmentRemaining > 0;
 
   const headerStatusLabel = showProduction
       ? (order.linkedOrderStatus === 'FINISHED' || order.linkedShipmentStatus === 'READY_FOR_PICKUP'
@@ -663,7 +667,7 @@ const CustomOrderDetail = () => {
           {/* Composer */}
           {order.isLocked ? (
             <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#6b7280', fontSize: 13, fontWeight: 600 }}>
-              Cuoc tro chuyen da duoc khoa.
+              Cuộc trò chuyện đã được khóa.
             </div>
           ) : order.isLocked && order.designWorkStatus !== 'COMPLETED' ? (
             <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#dc2626', fontSize: 13, fontWeight: 500 }}>
@@ -715,7 +719,7 @@ const CustomOrderDetail = () => {
               {isPrintService && order.designWorkStatus === 'SKETCHING' && (
                 <div style={{ flexShrink: 0, background: '#fef2f2', borderTop: '1px solid #fca5a5', padding: '12px 16px' }}>
                   <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: '#dc2626' }}>
-                    File cua ban bi tu choi. Vui long upload lai file moi:
+                    File của bạn bị từ chối. Vui lòng tải lên lại file mới:
                   </p>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     <input
@@ -733,7 +737,7 @@ const CustomOrderDetail = () => {
                         style={{ background: '#4f46e5', borderColor: '#4f46e5' }}
                         onClick={handleReuploadFiles}
                       >
-                        Upload lai ({reuploadFiles.length} file)
+                        Tải lên lại ({reuploadFiles.length} file)
                       </Button>
                     )}
                   </div>
@@ -748,9 +752,11 @@ const CustomOrderDetail = () => {
                   (isPrintService || designFeePaid) && !order.isLocked && ['IN_PROGRESS', 'REVIEWING', 'COMPLETED'].includes(order.designWorkStatus) ? (
                     <Button
                       onClick={() => setAdjustModalOpen(true)}
-                      style={{ flexShrink: 0, background: '#fffbeb', borderColor: '#fde68a', color: '#d97706', fontWeight: 600 }}
+                      disabled={!canAdjust}
+                      title={!canAdjust ? 'Đã hết lượt hiệu chỉnh' : ''}
+                      style={{ flexShrink: 0, background: canAdjust ? '#fffbeb' : '#f3f4f6', borderColor: canAdjust ? '#fde68a' : '#d1d5db', color: canAdjust ? '#d97706' : '#9ca3af', fontWeight: 600 }}
                     >
-                      Yeu cau hieu chinh
+                      Yêu cầu hiệu chỉnh
                     </Button>
                   ) : null
                 }
@@ -797,35 +803,29 @@ const CustomOrderDetail = () => {
             </ul>
           </div>
 
-          {/* Adjustment rounds remaining */}
-          {(() => {
-            const sels = order.selections || [];
-            const totalLimit = sels.reduce((s, x) => s + (x.adjustmentRoundLimit || 0), 0);
-            const totalRemaining = sels.reduce((s, x) => s + (x.remainingAdjustmentRoundCount || 0), 0);
-            if (totalLimit <= 0) return null;
-            return (
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
-                <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  Lượt hiệu chỉnh
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{
-                    padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600,
-                    background: totalRemaining > 0 ? '#ecfdf5' : '#fef2f2',
-                    color: totalRemaining > 0 ? '#059669' : '#dc2626',
-                  }}>
-                    {totalRemaining}/{totalLimit} còn lại
-                  </span>
-                </div>
+          {/* Lượt hiệu chỉnh còn lại */}
+          {adjustmentTotalLimit > 0 && (
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+              <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>
+                Lượt hiệu chỉnh
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600,
+                  background: canAdjust ? '#ecfdf5' : '#fef2f2',
+                  color: canAdjust ? '#059669' : '#dc2626',
+                }}>
+                  {adjustmentRemaining}/{adjustmentTotalLimit} còn lại
+                </span>
               </div>
-            );
-          })()}
+            </div>
+          )}
 
           {/* Design service fee — only for DESIGN_SERVICE */}
           {!isPrintService && (
           <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
             <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>
-              Phi dich vu thiet ke
+              Phí dịch vụ thiết kế
             </p>
             {serviceRows.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -833,7 +833,7 @@ const CustomOrderDetail = () => {
                   <div key={item.id} style={{ padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, background: '#f9fafb' }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: '#111827' }}>{item.name}</div>
                     <div style={{ fontSize: 11, color: '#6b7280' }}>
-                      {item.groupName || 'Dich vu'} x {item.quantity}
+                      {item.groupName || 'Dịch vụ'} x {item.quantity}
                     </div>
                     <div style={{ fontSize: 12, fontWeight: 700, color: '#4f46e5' }}>
                       {formatPrice(Number(item.price || 0) * Number(item.quantity || 1))}
@@ -841,16 +841,16 @@ const CustomOrderDetail = () => {
                   </div>
                 ))}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 800 }}>
-                  <span>Tong</span>
+                  <span>Tổng</span>
                   <span>{formatPrice(order.designServiceTotalAmount || serviceTotal)}</span>
                 </div>
               </div>
             ) : (
               <div>
-                <p style={{ margin: '0 0 10px', fontSize: 12, color: '#9ca3af' }}>Chua co noi dung dich vu da chon.</p>
+                <p style={{ margin: '0 0 10px', fontSize: 12, color: '#9ca3af' }}>Chưa có nội dung dịch vụ đã chọn.</p>
                 {!designFeeOrderId && (
                   <Button block onClick={() => setServicePickerOpen(true)}>
-                    Chon dich vu thiet ke
+                    Chọn dịch vụ thiết kế
                   </Button>
                 )}
               </div>
@@ -865,11 +865,11 @@ const CustomOrderDetail = () => {
                 onClick={handlePayDesignService}
                 disabled={!designFeeOrderId && pendingServiceSelections.length === 0}
               >
-                {designFeeOrderId ? 'Thanh toan phi dich vu thiet ke' : 'Tao don thanh toan phi thiet ke'}
+                {designFeeOrderId ? 'Thanh toán phí dịch vụ thiết kế' : 'Tạo đơn thanh toán phí thiết kế'}
               </Button>
             ) : (
               <div style={{ marginTop: 12, color: '#059669', fontSize: 12, fontWeight: 700 }}>
-                Da thanh toan phi dich vu thiet ke
+                Đã thanh toán phí dịch vụ thiết kế
               </div>
             )}
           </div>
@@ -879,7 +879,7 @@ const CustomOrderDetail = () => {
           {technicalDrafts.length > 0 && (
             <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
               <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>
-                Bao gia ky thuat
+                Báo giá kỹ thuật
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {technicalDrafts.map((draft) => {
@@ -889,10 +889,10 @@ const CustomOrderDetail = () => {
                   return (
                     <div key={draftId} style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 10 }}>
                       <div style={{ fontSize: 13, fontWeight: 800, color: '#111827' }}>
-                        {draft.name || draft.designWorkName || draft.DesignWorkName || 'Bao gia'}
+                        {draft.name || draft.designWorkName || draft.DesignWorkName || 'Báo giá'}
                       </div>
                       <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-                        {draft.materialName || draft.MaterialName || 'Vat lieu'} - {draft.estimatedWeightPerUnit || draft.EstimatedWeightPerUnit || 0}g
+                        {draft.materialName || draft.MaterialName || 'Vật liệu'} — {draft.estimatedWeightPerUnit || draft.EstimatedWeightPerUnit || 0}g
                       </div>
                       <div style={{ fontSize: 16, color: '#065f46', fontWeight: 800, marginTop: 6 }}>
                         {formatPrice(unitPrice)}
@@ -907,6 +907,8 @@ const CustomOrderDetail = () => {
                             block
                             danger
                             loading={processing}
+                            disabled={!canAdjust}
+                            title={!canAdjust ? 'Đã hết lượt hiệu chỉnh' : ''}
                             onClick={() => {
                               Modal.confirm({
                                 title: 'Không duyệt báo giá',
@@ -943,7 +945,7 @@ const CustomOrderDetail = () => {
             <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
               <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Báo giá cuối</p>
               <p style={{ margin: '0 0 2px', fontSize: 22, fontWeight: 800, color: '#065f46' }}>{formatPrice(order.latestQuotedPrice)}</p>
-              <p style={{ margin: '0 0 12px', fontSize: 11, color: '#9ca3af' }}>Revision {order.quoteRevision}</p>
+              <p style={{ margin: '0 0 12px', fontSize: 11, color: '#9ca3af' }}>Phiên bản {order.quoteRevision}</p>
               
               {showPayButtons && (
                 <Button
@@ -1014,11 +1016,11 @@ const CustomOrderDetail = () => {
       {!isPrintService && (
       <Modal
         open={servicePickerOpen}
-        title="Chon dich vu thiet ke"
+        title="Chọn dịch vụ thiết kế"
         onCancel={() => setServicePickerOpen(false)}
         onOk={() => setServicePickerOpen(false)}
-        okText="Luu lua chon"
-        cancelText="Dong"
+        okText="Lưu lựa chọn"
+        cancelText="Đóng"
         width={760}
       >
         <ServiceOptionPicker value={pendingServiceSelections} onChange={handlePendingServiceChange} />
@@ -1027,26 +1029,26 @@ const CustomOrderDetail = () => {
 
       {/* Adjustment request modal */}
       <Modal
-        title="Yeu cau hieu chinh thiet ke"
+        title="Yêu cầu hiệu chỉnh thiết kế"
         open={adjustModalOpen}
         onOk={handleRequestAdjustment}
         onCancel={() => { setAdjustModalOpen(false); setAdjustContent(''); setAdjustFiles([]); }}
-        okText="Gui yeu cau"
-        cancelText="Huy"
+        okText="Gửi yêu cầu"
+        cancelText="Hủy"
         okButtonProps={{ disabled: !adjustContent.trim() && adjustFiles.length === 0, loading: processing }}
       >
         <p style={{ margin: '0 0 12px', fontSize: 13, color: '#374151' }}>
-          Mo ta noi dung can hieu chinh. Luu y: moi lan hieu chinh se tieu mot luot trong goi dich vu.
+          Mô tả nội dung cần hiệu chỉnh. Lưu ý: mỗi lần hiệu chỉnh sẽ tiêu một lượt trong gói dịch vụ.
         </p>
         <textarea
           value={adjustContent}
           onChange={(e) => setAdjustContent(e.target.value)}
-          placeholder="VD: Dieu chinh kich thuoc phan de mo hinh, them logo o mat truoc..."
+          placeholder="VD: Điều chỉnh kích thước phần đế mô hình, thêm logo ở mặt trước..."
           rows={4}
           style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, resize: 'vertical', marginBottom: 12 }}
         />
         <div>
-          <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 600, color: '#374151' }}>Hinh anh minh hoa (tuy chon):</p>
+          <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 600, color: '#374151' }}>Hình ảnh minh họa (tùy chọn):</p>
           <input
             type="file"
             accept="image/*"
@@ -1056,7 +1058,7 @@ const CustomOrderDetail = () => {
           />
           {adjustFiles.length > 0 && (
             <p style={{ margin: '4px 0 0', fontSize: 11, color: '#6b7280' }}>
-              Da chon {adjustFiles.length} hinh anh
+              Đã chọn {adjustFiles.length} hình ảnh
             </p>
           )}
         </div>
