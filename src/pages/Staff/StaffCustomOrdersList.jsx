@@ -222,10 +222,14 @@ const StaffCustomOrdersList = () => {
                     <p className="text-gray-800 font-medium max-w-[220px] truncate" title={req.name}>{req.name || 'Không có tiêu đề'}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-gray-800 font-medium">
-                      {req.latestQuotedPrice != null ? `${req.latestQuotedPrice.toLocaleString()} ₫` : 'Chưa báo giá'}
-                    </span>
-                    {req.quoteRevision > 0 && <span className="ml-2 text-xs text-gray-400">(v{req.quoteRevision})</span>}
+                    {(() => {
+                      const price = req.latestConfirmedQuotePrice ?? req.latestQuotedPrice;
+                      return (
+                        <span className="text-gray-800 font-medium">
+                          {price != null ? `${Number(price).toLocaleString('vi-VN')} ₫` : 'Chưa báo giá'}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-sm">
                     {new Date(req.created).toLocaleString('vi-VN')}
