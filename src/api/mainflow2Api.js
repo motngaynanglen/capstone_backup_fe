@@ -343,13 +343,28 @@ export const submitQuote = async (id, payload = {}) => {
   return response.data;
 };
 
-// ─── Customer: Duyệt báo giá ────────────────────────────────────────────
-// BE: PATCH /api/design-work/{id}/mark-approve
+// ─── Customer: Duyệt báo giá (cũ — dùng mark-approve) ──────────────────
+// DEPRECATED: Dùng confirmTechnicalDraft thay thế
 export const approveQuote = async (id) => {
   const response = await axiosInstance.patch(`/api/design-work/${id}/mark-approve`, {
     IsApproved: true,
   });
   return response.data;
+};
+
+// ─── Customer: Duyệt báo giá kỹ thuật ──────────────────────────────────
+// BE: PATCH /api/technical-draft/{id}/confirm
+// Sets IsConfirmed=true, DesignWork → COMPLETED. Không khóa chat.
+export const confirmTechnicalDraft = async (draftId) => {
+  const response = await axiosInstance.patch(`/api/technical-draft/${draftId}/confirm`);
+  return response.data;
+};
+
+// ─── Lấy danh sách báo giá kỹ thuật theo design work ───────────────────
+// BE: GET /api/technical-draft/design-work/{designWorkId}
+export const getTechnicalDraftsByDesignWork = async (designWorkId) => {
+  const response = await axiosInstance.get(`/api/technical-draft/design-work/${designWorkId}`);
+  return extractResponseList(response.data);
 };
 
 // ─── Hủy design work ────────────────────────────────────────────────────

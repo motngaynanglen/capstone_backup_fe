@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Spin, message, Modal, Button } from "antd";
-import { getDesignRequestDetail, assignStaffToRequest, submitQuote, postDesignRequestMessage, cancelDesignRequest, uploadFile, getDesignVersions, reviewFileVersion, reviewAdjustment, createVersionUpdateLog } from "../../api/mainflow2Api";
+import { getDesignRequestDetail, assignStaffToRequest, submitQuote, postDesignRequestMessage, cancelDesignRequest, uploadFile, getDesignVersions, reviewFileVersion, reviewAdjustment, createVersionUpdateLog, getTechnicalDraftsByDesignWork } from "../../api/mainflow2Api";
 import AdjustmentRequestCard from "../../components/Mainflow2/AdjustmentRequestCard";
+import TechnicalDraftCard from "../../components/Mainflow2/TechnicalDraftCard";
 import { useAuth } from "../../contexts/AuthContext";
 import useMainflow2Realtime from "../../hooks/useMainflow2Realtime";
 import CustomerRequestPanel from "../../components/Mainflow2/CustomerRequestPanel";
 import StaffQuoteModal from "../../components/Mainflow2/StaffQuoteModal";
-import QuoteMessageCard from "../../components/Mainflow2/QuoteMessageCard";
 import ChatMessageBubble, { ChatComposer } from "../../components/Mainflow2/ChatMessageBubble";
 import { getMessageAuthorId } from "../../components/Mainflow2/messageMetadataUtils";
 import Model3DPreview from "../../components/Mainflow2/Model3DPreview";
@@ -125,8 +125,9 @@ const StaffCustomOrderDetail = () => {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
-  // Design versions (for file review)
+  // Design versions (for file review) + technical drafts
   const [designVersions, setDesignVersions] = useState([]);
+  const [technicalDrafts, setTechnicalDrafts] = useState([]);
   const [reviewingId, setReviewingId] = useState(null);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
@@ -177,12 +178,20 @@ const StaffCustomOrderDetail = () => {
     } catch { /* silent */ }
   }, [id]);
 
+  const fetchDrafts = useCallback(async () => {
+    try {
+      const drafts = await getTechnicalDraftsByDesignWork(id);
+      setTechnicalDrafts(Array.isArray(drafts) ? drafts : []);
+    } catch { setTechnicalDrafts([]); }
+  }, [id]);
+
   useEffect(() => {
     fetchDetail();
     fetchVersions();
+    fetchDrafts();
   }, [id]);
 
-  useMainflow2Realtime(id, () => { fetchDetail(true); fetchVersions(); });
+  useMainflow2Realtime(id, () => { fetchDetail(true); fetchVersions(); fetchDrafts(); });
 
   const handleReviewFile = async (versionId, isApproved, reviewNote = '') => {
     try {
@@ -259,6 +268,8 @@ const StaffCustomOrderDetail = () => {
       setVersionNote('');
       setVersionFile(null);
       fetchDetail(true);
+      fetchVersions();
+      fetchDrafts();
     } catch (err) {
       message.error(err?.response?.data?.detail || err?.response?.data?.message || 'Loi khi tao phien ban');
     } finally {
@@ -321,6 +332,7 @@ const StaffCustomOrderDetail = () => {
         message.success('Báo giá thành công!');
         setQuoteModalOpen(false);
         fetchDetail();
+        fetchDrafts();
       } else message.error(res?.message || 'Lỗi gửi báo giá');
     } catch (err) {
       message.error(err?.response?.data?.message || err?.response?.data?.data || 'Lỗi báo giá');
@@ -446,20 +458,36 @@ const StaffCustomOrderDetail = () => {
                 );
               }
 
-              if (isQuote) {
-                let meta = null;
-                try { meta = msg.metadataJson ? JSON.parse(msg.metadataJson) : null; } catch { }
-                return (
-                  <div key={msg.id || i} style={{ width: '100%', marginBottom: 12 }}>
-                    <QuoteMessageCard
-                      meta={meta}
-                      staffNote={msg.content}
-                      revision={meta?.revision}
+              // VERSION_UPDATE — check for associated TechnicalDraft
+              if (logType === 'VERSION_UPDATE' && technicalDrafts.length > 0) {
+                const msgVersionIds = (msg.versions || []).map(v => v.id || v.Id);
+                const matchingDraft = technicalDrafts.find(d =>
+                  msgVersionIds.includes(d.designVersionHistoryId || d.DesignVersionHistoryId)
+                );
+                if (matchingDraft) {
+                  return (
+                    <TechnicalDraftCard
+                      key={msg.id || i}
+                      draft={matchingDraft}
+                      showApprove={false}
+                      senderName={msg.senderName || 'Bạn'}
+                      createdAt={msg.created}
                     />
-                    <span style={{ fontSize: 10, color: '#9ca3af', marginTop: 3, display: 'block' }}>
-                      {new Date(msg.created).toLocaleString('vi-VN')} · Nhân viên
-                    </span>
-                  </div>
+                  );
+                }
+              }
+
+              // Legacy QUOTE type fallback
+              if (isQuote && technicalDrafts.length > 0) {
+                const latestDraft = technicalDrafts[technicalDrafts.length - 1];
+                return (
+                  <TechnicalDraftCard
+                    key={msg.id || i}
+                    draft={latestDraft}
+                    showApprove={false}
+                    senderName={msg.senderName || 'Bạn'}
+                    createdAt={msg.created}
+                  />
                 );
               }
 

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Spin, message, Modal, Button } from 'antd';
-import { getDesignRequestDetail, approveQuote, cancelDesignRequest, postDesignRequestMessage, uploadFile, lockDesignWork, requestAdjustment, addFilesToQuickPrint } from '../api/mainflow2Api';
+import { getDesignRequestDetail, approveQuote, cancelDesignRequest, postDesignRequestMessage, uploadFile, lockDesignWork, requestAdjustment, addFilesToQuickPrint, confirmTechnicalDraft, getTechnicalDraftsByDesignWork } from '../api/mainflow2Api';
 import AdjustmentRequestCard from '../components/Mainflow2/AdjustmentRequestCard';
+import TechnicalDraftCard from '../components/Mainflow2/TechnicalDraftCard';
 import { cancelOrderApi, checkoutDesignApi } from '../api/orderApi';
 import technicalDraftApi from '../api/technicalDraftApi';
 import { getActiveServiceOptionsApi } from '../api/serviceApi';
@@ -136,10 +137,16 @@ const CustomOrderDetail = () => {
 
   const fetchTechnicalDrafts = useCallback(async () => {
     try {
-      const res = await technicalDraftApi.getByDesignWork(id);
-      setTechnicalDrafts(res?.data || []);
+      // Thử wrapper mới trước, fallback sang API cũ
+      const drafts = await getTechnicalDraftsByDesignWork(id);
+      setTechnicalDrafts(Array.isArray(drafts) ? drafts : []);
     } catch {
-      setTechnicalDrafts([]);
+      try {
+        const res = await technicalDraftApi.getByDesignWork(id);
+        setTechnicalDrafts(res?.data || []);
+      } catch {
+        setTechnicalDrafts([]);
+      }
     }
   }, [id]);
 
@@ -234,19 +241,61 @@ const CustomOrderDetail = () => {
     }
   };
 
-  const handleApprove = () => {
+  const handleApproveDraft = (draftId) => {
     Modal.confirm({
-      title: 'Chấp nhận báo giá',
-      content: 'Bạn có chắc chắn muốn chấp nhận báo giá này không?',
-      okText: 'Chấp nhận',
+      title: 'Duyệt báo giá kỹ thuật',
+      content: 'Xác nhận duyệt báo giá này? Thiết kế sẽ được nghiệm thu. Cuộc trò chuyện vẫn mở.',
+      okText: 'Duyệt báo giá',
+      okButtonProps: { style: { background: '#059669', borderColor: '#059669' } },
       onOk: async () => {
         try {
           setProcessing(true);
-          const res = await approveQuote(id);
-          if (res?.statusCode === 200) { message.success('Đã chấp nhận báo giá!'); fetchDetail(); }
-          else message.error(res?.message || 'Lỗi khi duyệt');
-        } catch { message.error('Lỗi khi duyệt báo giá'); }
-        finally { setProcessing(false); }
+          const res = await confirmTechnicalDraft(draftId);
+          if (res?.statusCode === 200 || res?.code === 'UPDATED') {
+            message.success('Đã duyệt báo giá thành công!');
+            fetchDetail();
+            fetchTechnicalDrafts();
+          } else {
+            message.error(res?.message || 'Lỗi khi duyệt');
+          }
+        } catch (err) {
+          message.error(err?.response?.data?.message || 'Lỗi khi duyệt báo giá');
+        } finally {
+          setProcessing(false);
+        }
+      }
+    });
+  };
+
+  const handleLockChat = () => {
+    Modal.confirm({
+      title: 'Khóa cuộc trò chuyện',
+      icon: null,
+      content: (
+        <div style={{ textAlign: 'center', padding: '12px 0' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
+          <p style={{ fontSize: 14, color: '#374151', margin: 0 }}>
+            Sau khi khóa, bạn và nhân viên sẽ <b>không thể gửi tin nhắn</b> trong cuộc trò chuyện này nữa.
+          </p>
+          <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 0' }}>
+            Hành động này không thể hoàn tác.
+          </p>
+        </div>
+      ),
+      okText: 'Khóa cuộc trò chuyện',
+      okButtonProps: { danger: true, style: { fontWeight: 700 } },
+      cancelText: 'Hủy',
+      onOk: async () => {
+        try {
+          setProcessing(true);
+          await lockDesignWork(id);
+          message.success('Đã khóa cuộc trò chuyện');
+          fetchDetail();
+        } catch (err) {
+          message.error(err?.response?.data?.message || 'Lỗi khi khóa');
+        } finally {
+          setProcessing(false);
+        }
       }
     });
   };
@@ -497,12 +546,23 @@ const CustomOrderDetail = () => {
             Xem đơn {order.linkedOrderCode ? `#${order.linkedOrderCode}` : ''}
           </Link>
         )}
-        {/* Chỉ cho hủy khi: chưa bị cancelled, chưa vào sản xuất, và đơn dịch vụ chưa được thanh toán */}
-        {order.status !== 'CANCELLED' && !showProduction && !isPaid && !designFeePaid && ['SUBMITTED', 'PENDING', 'APPROVED'].includes(order.status?.toUpperCase?.() || order.status) && (
+        {/* Chỉ cho hủy khi: chưa locked, chưa vào sản xuất, và đơn dịch vụ chưa được thanh toán */}
+        {!order.isLocked && !showProduction && !isPaid && !designFeePaid && ['SKETCHING', 'PENDING'].includes(order.designWorkStatus) && (
           <button onClick={handleCancel} disabled={processing}
             style={{ padding: '4px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
             {showAwaitingPayment ? 'Hủy đơn hàng' : 'Hủy yêu cầu'}
           </button>
+        )}
+        {/* Nút khóa chat — hiện khi đã duyệt (COMPLETED) và chưa locked */}
+        {order.designWorkStatus === 'COMPLETED' && !order.isLocked && (
+          <Button
+            danger
+            loading={processing}
+            onClick={handleLockChat}
+            style={{ fontWeight: 700, borderRadius: 8 }}
+          >
+            🔒 KHÓA CUỘC TRÒ CHUYỆN
+          </Button>
         )}
       </div>
 
@@ -516,12 +576,12 @@ const CustomOrderDetail = () => {
           <div ref={messagesContainerRef}
             style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-{/* Messages + inline quotes + adjustment requests */}
+{/* Messages + inline drafts + adjustment requests */}
             {order.messages?.length > 0 ? order.messages.map((msg, i) => {
               const isMe = getMessageAuthorId(msg) === user?.id;
               const logType = (msg.logType || '').toUpperCase();
-              const isQuote = logType.includes('QUOTE');
               const isAdjustment = logType === 'ADJUSTMENT_REQUEST';
+              const isVersionUpdate = logType === 'VERSION_UPDATE';
 
               if (isAdjustment) {
                 return (
@@ -534,27 +594,52 @@ const CustomOrderDetail = () => {
                 );
               }
 
-              if (isQuote) {
-                let meta = null;
-                try { meta = msg.metadataJson ? JSON.parse(msg.metadataJson) : null; } catch {}
-                const isLatestQuote = i === order.messages.length - 1;
-                const canApprove =
-                  (order.status === 'QUOTED' || order.status === 'NEGOTIATING') && isLatestQuote;
-                return (
-                  <div key={msg.id || i} style={{ width: '100%', marginBottom: 12 }}>
-                    <QuoteMessageCard
-                      meta={meta}
-                      staffNote={msg.content}
-                      revision={meta?.revision}
-                      showApprove={canApprove}
-                      onApprove={handleApprove}
-                      approveLoading={processing}
-                    />
-                    <span style={{ fontSize: 10, color: '#9ca3af', marginTop: 3, display: 'block' }}>
-                      {new Date(msg.created).toLocaleString('vi-VN')} · Nhân viên
-                    </span>
-                  </div>
+              // VERSION_UPDATE log — check if there's a TechnicalDraft for any version in this log
+              if (isVersionUpdate && technicalDrafts.length > 0) {
+                const msgVersionIds = (msg.versions || []).map(v => v.id || v.Id);
+                const matchingDraft = technicalDrafts.find(d =>
+                  msgVersionIds.includes(d.designVersionHistoryId || d.DesignVersionHistoryId)
                 );
+                if (matchingDraft) {
+                  const rawStatus = order.designWorkStatus;
+                  const canApprove = !matchingDraft.isConfirmed
+                    && (rawStatus === 'REVIEWING' || rawStatus === 'IN_PROGRESS')
+                    && !order.isLocked;
+                  return (
+                    <TechnicalDraftCard
+                      key={msg.id || i}
+                      draft={matchingDraft}
+                      showApprove={canApprove}
+                      onApprove={handleApproveDraft}
+                      loading={processing}
+                      senderName={msg.senderName || 'Nhân viên'}
+                      createdAt={msg.created}
+                    />
+                  );
+                }
+              }
+
+              // Fallback: also check for QUOTE logType (legacy)
+              if (logType.includes('QUOTE')) {
+                // Find latest unconfirmed draft to show approve
+                const latestDraft = technicalDrafts.length > 0
+                  ? technicalDrafts[technicalDrafts.length - 1]
+                  : null;
+                if (latestDraft) {
+                  const canApprove = !latestDraft.isConfirmed && !order.isLocked
+                    && ['REVIEWING', 'IN_PROGRESS'].includes(order.designWorkStatus);
+                  return (
+                    <TechnicalDraftCard
+                      key={msg.id || i}
+                      draft={latestDraft}
+                      showApprove={canApprove}
+                      onApprove={handleApproveDraft}
+                      loading={processing}
+                      senderName={msg.senderName || 'Nhân viên'}
+                      createdAt={msg.created}
+                    />
+                  );
+                }
               }
 
               return (
