@@ -111,7 +111,7 @@ export default function VersionUpdateCard({
             const draftConfirmed = vDraft?.isConfirmed || vDraft?.IsConfirmed;
             const badge = reviewBadge(vReview);
 
-            const staffCanQuote = role === 'staff' && !isPrintService && !vDraft && !isLocked && canQuoteStatus;
+            const staffCanQuote = role === 'staff' && !isPrintService && !vDraft && !isLocked && canQuoteStatus;  // manager không có nút này
             const customerCanApprove = role === 'customer' && vDraft && !draftConfirmed && !isLocked && canQuoteStatus;
 
             return (

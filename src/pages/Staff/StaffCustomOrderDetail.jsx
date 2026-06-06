@@ -102,7 +102,7 @@ const isSuccessResponse = (res) =>
 const StaffCustomOrderDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isManager } = useAuth();
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -391,11 +391,14 @@ const StaffCustomOrderDetail = () => {
           ? <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#dbeafe', color: '#1d4ed8' }}>In theo yêu cầu</span>
           : <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#ede9fe', color: '#6d28d9' }}>Thiết kế 3D</span>
         }
-        {order.designWorkStatus !== 'COMPLETED' && !order.isLocked && (
+        {!isManager && order.designWorkStatus !== 'COMPLETED' && !order.isLocked && (
           <button onClick={handleCancel} disabled={processing}
             style={{ padding: '4px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
             Hủy yêu cầu
           </button>
+        )}
+        {isManager && (
+          <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#fef3c7', color: '#92400e' }}>Xem với tư cách Manager</span>
         )}
       </div>
 
@@ -439,9 +442,9 @@ const StaffCustomOrderDetail = () => {
                   <AdjustmentRequestCard
                     key={msg.id || i}
                     msg={msg}
-                    isStaff
-                    onApprove={handleApproveAdjustment}
-                    onReject={(logId) => { setRejectAdjustId(logId); setRejectAdjustOpen(true); }}
+                    isStaff={!isManager}
+                    onApprove={isManager ? undefined : handleApproveAdjustment}
+                    onReject={isManager ? undefined : (logId) => { setRejectAdjustId(logId); setRejectAdjustOpen(true); }}
                     processing={processing}
                   />
                 );
@@ -455,7 +458,7 @@ const StaffCustomOrderDetail = () => {
                     key={msg.id || i}
                     msg={msg}
                     isMe={true}  // VERSION_UPDATE luôn do staff tạo (BE [Authorize StaffOrManager])
-                    role="staff"
+                    role={isManager ? 'manager' : 'staff'}
                     drafts={technicalDrafts}
                     isPrintService={isWorkTypePrint(order)}
                     designWorkStatus={order.designWorkStatus}
@@ -542,7 +545,7 @@ const StaffCustomOrderDetail = () => {
                           : <>Khách chưa thanh toán phí thiết kế — bạn vẫn có thể trao đổi, nhưng chỉ <b>tiếp nhận được sau khi khách thanh toán</b>.</>
                       }
                     </span>
-                    {paid && (
+                    {paid && !isManager && (
                       <Button type="primary" loading={processing} onClick={handleAssign} style={{ flexShrink: 0, fontWeight: 600 }}>
                         ✋ Tiếp nhận
                       </Button>
@@ -553,14 +556,14 @@ const StaffCustomOrderDetail = () => {
               );
             }
 
-            // IN_PROGRESS or REVIEWING — staff can quote + upload version
+            // IN_PROGRESS or REVIEWING — staff can quote + upload version (manager chỉ chat)
             return (
               <ChatComposer
                 value={chatMessage}
                 onChange={setChatMessage}
                 onSend={handleSendChat}
                 uploading={uploading}
-                extraLeft={
+                extraLeft={!isManager ? (
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                     <Button
                       onClick={() => setQuoteModalOpen(true)}
@@ -575,7 +578,7 @@ const StaffCustomOrderDetail = () => {
                       📐 Tạo phiên bản 3D
                     </Button>
                   </div>
-                }
+                ) : null}
               />
             );
           })()}
@@ -732,7 +735,7 @@ const StaffCustomOrderDetail = () => {
                       </div>
                       {/* Duyệt/Từ chối file CHỈ dành cho đơn in theo yêu cầu (khách upload file, NV kiểm tra
                           tiêu chuẩn in). Trong dịch vụ thiết kế, nhân viên KHÔNG duyệt thiết kế — đó là việc của khách. */}
-                      {isWorkTypePrint(order) && canReview && (
+                      {!isManager && isWorkTypePrint(order) && canReview && (
                         <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                           <button
                             onClick={() => handleReviewFile(f.id, true)}
@@ -750,8 +753,8 @@ const StaffCustomOrderDetail = () => {
                           </button>
                         </div>
                       )}
-                      {/* Quote button for this specific version */}
-                      {(order.designWorkStatus === 'IN_PROGRESS' || order.designWorkStatus === 'REVIEWING') && (
+                      {/* Quote button for this specific version — ẩn cho manager */}
+                      {!isManager && (order.designWorkStatus === 'IN_PROGRESS' || order.designWorkStatus === 'REVIEWING') && (
                         <button
                           onClick={() => { setQuoteVersionId(f.id); setQuoteModalOpen(true); }}
                           style={{ width: '100%', marginTop: 6, padding: '4px 0', borderRadius: 6, border: '1px solid #c7d2fe', background: '#eef2ff', color: '#4f46e5', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}

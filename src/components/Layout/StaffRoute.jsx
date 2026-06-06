@@ -6,7 +6,7 @@ import PrivateRoute from '../../routes/PrivateRoute';
 export default function StaffRoute({ children }) {
   return (
     <StaffLayout>
-      <PrivateRoute requiredRole={['employee', 'staff']}>{children}</PrivateRoute>
+      <PrivateRoute requiredRole={['employee', 'staff', 'manager']}>{children}</PrivateRoute>
     </StaffLayout>
   );
 }
