@@ -2,11 +2,14 @@ import axiosInstance from './axiosInstance';
 
 const technicalDraftApi = {
   // BE: GET /api/technical-draft/my-drafts
+  // LƯU Ý: BE bind PageNumber & PageSize là tham số query BẮT BUỘC (kiểu int non-nullable).
+  // Thiếu pageNumber → 400 Bad Request → danh sách rỗng. Phải gửi đủ cả hai.
   getMyConfirmed: async (params = {}) => {
     const response = await axiosInstance.get('/api/technical-draft/my-drafts', {
       params: {
-        isConfirmed: true,
+        pageNumber: 1,
         pageSize: 100,
+        isConfirmed: true,
         ...params,
       },
     });
@@ -17,6 +20,7 @@ const technicalDraftApi = {
   getMyDrafts: async (params = {}) => {
     const response = await axiosInstance.get('/api/technical-draft/my-drafts', {
       params: {
+        pageNumber: 1,
         pageSize: 100,
         ...params,
       },
