@@ -189,8 +189,8 @@ export default function VersionUpdateCard({
                   )}
                 </div>
 
-                {/* Báo giá kỹ thuật gắn với version này */}
-                {vDraft && (
+                {/* Báo giá kỹ thuật gắn với version — chỉ hiện cho customer (staff thấy riêng trên chat) */}
+                {role === 'customer' && vDraft && (
                   <div style={{ marginTop: 10 }}>
                     <TechnicalDraftCard
                       draft={vDraft}
