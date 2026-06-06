@@ -157,6 +157,7 @@ const StaffCustomOrderDetail = () => {
 
   // Quote panel
   const [quoteModalOpen, setQuoteModalOpen] = useState(false);
+  const [quoteVersionId, setQuoteVersionId] = useState(null); // designVersionHistoryId for targeted quote
 
   const fetchDetail = useCallback(async (silent = false) => {
     try {
@@ -331,6 +332,7 @@ const StaffCustomOrderDetail = () => {
       if (isSuccessResponse(res)) {
         message.success('Báo giá thành công!');
         setQuoteModalOpen(false);
+        setQuoteVersionId(null);
         fetchDetail();
         fetchDrafts();
       } else message.error(res?.message || 'Lỗi gửi báo giá');
@@ -724,6 +726,15 @@ const StaffCustomOrderDetail = () => {
                           </button>
                         </div>
                       )}
+                      {/* Quote button for this specific version */}
+                      {(order.designWorkStatus === 'IN_PROGRESS' || order.designWorkStatus === 'REVIEWING') && (
+                        <button
+                          onClick={() => { setQuoteVersionId(f.id); setQuoteModalOpen(true); }}
+                          style={{ width: '100%', marginTop: 6, padding: '4px 0', borderRadius: 6, border: '1px solid #c7d2fe', background: '#eef2ff', color: '#4f46e5', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          💰 Báo giá phiên bản này
+                        </button>
+                      )}
                     </div>
                   );
                 })}
@@ -744,11 +755,11 @@ const StaffCustomOrderDetail = () => {
 
       <StaffQuoteModal
         open={quoteModalOpen}
-        onClose={() => setQuoteModalOpen(false)}
+        onClose={() => { setQuoteModalOpen(false); setQuoteVersionId(null); }}
         onSubmit={handleSubmitQuote}
         submitting={processing}
         designWorkTitle={order.title}
-        sourceType={order.sourceType}
+        designVersionHistoryId={quoteVersionId}
       />
 
       {/* Reject file modal */}

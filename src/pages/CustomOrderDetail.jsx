@@ -1,38 +1,29 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Spin, message, Modal, Button } from 'antd';
-import { getDesignRequestDetail, approveQuote, cancelDesignRequest, postDesignRequestMessage, uploadFile, lockDesignWork, requestAdjustment, addFilesToQuickPrint, confirmTechnicalDraft, getTechnicalDraftsByDesignWork } from '../api/mainflow2Api';
+import { getDesignRequestDetail, cancelDesignRequest, postDesignRequestMessage, uploadFile, lockDesignWork, requestAdjustment, addFilesToQuickPrint, confirmTechnicalDraft, getTechnicalDraftsByDesignWork } from '../api/mainflow2Api';
 import AdjustmentRequestCard from '../components/Mainflow2/AdjustmentRequestCard';
 import TechnicalDraftCard from '../components/Mainflow2/TechnicalDraftCard';
 import { cancelOrderApi, checkoutDesignApi } from '../api/orderApi';
-import technicalDraftApi from '../api/technicalDraftApi';
+
 import { getActiveServiceOptionsApi } from '../api/serviceApi';
 import { useAuth } from '../contexts/AuthContext';
 import useMainflow2Realtime from '../hooks/useMainflow2Realtime';
-import QuoteMessageCard from '../components/Mainflow2/QuoteMessageCard';
+
 import ChatMessageBubble, { ChatComposer } from '../components/Mainflow2/ChatMessageBubble';
 import { getMessageAuthorId } from '../components/Mainflow2/messageMetadataUtils';
 import Model3DPreview from '../components/Mainflow2/Model3DPreview';
 import ServiceOptionPicker from '../components/Mainflow2/ServiceOptionPicker';
 
-const CUSTOM_STATUS_STEPS = [
-  { key: 'SUBMITTED', label: 'Gửi yêu cầu' },
-  { key: 'ASSIGNED', label: 'NV đã nhận' },
-  { key: 'QUOTED', label: 'Có báo giá' },
-  { key: 'NEGOTIATING', label: 'Thương lượng' },
-  { key: 'APPROVED', label: 'Đã duyệt' },
-];
-
-const STATUS_ORDER = CUSTOM_STATUS_STEPS.map(s => s.key);
-
-const STATUS_LABEL = {
-  SUBMITTED: 'Mới gửi',
-  ASSIGNED: 'NV đã nhận',
-  QUOTED: 'Có báo giá',
-  NEGOTIATING: 'Đang thương lượng',
-  APPROVED: 'Đã duyệt',
-  CANCELLED: 'Đã hủy',
+// Real BE DesignWork statuses
+const BE_STATUS_LABEL = {
+  SKETCHING: 'Phác thảo',
+  PENDING: 'Chờ tiếp nhận',
+  IN_PROGRESS: 'Đang thực hiện',
+  REVIEWING: 'Đang kiểm duyệt',
+  COMPLETED: 'Đã nghiệm thu',
 };
+
 
 const LINKED_ORDER_STATUS_LABEL = {
   PENDING: 'Chờ xác nhận',
@@ -68,14 +59,32 @@ const formatPrice = (price) =>
 
 const designServiceSelectionKey = (designWorkId) => `design-service-selections:${designWorkId}`;
 
-const statusColor = (status) => {
-  if (status === 'SUBMITTED') return { background: '#f3f4f6', color: '#6b7280' };
-  if (status === 'ASSIGNED') return { background: '#eff6ff', color: '#2563eb' };
-  if (status === 'QUOTED') return { background: '#f5f3ff', color: '#7c3aed' };
-  if (status === 'NEGOTIATING') return { background: '#fffbeb', color: '#d97706' };
-  if (status === 'APPROVED') return { background: '#ecfdf5', color: '#059669' };
+const beStatusColor = (status) => {
+  if (status === 'SKETCHING') return { background: '#f3f4f6', color: '#6b7280' };
+  if (status === 'PENDING') return { background: '#fffbeb', color: '#d97706' };
+  if (status === 'IN_PROGRESS') return { background: '#eff6ff', color: '#2563eb' };
+  if (status === 'REVIEWING') return { background: '#f5f3ff', color: '#7c3aed' };
+  if (status === 'COMPLETED') return { background: '#ecfdf5', color: '#059669' };
   return { background: '#fef2f2', color: '#dc2626' };
 };
+
+/**
+ * Build customer timeline from real BE designWorkStatus + payment.
+ */
+function buildCustomerTimeline(order) {
+  const raw = order?.designWorkStatus || '';
+  const paid = order?.designServicePaid || order?.designServicePaymentStatus === 'PAID';
+  const rankMap = { SKETCHING: 0, PENDING: 0, IN_PROGRESS: 1, REVIEWING: 2, COMPLETED: 3 };
+  const rank = rankMap[raw] ?? -1;
+
+  return [
+    { key: 'request', label: 'Gửi yêu cầu', done: true, isCurrent: false },
+    { key: 'paid', label: paid ? 'Đã thanh toán phí TK' : 'Chờ thanh toán', done: paid, isCurrent: !paid && rank === 0 },
+    { key: 'assigned', label: rank >= 1 ? 'NV đã nhận' : 'Chờ tiếp nhận', done: rank >= 1, isCurrent: paid && rank === 0 },
+    { key: 'quoted', label: rank >= 2 ? 'Có báo giá' : 'Chờ báo giá', done: rank >= 2, isCurrent: rank === 1 },
+    { key: 'completed', label: rank >= 3 ? 'Đã nghiệm thu' : 'Chờ duyệt', done: rank >= 3, isCurrent: rank === 2 },
+  ];
+}
 
 const CustomOrderDetail = () => {
   const { id } = useParams();
@@ -332,9 +341,6 @@ const CustomOrderDetail = () => {
   const serviceTotal = serviceRows.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0);
   const designFeeOrderId = order?.designServiceOrderId;
   const designFeePaid = order?.designServicePaymentStatus === 'PAID';
-  const confirmedDraft = technicalDrafts.find((draft) => draft.isConfirmed || draft.IsConfirmed);
-  const hasConfirmedDraft = Boolean(confirmedDraft);
-
   const handlePendingServiceChange = (items) => {
     setPendingServiceSelections(items);
     if (items.length > 0) {
@@ -381,49 +387,6 @@ const CustomOrderDetail = () => {
     }
   };
 
-  const handleConfirmTechnicalDraft = (draft) => {
-    Modal.confirm({
-      title: 'Duyet bao gia ky thuat',
-      content: 'Sau khi duyet, ban co the thay thiet ke nay trong Kho do thiet ke va van tiep tuc chat neu can.',
-      okText: 'Duyet bao gia',
-      cancelText: 'Bo qua',
-      onOk: async () => {
-        try {
-          setProcessing(true);
-          await technicalDraftApi.confirm(draft.id || draft.Id);
-          message.success('Bao gia thanh cong.');
-          await fetchTechnicalDrafts();
-          await fetchDetail(true);
-        } catch (err) {
-          message.error(err?.response?.data?.message || err?.message || 'Duyet bao gia that bai.');
-        } finally {
-          setProcessing(false);
-        }
-      },
-    });
-  };
-
-  const handleLockConversation = () => {
-    Modal.confirm({
-      title: 'KHOA CUOC TRO CHUYEN',
-      content: 'Thao tac nay khoa DesignWork va ket thuc luong thiet ke 3D rieng. Ban chi nen khoa sau khi da chot xong voi shop.',
-      okText: 'Khoa cuoc tro chuyen',
-      okType: 'danger',
-      cancelText: 'Bo qua',
-      onOk: async () => {
-        try {
-          setProcessing(true);
-          await lockDesignWork(id);
-          message.success('Da khoa cuoc tro chuyen.');
-          await fetchDetail(true);
-        } catch (err) {
-          message.error(err?.response?.data?.message || err?.message || 'Khoa cuoc tro chuyen that bai.');
-        } finally {
-          setProcessing(false);
-        }
-      },
-    });
-  };
 
   const handleCancel = () => {
     const designWorkId = order?.id || id;
@@ -485,11 +448,10 @@ const CustomOrderDetail = () => {
   const linkedOrderId = order?.orderId;
   const isPaid = order?.linkedPaymentStatus === 'PAID';
   const hasLinkedOrder = Boolean(linkedOrderId);
-  const showPayButtons = order?.status === 'APPROVED' && !hasLinkedOrder && order?.latestQuotedPrice != null;
+  const showPayButtons = order?.designWorkStatus === 'COMPLETED' && !hasLinkedOrder && order?.latestQuotedPrice != null;
   const showAwaitingPayment = hasLinkedOrder && !isPaid;
   const showProduction = hasLinkedOrder && isPaid;
   const fileVersions = order?.versions || order?.quoteFileVersions || [];
-  const timelineSteps = order?.timeline?.length > 0 ? order.timeline : null;
 
   const headerStatusLabel = showProduction
       ? (order.linkedOrderStatus === 'FINISHED' || order.linkedShipmentStatus === 'READY_FOR_PICKUP'
@@ -501,11 +463,13 @@ const CustomOrderDetail = () => {
           : SHIPMENT_STATUS_LABEL[order.linkedShipmentStatus]
             || LINKED_ORDER_STATUS_LABEL[order.linkedOrderStatus]
             || 'Đang xử lý đơn')
-    : (STATUS_LABEL[order?.status] || order?.status);
+    : order.isLocked && order.designWorkStatus !== 'COMPLETED'
+      ? 'Đã đóng'
+      : (BE_STATUS_LABEL[order?.designWorkStatus] || order?.designWorkStatus || order?.status);
 
   const headerStatusStyle = showProduction
     ? { background: '#eff6ff', color: '#2563eb' }
-    : statusColor(order?.status);
+    : beStatusColor(order?.designWorkStatus);
 
   if (!order) {
     return (
@@ -532,12 +496,6 @@ const CustomOrderDetail = () => {
         <span style={{ padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, ...headerStatusStyle }}>
           {headerStatusLabel}
         </span>
-        {hasConfirmedDraft && !order.isLocked && (
-          <button onClick={handleLockConversation} disabled={processing}
-            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #dc2626', background: '#dc2626', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
-            KHOA CUOC TRO CHUYEN
-          </button>
-        )}
         {showProduction && linkedOrderId && (
           <Link
             to={`/orders/${linkedOrderId}`}
@@ -662,9 +620,9 @@ const CustomOrderDetail = () => {
             <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#6b7280', fontSize: 13, fontWeight: 600 }}>
               Cuoc tro chuyen da duoc khoa.
             </div>
-          ) : order.status === 'CANCELLED' ? (
+          ) : order.isLocked && order.designWorkStatus !== 'COMPLETED' ? (
             <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#dc2626', fontSize: 13, fontWeight: 500 }}>
-              Yêu cầu đã bị hủy.
+              Yêu cầu đã đóng.
             </div>
           ) : showProduction ? (
             <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center' }}>
@@ -705,10 +663,6 @@ const CustomOrderDetail = () => {
                 🚀 Thanh toán & Đặt hàng ngay
               </Button>
               <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Bấm để thanh toán — shop sẽ bắt đầu sản xuất và gửi hàng cho bạn.</p>
-            </div>
-          ) : order.status === '__APPROVED_CHAT_BLOCK_DISABLED__' ? (
-            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#6b7280', fontSize: 13 }}>
-              Yêu cầu đã duyệt. Liên hệ shop nếu cần hỗ trợ đơn hàng.
             </div>
           ) : (
             <>
@@ -769,43 +723,30 @@ const CustomOrderDetail = () => {
               {showProduction ? 'Tiến độ làm việc' : 'Tiến trình'}
             </p>
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {(timelineSteps || CUSTOM_STATUS_STEPS.map(s => ({ code: s.key, label: s.label }))).map((step, idx, arr) => {
-                const stepCode = step.code || step.key;
-                let isDone;
-                let isCurrent;
-                if (timelineSteps) {
-                  isDone = Boolean(step.isDone);
-                  isCurrent = Boolean(step.isCurrent);
-                } else {
-                  const currentIdx = STATUS_ORDER.indexOf(order.status);
-                  isDone = idx < currentIdx || (idx === currentIdx && order.status !== 'CANCELLED');
-                  isCurrent = idx === currentIdx && order.status !== 'CANCELLED';
-                }
-                return (
-                  <li key={stepCode || idx} style={{ display: 'flex', gap: 12, paddingBottom: idx < arr.length - 1 ? 16 : 0, position: 'relative' }}>
-                    {idx < arr.length - 1 && (
-                      <div style={{ position: 'absolute', left: 11, top: 24, width: 2, bottom: 0, background: isDone ? '#4f46e5' : '#e5e7eb' }} />
-                    )}
-                    <div style={{
-                      width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12,
-                      background: isCurrent ? '#4f46e5' : isDone ? '#4f46e5' : '#f3f4f6',
-                      color: isDone || isCurrent ? '#fff' : '#9ca3af',
-                      border: isCurrent ? '2px solid #a5b4fc' : 'none',
-                      zIndex: 1
-                    }}>
-                      {isDone && !isCurrent ? '✓' : idx + 1}
-                    </div>
-                    <p style={{ margin: 'auto 0', fontSize: 13, fontWeight: isCurrent ? 700 : 500, color: isCurrent ? '#4f46e5' : isDone ? '#111827' : '#9ca3af' }}>
-                      {step.label}
-                    </p>
-                  </li>
-                );
-              })}
-              {!timelineSteps && order.status === 'CANCELLED' && (
+              {buildCustomerTimeline(order).map((step, idx, arr) => (
+                <li key={step.key} style={{ display: 'flex', gap: 12, paddingBottom: idx < arr.length - 1 ? 16 : 0, position: 'relative' }}>
+                  {idx < arr.length - 1 && (
+                    <div style={{ position: 'absolute', left: 11, top: 24, width: 2, bottom: 0, background: step.done ? '#4f46e5' : '#e5e7eb' }} />
+                  )}
+                  <div style={{
+                    width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12,
+                    background: step.isCurrent ? '#4f46e5' : step.done ? '#4f46e5' : '#f3f4f6',
+                    color: step.done || step.isCurrent ? '#fff' : '#9ca3af',
+                    border: step.isCurrent ? '2px solid #a5b4fc' : 'none',
+                    zIndex: 1,
+                  }}>
+                    {step.done && !step.isCurrent ? '✓' : idx + 1}
+                  </div>
+                  <p style={{ margin: 'auto 0', fontSize: 13, fontWeight: step.isCurrent ? 700 : 500, color: step.isCurrent ? '#4f46e5' : step.done ? '#111827' : '#9ca3af' }}>
+                    {step.label}
+                  </p>
+                </li>
+              ))}
+              {order.isLocked && order.designWorkStatus !== 'COMPLETED' && (
                 <li style={{ display: 'flex', gap: 12, marginTop: 8 }}>
                   <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#fef2f2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#dc2626' }}>✕</div>
-                  <p style={{ margin: 'auto 0', fontSize: 13, fontWeight: 600, color: '#dc2626' }}>Đã hủy</p>
+                  <p style={{ margin: 'auto 0', fontSize: 13, fontWeight: 600, color: '#dc2626' }}>Đã đóng</p>
                 </li>
               )}
             </ul>
@@ -895,7 +836,7 @@ const CustomOrderDetail = () => {
                           type="primary"
                           loading={processing}
                           style={{ marginTop: 8, background: '#059669', borderColor: '#059669', fontWeight: 700 }}
-                          onClick={() => handleConfirmTechnicalDraft(draft)}
+                          onClick={() => handleApproveDraft(draft.id || draft.Id)}
                         >
                           Duyet bao gia
                         </Button>
@@ -914,13 +855,6 @@ const CustomOrderDetail = () => {
               <p style={{ margin: '0 0 2px', fontSize: 22, fontWeight: 800, color: '#065f46' }}>{formatPrice(order.latestQuotedPrice)}</p>
               <p style={{ margin: '0 0 12px', fontSize: 11, color: '#9ca3af' }}>Revision {order.quoteRevision}</p>
               
-              {(order.status === 'QUOTED' || order.status === 'NEGOTIATING') && (
-                <Button type="primary" style={{ background: '#059669', borderColor: '#059669', width: '100%' }}
-                  onClick={handleApprove} loading={processing}>
-                  ✓ Chấp nhận báo giá
-                </Button>
-              )}
-
               {showPayButtons && (
                 <Button
                   type="primary"

@@ -1,81 +1,38 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Input, InputNumber, Select, Table, Typography, message } from 'antd';
-import { PlusOutlined, DeleteOutlined, UploadOutlined, FileOutlined } from '@ant-design/icons';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Button, Input, InputNumber, Select, Typography, message } from 'antd';
 import materialApi from '../../api/materialApi';
-import { uploadFile } from '../../api/mainflow2Api';
-import { createId } from '../../utils/createId';
 
 const { Text } = Typography;
 
 const formatVnd = (n) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(n) || 0);
 
-const extractUploadUrl = (res) => {
-  const data = res?.data || res;
-  return data?.publicUrl || data?.url || res?.publicUrl || res?.url || null;
-};
-
-const isGlbFile = (file) => {
-  const name = (file?.name || '').toLowerCase();
-  return name.endsWith('.glb');
-};
-
-const newMaterialRow = () => ({ key: createId(), materialId: null, grams: 50 });
-
-const newComponent = (index = 0) => ({
-  key: createId(),
-  name: `Thành phần ${index + 1}`,
-  quantity: 1,
-  materials: [newMaterialRow()],
-});
-
-const calcPreview = (components, materialsById, laborCost) => {
-  let materialSubtotal = 0;
-  const lines = [];
-
-  components.forEach((comp) => {
-    const qty = Math.max(1, Number(comp.quantity) || 1);
-    let compTotal = 0;
-    (comp.materials || []).forEach((row) => {
-      const mat = materialsById[row.materialId];
-      if (!mat || !row.grams) return;
-      const pricePerGram = Number(mat.totalServiceCostPerGram) || 0;
-      const totalGrams = Number(row.grams) * qty;
-      const lineTotal = Math.round(totalGrams * pricePerGram);
-      compTotal += lineTotal;
-      lines.push({
-        component: comp.name,
-        material: mat.name,
-        grams: row.grams,
-        qty,
-        totalGrams,
-        lineTotal,
-      });
-    });
-    materialSubtotal += compTotal;
-  });
-
-  const labor = Math.max(0, Number(laborCost) || 0);
-  return { lines, materialSubtotal, labor, total: materialSubtotal + labor };
-};
-
 /**
- * Form báo giá chi tiết Mainflow2: thành phần → vật liệu → gram → tiền công + file GLB xem trước.
+ * Form báo giá kỹ thuật (TechnicalDraft).
+ *
+ * Mỗi sản phẩm chỉ có duy nhất 1 chất liệu — không có thành phần, không có tiền công.
+ * Trường hợp staff muốn tùy chỉnh đơn giá (unitPrice), có thể nhập trực tiếp
+ * hoặc để trống để BE tự tính = weight × serviceCost × (1 + markup%).
+ *
+ * Props:
+ *   onSubmit(payload)  — gọi khi staff bấm Gửi báo giá
+ *   submitting         — loading state
+ *   onCancel           — đóng modal
+ *   designVersionHistoryId — (optional) gắn báo giá vào version cụ thể
  */
-const Mainflow2QuoteBuilder = ({ onSubmit, submitting, onCancel, sourceType }) => {
-  const glbInputRef = useRef(null);
-  const extraInputRef = useRef(null);
+const Mainflow2QuoteBuilder = ({ onSubmit, submitting, onCancel, designVersionHistoryId }) => {
   const [materials, setMaterials] = useState([]);
   const [loadingMaterials, setLoadingMaterials] = useState(true);
-  const [components, setComponents] = useState([newComponent(0)]);
-  const [laborCost, setLaborCost] = useState(0);
-  const [staffNote, setStaffNote] = useState('');
-  const [previewGlb, setPreviewGlb] = useState(null); // { name, url }
-  const [extraFiles, setExtraFiles] = useState([]); // { name, url }[]
-  const [uploadingGlb, setUploadingGlb] = useState(false);
-  const [uploadingExtra, setUploadingExtra] = useState(false);
 
-  const requiresGlbPreview = sourceType !== 'AI_GENERATED';
+  // Form fields — match BE CreateTechnicalDraftCommand
+  const [materialId, setMaterialId] = useState(null);
+  const [weight, setWeight] = useState(50);             // EstimatedWeightPerUnit (g)
+  const [infill, setInfill] = useState(20);              // InfillDensity (0-100)
+  const [layerHeight, setLayerHeight] = useState(0.2);   // LayerHeight (mm)
+  const [printTime, setPrintTime] = useState(null);       // EstimatedPrintTimePerUnit (min)
+  const [markup, setMarkup] = useState(10);               // MarkupPercentage (%)
+  const [unitPriceOverride, setUnitPriceOverride] = useState(null); // UnitPrice (null = auto)
+  const [note, setNote] = useState('');                   // TechnicalNote
 
   useEffect(() => {
     (async () => {
@@ -85,7 +42,7 @@ const Mainflow2QuoteBuilder = ({ onSubmit, submitting, onCancel, sourceType }) =
         const list = (res?.data || res || []).filter((m) => m.isActive !== false);
         setMaterials(list);
       } catch (e) {
-        console.error(e);
+        console.error('Load materials failed', e);
       } finally {
         setLoadingMaterials(false);
       }
@@ -98,363 +55,227 @@ const Mainflow2QuoteBuilder = ({ onSubmit, submitting, onCancel, sourceType }) =
     return map;
   }, [materials]);
 
+  const selectedMaterial = materialsById[materialId];
+
   const materialOptions = materials.map((m) => ({
     value: m.id,
-    label: `${m.name} (${Number(m.totalServiceCostPerGram || 0).toLocaleString('vi-VN')} đ/g)`,
+    label: `${m.name} — ${Number(m.totalServiceCostPerGram || 0).toLocaleString('vi-VN')} đ/g`,
   }));
 
-  const preview = useMemo(
-    () => calcPreview(components, materialsById, laborCost),
-    [components, materialsById, laborCost],
-  );
-
-  const updateComponent = (key, patch) => {
-    setComponents((list) => list.map((c) => (c.key === key ? { ...c, ...patch } : c)));
-  };
-
-  const addComponent = () => setComponents((list) => [...list, newComponent(list.length)]);
-
-  const removeComponent = (key) => {
-    setComponents((list) => (list.length <= 1 ? list : list.filter((c) => c.key !== key)));
-  };
-
-  const updateMaterialRow = (compKey, rowKey, patch) => {
-    setComponents((list) =>
-      list.map((c) => {
-        if (c.key !== compKey) return c;
-        return {
-          ...c,
-          materials: c.materials.map((r) => (r.key === rowKey ? { ...r, ...patch } : r)),
-        };
-      }),
-    );
-  };
-
-  const addMaterialRow = (compKey) => {
-    setComponents((list) =>
-      list.map((c) =>
-        c.key === compKey ? { ...c, materials: [...c.materials, newMaterialRow()] } : c,
-      ),
-    );
-  };
-
-  const removeMaterialRow = (compKey, rowKey) => {
-    setComponents((list) =>
-      list.map((c) => {
-        if (c.key !== compKey) return c;
-        const mats = c.materials.filter((r) => r.key !== rowKey);
-        return { ...c, materials: mats.length ? mats : [newMaterialRow()] };
-      }),
-    );
-  };
-
-  const buildPayload = () => ({
-    quotedPrice: preview.total,
-    currency: 'VND',
-    laborCost: Number(laborCost) || 0,
-    staffNote: staffNote.trim(),
-    previewGlbUrl: previewGlb?.url,
-    designFileUrls: extraFiles.map((f) => f.url),
-    components: components.map((c) => ({
-      name: c.name.trim() || 'Thành phần',
-      quantity: Math.max(1, Number(c.quantity) || 1),
-      materials: (c.materials || [])
-        .filter((r) => r.materialId && r.grams > 0)
-        .map((r) => ({ materialId: r.materialId, grams: Number(r.grams) })),
-    })),
-  });
-
-  const handleGlbUpload = async (file) => {
-    if (!isGlbFile(file)) {
-      message.warning('Chỉ chấp nhận file .glb cho bản xem trước 3D.');
-      return;
-    }
-    try {
-      setUploadingGlb(true);
-      const res = await uploadFile(file);
-      const url = extractUploadUrl(res);
-      if (!url) throw new Error('Server không trả về URL file.');
-      setPreviewGlb({ name: file.name, url });
-      message.success(`Đã tải GLB: ${file.name}`);
-    } catch (err) {
-      message.error(err?.response?.data?.message || err.message || 'Upload GLB thất bại');
-    } finally {
-      setUploadingGlb(false);
-    }
-  };
-
-  const handleExtraUpload = async (file) => {
-    try {
-      setUploadingExtra(true);
-      const res = await uploadFile(file);
-      const url = extractUploadUrl(res);
-      if (!url) throw new Error('Server không trả về URL file.');
-      setExtraFiles((list) => [...list, { name: file.name, url }]);
-      message.success(`Đã đính kèm: ${file.name}`);
-    } catch (err) {
-      message.error(err?.response?.data?.message || err.message || 'Upload file thất bại');
-    } finally {
-      setUploadingExtra(false);
-    }
-  };
+  // Price preview — mirrors BE PricingEngine logic
+  const pricePreview = useMemo(() => {
+    if (!selectedMaterial || !weight) return null;
+    const costPerGram = Number(selectedMaterial.totalServiceCostPerGram || 0);
+    const baseCostPerGram = Number(selectedMaterial.baseCostPerGram || selectedMaterial.baseCost || 0);
+    const materialCost = Math.round(weight * costPerGram);
+    const effectiveUnitPrice = unitPriceOverride != null ? unitPriceOverride : materialCost;
+    const finalPrice = Math.round(effectiveUnitPrice * (1 + (markup || 0) / 100));
+    return { costPerGram, baseCostPerGram, materialCost, effectiveUnitPrice, finalPrice };
+  }, [selectedMaterial, weight, markup, unitPriceOverride]);
 
   const handleSubmit = () => {
-    const payload = buildPayload();
-    if (!payload.components.length || payload.components.some((c) => !c.materials.length)) {
-      return { error: 'Mỗi thành phần cần ít nhất một vật liệu và định lượng (gram).' };
+    if (!materialId) {
+      message.warning('Vui lòng chọn vật liệu.');
+      return;
     }
-    if (preview.total <= 0) {
-      return { error: 'Tổng báo giá phải lớn hơn 0.' };
+    if (!weight || weight <= 0) {
+      message.warning('Khối lượng phải lớn hơn 0.');
+      return;
     }
-    if (!staffNote.trim()) {
-      return { error: 'Vui lòng nhập ghi chú báo giá.' };
+    if (layerHeight <= 0) {
+      message.warning('Độ dày lớp in phải lớn hơn 0.');
+      return;
     }
-    if (requiresGlbPreview && !payload.previewGlbUrl) {
-      return { error: 'Vui lòng upload file GLB xem trước thiết kế trước khi gửi báo giá.' };
+
+    const payload = {
+      materialId,
+      estimatedWeightPerUnit: weight,
+      infillDensity: infill,
+      layerHeight,
+      estimatedPrintTimePerUnit: printTime || null,
+      unitPrice: unitPriceOverride,
+      markupPercentage: markup,
+      technicalNote: note.trim(),
+    };
+
+    // Gắn version nếu có
+    if (designVersionHistoryId) {
+      payload.designVersionHistoryId = designVersionHistoryId;
     }
+
     onSubmit?.(payload);
-    return {};
   };
 
-  const previewColumns = [
-    { title: 'Thành phần', dataIndex: 'component', key: 'component' },
-    { title: 'Vật liệu', dataIndex: 'material', key: 'material' },
-    {
-      title: 'Định lượng',
-      key: 'grams',
-      render: (_, r) => `${r.grams} g/sp × ${r.qty} = ${r.totalGrams} g`,
-    },
-    {
-      title: 'Tiền',
-      dataIndex: 'lineTotal',
-      key: 'lineTotal',
-      align: 'right',
-      render: (v) => formatVnd(v),
-    },
-  ];
-
   return (
-    <div className="space-y-4">
-      <Text type="secondary" className="text-xs block">
-        Một sản phẩm gồm nhiều <strong>thành phần</strong>. Mỗi thành phần chọn một hoặc nhiều{' '}
-        <strong>vật liệu</strong> kèm <strong>định lượng (gram/sp)</strong>, sau đó cộng{' '}
-        <strong>tiền công</strong> để ra báo giá chi tiết.
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Text type="secondary" style={{ fontSize: 12 }}>
+        Chọn <strong>vật liệu</strong>, nhập <strong>thông số in</strong> và BE sẽ tự tính giá.
+        Bạn có thể ghi đè đơn giá nếu cần.
       </Text>
 
-      {components.map((comp, ci) => (
-        <div
-          key={comp.key}
-          className="p-4 rounded-xl border border-slate-200 bg-white space-y-3"
-        >
-          <div className="flex flex-wrap items-center gap-2 justify-between">
-            <Input
-              value={comp.name}
-              onChange={(e) => updateComponent(comp.key, { name: e.target.value })}
-              placeholder="Tên thành phần (vd: Thân, Đế, Phụ kiện...)"
-              style={{ flex: 1, minWidth: 160, fontWeight: 600 }}
-            />
-            <div className="flex items-center gap-2">
-              <Text className="text-xs">SL:</Text>
-              <InputNumber
-                min={1}
-                value={comp.quantity}
-                onChange={(v) => updateComponent(comp.key, { quantity: v })}
-                style={{ width: 72 }}
-              />
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-                disabled={components.length <= 1}
-                onClick={() => removeComponent(comp.key)}
-              />
-            </div>
+      {/* Material selector */}
+      <div>
+        <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
+          Vật liệu <span style={{ color: '#dc2626' }}>*</span>
+        </label>
+        <Select
+          showSearch
+          placeholder="Chọn vật liệu in"
+          loading={loadingMaterials}
+          options={materialOptions}
+          value={materialId}
+          onChange={setMaterialId}
+          style={{ width: '100%' }}
+          optionFilterProp="label"
+          size="large"
+        />
+        {selectedMaterial && (
+          <div style={{ marginTop: 6, fontSize: 11, color: '#6b7280', display: 'flex', gap: 12 }}>
+            <span>Giá cơ bản: {Number(selectedMaterial.baseCostPerGram || selectedMaterial.baseCost || 0).toLocaleString('vi-VN')} đ/g</span>
+            <span>Giá dịch vụ: {Number(selectedMaterial.totalServiceCostPerGram || 0).toLocaleString('vi-VN')} đ/g</span>
           </div>
+        )}
+      </div>
 
-          {(comp.materials || []).map((row) => (
-            <div key={row.key} className="flex flex-wrap gap-2 items-center pl-2 border-l-2 border-indigo-200">
-              <Select
-                showSearch
-                placeholder="Chất liệu"
-                loading={loadingMaterials}
-                options={materialOptions}
-                value={row.materialId}
-                onChange={(v) => updateMaterialRow(comp.key, row.key, { materialId: v })}
-                style={{ minWidth: 200, flex: 1 }}
-                optionFilterProp="label"
-              />
-              <InputNumber
-                min={0.1}
-                step={1}
-                value={row.grams}
-                onChange={(v) => updateMaterialRow(comp.key, row.key, { grams: v })}
-                addonAfter="g/sp"
-                style={{ width: 130 }}
-              />
-              <Button
-                type="text"
-                danger
-                size="small"
-                icon={<DeleteOutlined />}
-                onClick={() => removeMaterialRow(comp.key, row.key)}
-              />
-            </div>
-          ))}
-          <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => addMaterialRow(comp.key)}>
-            Thêm vật liệu cho {comp.name || `thành phần ${ci + 1}`}
-          </Button>
-        </div>
-      ))}
-
-      <Button type="dashed" block icon={<PlusOutlined />} onClick={addComponent}>
-        Thêm thành phần
-      </Button>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Specs grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div>
-          <label className="text-xs font-semibold text-gray-700 block mb-1">Tiền công / gia công (VND)</label>
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
+            Khối lượng / sản phẩm <span style={{ color: '#dc2626' }}>*</span>
+          </label>
           <InputNumber
-            className="w-full"
-            min={0}
-            step={10000}
-            value={laborCost}
-            onChange={setLaborCost}
-            formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-            parser={(v) => v?.replace(/\$\s?|(,*)/g, '')}
+            min={0.1}
+            step={1}
+            value={weight}
+            onChange={setWeight}
+            addonAfter="g"
+            style={{ width: '100%' }}
           />
         </div>
-        <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100 text-sm">
-          <div className="flex justify-between text-gray-600">
-            <span>Vật liệu</span>
-            <span>{formatVnd(preview.materialSubtotal)}</span>
-          </div>
-          <div className="flex justify-between text-gray-600 mt-1">
-            <span>Tiền công</span>
-            <span>{formatVnd(preview.labor)}</span>
-          </div>
-          <div className="flex justify-between font-bold text-emerald-800 text-base mt-2 pt-2 border-t border-emerald-200">
-            <span>Tổng báo giá</span>
-            <span>{formatVnd(preview.total)}</span>
-          </div>
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
+            Mật độ in (infill)
+          </label>
+          <InputNumber
+            min={0}
+            max={100}
+            step={5}
+            value={infill}
+            onChange={setInfill}
+            addonAfter="%"
+            style={{ width: '100%' }}
+          />
+        </div>
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
+            Độ dày lớp in
+          </label>
+          <InputNumber
+            min={0.01}
+            step={0.05}
+            value={layerHeight}
+            onChange={setLayerHeight}
+            addonAfter="mm"
+            style={{ width: '100%' }}
+          />
+        </div>
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
+            Thời gian in ước tính
+          </label>
+          <InputNumber
+            min={0}
+            step={10}
+            value={printTime}
+            onChange={setPrintTime}
+            addonAfter="phút"
+            placeholder="Tùy chọn"
+            style={{ width: '100%' }}
+          />
         </div>
       </div>
 
-      {preview.lines.length > 0 && (
-        <Table
-          size="small"
-          pagination={false}
-          columns={previewColumns}
-          dataSource={preview.lines.map((l, i) => ({ ...l, key: i }))}
-        />
+      {/* Pricing */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
+            Đơn giá (để trống = tự tính)
+          </label>
+          <InputNumber
+            min={0}
+            step={1000}
+            value={unitPriceOverride}
+            onChange={setUnitPriceOverride}
+            placeholder="Tự tính từ vật liệu"
+            formatter={(v) => v ? `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : ''}
+            parser={(v) => v?.replace(/\$\s?|(,*)/g, '')}
+            addonAfter="đ"
+            style={{ width: '100%' }}
+          />
+        </div>
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
+            Markup (phụ thu)
+          </label>
+          <InputNumber
+            min={0}
+            max={200}
+            step={5}
+            value={markup}
+            onChange={setMarkup}
+            addonAfter="%"
+            style={{ width: '100%' }}
+          />
+        </div>
+      </div>
+
+      {/* Price preview */}
+      {pricePreview && (
+        <div style={{ padding: 14, borderRadius: 10, background: '#ecfdf5', border: '1px solid #6ee7b7' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6b7280' }}>
+            <span>Chi phí vật liệu ({weight}g × {pricePreview.costPerGram.toLocaleString('vi-VN')} đ/g)</span>
+            <span>{formatVnd(pricePreview.materialCost)}</span>
+          </div>
+          {unitPriceOverride != null && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#d97706', marginTop: 4 }}>
+              <span>Đơn giá ghi đè</span>
+              <span>{formatVnd(unitPriceOverride)}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+            <span>Markup +{markup}%</span>
+            <span>×{(1 + markup / 100).toFixed(2)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 16, color: '#065f46', marginTop: 8, paddingTop: 8, borderTop: '1px solid #6ee7b7' }}>
+            <span>Giá cuối</span>
+            <span>{formatVnd(pricePreview.finalPrice)}</span>
+          </div>
+        </div>
       )}
 
-      <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-3">
-        <div>
-          <label className="text-xs font-semibold text-gray-700 block mb-1">
-            File GLB xem trước 3D {requiresGlbPreview ? <span className="text-red-500">*</span> : null}
-          </label>
-          <Text type="secondary" className="text-xs block mb-2">
-            {requiresGlbPreview
-              ? 'Khách sẽ xem mô hình 3D này trước khi duyệt báo giá. Upload file .glb thiết kế của bạn.'
-              : 'Luồng AI dùng GLB khách đã tạo — upload thêm nếu muốn gửi bản chỉnh sửa.'}
-          </Text>
-          <input
-            ref={glbInputRef}
-            type="file"
-            accept=".glb,model/gltf-binary"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void handleGlbUpload(file);
-              e.target.value = '';
-            }}
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              icon={<UploadOutlined />}
-              loading={uploadingGlb}
-              onClick={() => glbInputRef.current?.click()}
-            >
-              {previewGlb ? 'Đổi file GLB' : 'Chọn file GLB'}
-            </Button>
-            {previewGlb && (
-              <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
-                <FileOutlined />
-                <span className="font-medium truncate max-w-[280px]" title={previewGlb.name}>{previewGlb.name}</span>
-                <Button type="text" size="small" danger onClick={() => setPreviewGlb(null)}>
-                  Xóa
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <label className="text-xs font-semibold text-gray-700 block mb-1">File đính kèm thêm (tùy chọn)</label>
-          <Text type="secondary" className="text-xs block mb-2">STL, OBJ hoặc GLB bổ sung.</Text>
-          <input
-            ref={extraInputRef}
-            type="file"
-            accept=".glb,.stl,.obj,model/gltf-binary"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void handleExtraUpload(file);
-              e.target.value = '';
-            }}
-          />
-          <Button
-            type="dashed"
-            size="small"
-            icon={<PlusOutlined />}
-            loading={uploadingExtra}
-            onClick={() => extraInputRef.current?.click()}
-          >
-            Thêm file đính kèm
-          </Button>
-          {extraFiles.length > 0 && (
-            <ul className="mt-2 space-y-1">
-              {extraFiles.map((f) => (
-                <li key={f.url} className="flex items-center justify-between text-xs text-gray-600 bg-white rounded px-2 py-1 border border-slate-100">
-                  <span className="truncate flex-1" title={f.name}>{f.name}</span>
-                  <Button
-                    type="text"
-                    size="small"
-                    danger
-                    onClick={() => setExtraFiles((list) => list.filter((x) => x.url !== f.url))}
-                  >
-                    Xóa
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-
+      {/* Note */}
       <div>
-        <label className="text-xs font-semibold text-gray-700 block mb-1">Ghi chú gửi khách</label>
+        <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
+          Ghi chú kỹ thuật
+        </label>
         <Input.TextArea
           rows={2}
-          value={staffNote}
-          onChange={(e) => setStaffNote(e.target.value)}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
           placeholder="Cam kết, thời gian hoàn thành, lưu ý in..."
         />
       </div>
 
-      <div className="flex justify-end gap-2">
+      {/* Actions */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
         {onCancel && <Button onClick={onCancel}>Hủy</Button>}
         <Button
           type="primary"
-          loading={submitting || uploadingGlb || uploadingExtra}
-          disabled={uploadingGlb || uploadingExtra}
-          style={{ background: '#059669', borderColor: '#059669' }}
-          onClick={() => {
-            const { error: err } = handleSubmit();
-            if (err) message.warning(err);
-          }}
+          loading={submitting}
+          style={{ background: '#059669', borderColor: '#059669', fontWeight: 600 }}
+          onClick={handleSubmit}
         >
-          Gửi báo giá {formatVnd(preview.total)}
+          Gửi báo giá {pricePreview ? formatVnd(pricePreview.finalPrice) : ''}
         </Button>
       </div>
     </div>

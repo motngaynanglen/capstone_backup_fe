@@ -3,7 +3,8 @@ import { Modal } from "antd";
 import Mainflow2QuoteBuilder from "./Mainflow2QuoteBuilder";
 
 /**
- * Modal báo giá chi tiết: chọn vật liệu, khối lượng (gram), nhân đơn giá + tiền công.
+ * Modal báo giá kỹ thuật (TechnicalDraft).
+ * Chọn vật liệu + thông số in → BE tự tính giá.
  */
 export default function StaffQuoteModal({
   open,
@@ -11,7 +12,7 @@ export default function StaffQuoteModal({
   onSubmit,
   submitting,
   designWorkTitle,
-  sourceType,
+  designVersionHistoryId,
 }) {
   const [key, setKey] = useState(0);
 
@@ -21,12 +22,12 @@ export default function StaffQuoteModal({
 
   return (
     <Modal
-      title={designWorkTitle ? `Báo giá chi tiết — ${designWorkTitle}` : "Báo giá chi tiết"}
+      title={designWorkTitle ? `Báo giá kỹ thuật — ${designWorkTitle}` : "Báo giá kỹ thuật"}
       open={open}
       onCancel={onClose}
       footer={null}
       destroyOnClose
-      width={760}
+      width={640}
       styles={{ body: { maxHeight: "75vh", overflowY: "auto" } }}
     >
       <Mainflow2QuoteBuilder
@@ -34,7 +35,7 @@ export default function StaffQuoteModal({
         submitting={submitting}
         onCancel={onClose}
         onSubmit={onSubmit}
-        sourceType={sourceType}
+        designVersionHistoryId={designVersionHistoryId}
       />
     </Modal>
   );
