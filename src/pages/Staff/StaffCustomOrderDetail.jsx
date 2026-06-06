@@ -371,13 +371,28 @@ const StaffCustomOrderDetail = () => {
           </div>
 
           {/* Composer */}
-          {order.status === 'SUBMITTED' ? (
+          {order.status === 'SUBMITTED' && !order.designServicePaid && order.designServicePaymentStatus !== 'PAID' ? (
             <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb' }}>
               <div style={{ padding: '10px 16px', background: '#fffbeb', borderBottom: '1px solid #fde68a', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <span style={{ color: '#b45309', fontSize: 12, flex: 1, minWidth: 200 }}>
-                  Khách chưa thanh toán phí thiết kế — bạn vẫn có thể trao đổi, nhưng chỉ <b>tạo được báo giá sau khi khách thanh toán</b>.
+                  Khach chua thanh toan phi thiet ke — ban van co the trao doi, nhung chi <b>tao duoc bao gia sau khi khach thanh toan</b>.
                 </span>
-                <Button size="small" type="primary" style={{ background: '#4f46e5' }} onClick={handleAssign} loading={processing}>Tiếp nhận</Button>
+                <Button size="small" type="primary" style={{ background: '#4f46e5' }} onClick={handleAssign} loading={processing}>Tiep nhan</Button>
+              </div>
+              <ChatComposer
+                value={chatMessage}
+                onChange={setChatMessage}
+                onSend={handleSendChat}
+                uploading={uploading}
+              />
+            </div>
+          ) : order.status === 'SUBMITTED' && (order.designServicePaid || order.designServicePaymentStatus === 'PAID') ? (
+            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb' }}>
+              <div style={{ padding: '10px 16px', background: '#ecfdf5', borderBottom: '1px solid #6ee7b7', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ color: '#059669', fontSize: 12, flex: 1, minWidth: 200 }}>
+                  Khach da thanh toan phi thiet ke. Ban co the <b>tiep nhan va bat dau lam viec</b>.
+                </span>
+                <Button size="small" type="primary" style={{ background: '#4f46e5' }} onClick={handleAssign} loading={processing}>Tiep nhan</Button>
               </div>
               <ChatComposer
                 value={chatMessage}
