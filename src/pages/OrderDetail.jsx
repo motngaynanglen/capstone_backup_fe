@@ -442,6 +442,8 @@ const OrderDetail = () => {
 
   const hasPreOrder = sourceType.toUpperCase() === 'PRE_ORDER' || orderItems.some(i => (i.sourceType || '').toUpperCase() === 'PRE_ORDER');
   const hasCustom = orderItems.some(i => (i.sourceType || '').toUpperCase().includes('SERVICE'));
+  const isDesignService = sourceType.toUpperCase() === 'DESIGN_SERVICE'
+    || orderItems.some(i => (i.sourceType || '').toUpperCase() === 'DESIGN_SERVICE');
   const isFailed = orderStatus.toUpperCase() === 'FAILED' || orderStatus.toUpperCase() === 'CANCELLED';
   const canCancelOrder = !isInvoicePaid
     && orderStatus.toUpperCase() === 'PENDING'
@@ -533,7 +535,9 @@ const OrderDetail = () => {
                 <ExclamationIcon />
                 <p>
                   Đơn hàng có sản phẩm <strong>{hasCustom ? 'Dịch vụ' : 'Pre-Order'}</strong> —
-                  sẽ chuyển sang trạng thái <em>Đang sản xuất</em> trước khi chuẩn bị giao.
+                  {isDesignService
+                    ? <> sẽ <em>hoàn thành</em> sau khi được thông qua duyệt file 3D.</>
+                    : <> sẽ chuyển sang trạng thái <em>Đang sản xuất</em> trước khi chuẩn bị giao.</>}
                 </p>
               </div>
             )}

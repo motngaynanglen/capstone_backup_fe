@@ -18,6 +18,12 @@ export function orderHasPreOrder(items) {
   return items.some((it) => norm(it.sourceType) === 'PRE_ORDER');
 }
 
+/** Đơn dịch vụ thiết kế (trả phí thiết kế) — không có sản xuất/giao hàng vật lý. */
+export function orderHasDesignService(items) {
+  if (!Array.isArray(items) || items.length === 0) return false;
+  return items.some((it) => norm(it.sourceType) === 'DESIGN_SERVICE');
+}
+
 /** COD = giao dịch CASH hoặc invoice.isCod từ BE. */
 export function resolveOrderIsCod(invoice, transaction) {
   if (invoice?.isCod === true || invoice?.IsCod === true) return true;
@@ -58,6 +64,13 @@ export function resolveCustomerOrderDisplayStatus(
   if (ss === 'RETURNED') return { key: 'CANCELLED', label: 'Đã hoàn hàng' };
   if (ss === 'FAILED') return { key: 'FAILED', label: 'Giao hàng thất bại' };
   if (ss === 'IN_TRANSIT') return { key: 'SHIPPING', label: 'Đang giao hàng' };
+
+  // Đơn dịch vụ thiết kế: không sản xuất/giao hàng vật lý — chỉ thiết kế & duyệt file 3D.
+  if (orderHasDesignService(items)) {
+    if (os === 'PENDING' && isInvoicePaid) return { key: 'PAID', label: 'Đã thanh toán · chờ thiết kế' };
+    if (os === 'PENDING') return { key: 'PENDING', label: 'Chờ thanh toán' };
+    return { key: 'PRODUCTION', label: 'Đang thiết kế' };
+  }
 
   if (customMfg) {
     if (os === 'FINISHED' || ss === 'READY_FOR_PICKUP') {
@@ -112,6 +125,46 @@ export function buildCustomerTrackingSteps(
   const customMfg = orderHasCustomManufacturing(items);
   const preOrder = orderHasPreOrder(items);
   const shopProcessing = isShopProcessing(orderStatus, shipmentStatus, isInvoicePaid, isCod);
+
+  // ─── Đơn dịch vụ thiết kế: đặt → thanh toán phí → thiết kế → duyệt file 3D ───
+  // Không có bước sản xuất/đóng gói/giao hàng vật lý.
+  if (orderHasDesignService(items)) {
+    const designDone = os === 'COMPLETED';
+    return [
+      {
+        key: 'placed',
+        label: 'Đã đặt hàng',
+        description: 'Đơn dịch vụ thiết kế đã được tiếp nhận.',
+        done: true,
+        isCurrent: false,
+      },
+      {
+        key: 'paid',
+        label: 'Chờ thanh toán phí dịch vụ',
+        completedLabel: 'Đã thanh toán phí dịch vụ',
+        description: 'Vui lòng thanh toán để nhân viên bắt đầu thiết kế.',
+        completedDescription: 'Đã thanh toán — nhân viên bắt đầu thiết kế.',
+        done: paid,
+        isCurrent: !paid && os === 'PENDING',
+      },
+      {
+        key: 'designing',
+        label: 'Đang thiết kế',
+        completedLabel: 'Đã hoàn tất thiết kế',
+        description: 'Nhân viên đang thiết kế và trao đổi với bạn tại trang yêu cầu thiết kế.',
+        completedDescription: 'Nhân viên đã hoàn tất thiết kế.',
+        done: designDone,
+        isCurrent: paid && !designDone,
+      },
+      {
+        key: 'completed',
+        label: 'Hoàn thành',
+        description: 'Đơn hoàn thành sau khi bạn duyệt (thông qua) file thiết kế 3D.',
+        done: designDone,
+        isCurrent: designDone,
+      },
+    ];
+  }
 
   const productionComplete =
     ['FINISHED', 'COMPLETED'].includes(os) ||
