@@ -515,7 +515,7 @@ const StaffCustomOrderDetail = () => {
               return (
                 <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb' }}>
                   <div style={{ padding: '8px 16px', background: '#ecfdf5', borderBottom: '1px solid #6ee7b7', textAlign: 'center', color: '#059669', fontSize: 12, fontWeight: 600 }}>
-                    🎉 Khách đã duyệt! Giá cuối: {formatPrice(order.latestQuotedPrice)} · Cuộc trò chuyện vẫn mở cho tới khi được khóa.
+                    🎉 Khách đã duyệt thiết kế · Sản phẩm đã vào kho đồ, khách có thể đặt in tùy ý · Cuộc trò chuyện vẫn mở cho tới khi được khóa.
                   </div>
                   <ChatComposer value={chatMessage} onChange={setChatMessage} onSend={handleSendChat} uploading={uploading} />
                 </div>
