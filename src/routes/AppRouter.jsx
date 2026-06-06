@@ -18,6 +18,7 @@ import Checkout from '../pages/Checkout';
 import OrderConfirmation from '../pages/OrderConfirmation';
 import MyOrders from '../pages/MyOrders';
 import OrderDetail from '../pages/OrderDetail';
+import Policies from '../pages/Policies';
 
 // Customer Pages
 import UserProfilePage from "../pages/Customer/UserProfilePage";
@@ -376,6 +377,23 @@ const AppRouter = () => {
             </Layout>
           }
         />
+        <Route
+          path="/policies"
+          element={
+            <Layout>
+              <Policies />
+            </Layout>
+          }
+        />
+        <Route
+          path="/policies/:slug"
+          element={
+            <Layout>
+              <Policies />
+            </Layout>
+          }
+        />
+        <Route path="/shipping" element={<Navigate to="/policies/shipping" replace />} />
 
         {/* ===== ĐÃ THÊM ROUTE PROFILE VÀO ĐÂY ===== */}
         <Route

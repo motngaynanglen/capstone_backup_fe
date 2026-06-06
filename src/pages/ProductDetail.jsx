@@ -391,6 +391,18 @@ const ProductDetail = () => {
                     Xem toàn màn hình 3D
                   </Button>
 
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 leading-relaxed">
+                    Trước khi mua, bạn có thể xem{' '}
+                    <Link to="/policies/purchase" className="font-medium text-indigo-600 no-underline hover:underline">
+                      chính sách mua hàng
+                    </Link>
+                    {' '}và{' '}
+                    <Link to="/policies/shipping" className="font-medium text-indigo-600 no-underline hover:underline">
+                      chính sách vận chuyển
+                    </Link>
+                    .
+                  </div>
+
                   {!showBuyNow && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <div className="flex items-start gap-3">

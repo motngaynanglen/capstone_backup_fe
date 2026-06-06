@@ -2,6 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Layout, Space, Typography } from 'antd';
 
+const footerLinkClass = 'block text-slate-300 no-underline hover:text-white';
+
 const Footer = () => {
   return (
     <Layout.Footer style={{ padding: 0, background: '#0f172a' }}>
@@ -11,8 +13,7 @@ const Footer = () => {
             3D Print Shop
           </Typography.Title>
           <Typography.Paragraph style={{ color: 'rgba(255,255,255,0.65)' }}>
-            Nền tảng in 3D chuyên nghiệp cho cá nhân và doanh nghiệp. Nhận thiết kế, in ấn,
-            gia công hoàn thiện và giao hàng toàn quốc.
+            Nền tảng in 3D cho sản phẩm có sẵn, thiết kế riêng, in theo yêu cầu và giao hàng toàn quốc.
           </Typography.Paragraph>
         </div>
 
@@ -21,14 +22,31 @@ const Footer = () => {
             Sản phẩm & dịch vụ
           </Typography.Text>
           <div className="mt-3 space-y-2 text-sm">
-            <Link className="block text-slate-300 no-underline hover:text-white" to="/products">
+            <Link className={footerLinkClass} to="/products">
               Sản phẩm in sẵn
             </Link>
-            <Link className="block text-slate-300 no-underline hover:text-white" to="/custom-order">
+            <Link className={footerLinkClass} to="/custom-order">
               Đặt in theo yêu cầu
             </Link>
-            <Link className="block text-slate-300 no-underline hover:text-white" to="/preview/1">
-              Xem trước mô hình 3D
+            <Link className={footerLinkClass} to="/custom-order/request-design">
+              Thiết kế 3D riêng
+            </Link>
+          </div>
+        </div>
+
+        <div>
+          <Typography.Text style={{ color: 'rgba(255,255,255,0.75)', fontWeight: 700 }}>
+            Chính sách
+          </Typography.Text>
+          <div className="mt-3 space-y-2 text-sm">
+            <Link className={footerLinkClass} to="/policies/purchase">
+              Chính sách mua hàng
+            </Link>
+            <Link className={footerLinkClass} to="/policies/shipping">
+              Chính sách vận chuyển
+            </Link>
+            <Link className={footerLinkClass} to="/policies/custom-design-print">
+              Thiết kế & in theo yêu cầu
             </Link>
           </div>
         </div>
@@ -36,23 +54,6 @@ const Footer = () => {
         <div>
           <Typography.Text style={{ color: 'rgba(255,255,255,0.75)', fontWeight: 700 }}>
             Hỗ trợ khách hàng
-          </Typography.Text>
-          <div className="mt-3 space-y-2 text-sm">
-            <Link className="block text-slate-300 no-underline hover:text-white" to="/faq">
-              Câu hỏi thường gặp
-            </Link>
-            <Link className="block text-slate-300 no-underline hover:text-white" to="/shipping">
-              Chính sách vận chuyển
-            </Link>
-            <Link className="block text-slate-300 no-underline hover:text-white" to="/contact">
-              Liên hệ
-            </Link>
-          </div>
-        </div>
-
-        <div>
-          <Typography.Text style={{ color: 'rgba(255,255,255,0.75)', fontWeight: 700 }}>
-            Kết nối với chúng tôi
           </Typography.Text>
           <Typography.Paragraph style={{ color: 'rgba(255,255,255,0.65)', marginTop: 12 }}>
             Hotline: <span className="font-semibold text-amber-300">1900 1234</span>
@@ -84,4 +85,3 @@ const Footer = () => {
 };
 
 export default Footer;
-

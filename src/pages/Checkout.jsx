@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import shippingAddressApi from '../api/shippingAddressApi';
 import { checkoutOrderApi, performTransactionApi } from '../api/orderApi';
 import axiosInstance from '../api/axiosInstance';
@@ -869,8 +869,19 @@ const Checkout = () => {
             >
               {isSubmitting ? <><SpinnerIcon />Đang xử lý...</> : 'Đặt hàng ngay'}
             </button>
-            <p className="text-xs text-center text-gray-400">
+            <p className="hidden">
               Bằng cách đặt hàng, bạn đồng ý với điều khoản sử dụng của chúng tôi.
+            </p>
+            <p className="text-xs text-center text-gray-500 leading-relaxed">
+              Bằng cách đặt hàng, bạn đồng ý với{' '}
+              <Link to="/policies/purchase" className="text-indigo-600 font-medium no-underline hover:underline">
+                chính sách mua hàng
+              </Link>
+              {' '}và{' '}
+              <Link to="/policies/shipping" className="text-indigo-600 font-medium no-underline hover:underline">
+                chính sách vận chuyển
+              </Link>
+              {' '}của 3D Print Shop.
             </p>
           </div>
         </div>

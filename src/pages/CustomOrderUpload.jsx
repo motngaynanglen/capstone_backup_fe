@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { notification } from 'antd';
 import materialApi from '../api/materialApi';
 import { uploadFile, createCustomFilePrintRequest } from '../api/mainflow2Api';
@@ -214,6 +214,14 @@ const CustomOrderUpload = () => {
             placeholder="Bạn muốn nhận sản phẩm khi nào? Có yêu cầu đặc biệt gì không?"
             className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 resize-none"
           />
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600 leading-relaxed">
+          Dịch vụ in theo yêu cầu tuân theo{' '}
+          <Link to="/policies/custom-design-print" className="font-medium text-indigo-600 no-underline hover:underline">
+            chính sách thiết kế & in theo yêu cầu
+          </Link>
+          .
         </div>
 
         <div className="flex gap-4">

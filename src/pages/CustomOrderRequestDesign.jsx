@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button, Modal, Spin, Tag, message } from 'antd';
 import { createDesignRequest } from '../api/mainflow2Api';
 import { uploadFiles } from '../api/fileApi';
@@ -219,6 +219,14 @@ const CustomOrderRequestDesign = () => {
               </Button>
             </div>
           </div>
+        </div>
+
+        <div className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600 leading-relaxed">
+          Dịch vụ thiết kế riêng tuân theo{' '}
+          <Link to="/policies/custom-design-print" className="font-medium text-indigo-600 no-underline hover:underline">
+            chính sách thiết kế & in theo yêu cầu
+          </Link>
+          .
         </div>
 
         <div className="flex gap-4">
