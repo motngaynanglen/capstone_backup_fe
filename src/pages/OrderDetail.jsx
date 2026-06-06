@@ -7,6 +7,16 @@ import transactionApi from '../api/transactionApi';
 import { buildCustomerTrackingSteps, resolveCustomerOrderDisplayStatus, normalizeOrderDetail, resolveOrderIsCod } from '../utils/orderNormalize';
 import OrderFeedbackSection from '../components/Orders/OrderFeedbackSection';
 
+// BE trả Invoice.DueDate kiểu DateTime (UTC) nhưng đọc lại từ MySQL là Kind=Unspecified
+// nên JSON KHÔNG có hậu tố 'Z'. Nếu để JS tự parse, nó hiểu nhầm là giờ local (VN +7)
+// → deadline bị lùi 7 tiếng → countdown báo "hết giờ" ngay. Vì vậy: nếu chuỗi thiếu
+// thông tin múi giờ (không có Z và không có offset ±hh:mm) thì coi như UTC.
+const parseServerDate = (value) => {
+  if (!value) return null;
+  const hasTimezone = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(value);
+  return new Date(hasTimezone ? value : `${value}Z`);
+};
+
 // ─── COUNTDOWN TIMER cho đơn chờ thanh toán (15 phút)
 const PaymentCountdown = ({ dueDate, onExpired }) => {
   const [remaining, setRemaining] = React.useState(null);
@@ -15,7 +25,7 @@ const PaymentCountdown = ({ dueDate, onExpired }) => {
   React.useEffect(() => {
     if (!dueDate) return;
     expiredCalled.current = false;
-    const target = new Date(dueDate).getTime();
+    const target = parseServerDate(dueDate).getTime();
     const tick = () => {
       const diff = target - Date.now();
       if (diff <= 0) {
