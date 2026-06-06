@@ -5,8 +5,13 @@ import axiosInstance from './axiosInstance';
 // ==========================================
 
 // 1. Lấy danh sách tùy chọn dịch vụ (tất cả, cho admin)
-export const getAllServiceOptionsApi = async () => {
-  const response = await axiosInstance.get('/api/service-option/all');
+export const getAllServiceOptionsApi = async (params = {}) => {
+  const response = await axiosInstance.post('/api/service-option/all', {
+    pageNumber: 1,
+    pageSize: 100,
+    sortBy: 'Group',
+    ...params,
+  });
   return response.data;
 };
 

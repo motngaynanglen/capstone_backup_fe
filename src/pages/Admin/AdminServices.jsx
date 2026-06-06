@@ -1,37 +1,137 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Card, Table, Tag, Button, Modal, Form, Input, Select, Popconfirm, App,
-  Tooltip, Switch, Space, InputNumber, Row, Col, Typography, Empty,
+  App,
+  Button,
+  Card,
+  Col,
+  Empty,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Popconfirm,
+  Row,
+  Select,
+  Space,
+  Switch,
+  Table,
+  Tag,
+  Tooltip,
+  Typography,
 } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import {
-  getAllServiceOptionsApi, createServiceOptionApi, updateServiceOptionApi,
-  activateServiceOptionApi, deactivateServiceOptionApi, deleteServiceOptionApi,
+  activateServiceOptionApi,
+  createServiceOptionApi,
+  deactivateServiceOptionApi,
+  deleteServiceOptionApi,
+  getAllServiceOptionsApi,
+  updateServiceOptionApi,
 } from '../../api/serviceApi';
 
 const { Text } = Typography;
 
 const GROUP_CODES = [
-  { value: 'DESIGN_PACKAGE', label: 'DESIGN_PACKAGE — Gói thiết kế' },
-  { value: 'COMPLEXITY', label: 'COMPLEXITY — Độ phức tạp' },
-  { value: 'DEADLINE', label: 'DEADLINE — Thời hạn' },
-  { value: 'DELIVERABLE', label: 'DELIVERABLE — Sản phẩm giao' },
-  { value: 'PRINTABILITY', label: 'PRINTABILITY — Khả năng in' },
-  { value: 'MODEL_SCOPE', label: 'MODEL_SCOPE — Phạm vi mô hình' },
-  { value: 'REVISION', label: 'REVISION — Lượt hiệu chỉnh' },
-  { value: 'NEW_SCOPE', label: 'NEW_SCOPE — Phạm vi mới' },
+  { value: 'DESIGN_PACKAGE', groupName: 'Gói thiết kế', label: 'DESIGN_PACKAGE - Gói thiết kế' },
+  { value: 'COMPLEXITY', groupName: 'Độ phức tạp', label: 'COMPLEXITY - Độ phức tạp' },
+  { value: 'DEADLINE', groupName: 'Thời hạn', label: 'DEADLINE - Thời hạn' },
+  { value: 'DELIVERABLE', groupName: 'Sản phẩm bàn giao', label: 'DELIVERABLE - Sản phẩm bàn giao' },
+  { value: 'PRINTABILITY', groupName: 'Khả năng in', label: 'PRINTABILITY - Khả năng in' },
+  { value: 'MODEL_SCOPE', groupName: 'Phạm vi mô hình', label: 'MODEL_SCOPE - Phạm vi mô hình' },
+  { value: 'REVISION', groupName: 'Lượt hiệu chỉnh', label: 'REVISION - Lượt hiệu chỉnh' },
+  { value: 'NEW_SCOPE', groupName: 'Phạm vi mới', label: 'NEW_SCOPE - Phạm vi mới' },
 ];
 
 const SELECTION_TYPES = [
-  { value: 'SINGLE', label: 'SINGLE — Chọn 1 (radio)' },
-  { value: 'MULTIPLE', label: 'MULTIPLE — Chọn nhiều (checkbox)' },
-  { value: 'QUANTITY', label: 'QUANTITY — Số lượng (stepper)' },
-  { value: 'ADDON', label: 'ADDON — Bật/tắt (toggle)' },
+  { value: 'SINGLE', label: 'SINGLE - Chọn 1' },
+  { value: 'MULTIPLE', label: 'MULTIPLE - Chọn nhiều' },
+  { value: 'QUANTITY', label: 'QUANTITY - Theo số lượng' },
+  { value: 'ADDON', label: 'ADDON - Bật/tắt' },
 ];
 
-const formatVnd = (n) => n != null ? `${Number(n).toLocaleString('vi-VN')}₫` : '—';
+const pick = (obj, camel, pascal) => {
+  if (!obj) return undefined;
+  if (obj[camel] !== undefined && obj[camel] !== null) return obj[camel];
+  if (pascal && obj[pascal] !== undefined && obj[pascal] !== null) return obj[pascal];
+  return undefined;
+};
 
-const AdminServices = () => {
+const formatVnd = (value) =>
+  value != null ? `${Number(value).toLocaleString('vi-VN')} đ` : '-';
+
+const getErrorMessage = (err, fallback = 'Thao tác thất bại') =>
+  err?.response?.data?.message
+  || err?.response?.data?.title
+  || err?.message
+  || fallback;
+
+const getGroupName = (groupCode, currentName) => {
+  if (currentName?.trim()) return currentName.trim();
+  return GROUP_CODES.find((group) => group.value === groupCode)?.groupName || groupCode || 'Chung';
+};
+
+const normalizeServiceOption = (item = {}) => ({
+  id: pick(item, 'id', 'Id'),
+  code: pick(item, 'code', 'Code') || '',
+  name: pick(item, 'name', 'Name') || '',
+  description: pick(item, 'description', 'Description') || '',
+  groupCode: pick(item, 'groupCode', 'GroupCode') || 'OTHER',
+  groupName: pick(item, 'groupName', 'GroupName') || pick(item, 'groupCode', 'GroupCode') || 'Khác',
+  selectionType: pick(item, 'selectionType', 'SelectionType') || 'ADDON',
+  defaultPrice: Number(pick(item, 'defaultPrice', 'DefaultPrice') ?? 0),
+  minQuantity: Number(pick(item, 'minQuantity', 'MinQuantity') ?? 1),
+  maxQuantity: pick(item, 'maxQuantity', 'MaxQuantity') ?? null,
+  adjustmentRoundDelta: pick(item, 'adjustmentRoundDelta', 'AdjustmentRoundDelta') ?? null,
+  sortOrder: Number(pick(item, 'sortOrder', 'SortOrder') ?? 0),
+  isActive: Boolean(pick(item, 'isActive', 'IsActive')),
+});
+
+const extractServiceOptions = (response) => {
+  const raw =
+    Array.isArray(response?.data)
+      ? response.data
+      : Array.isArray(response?.data?.items)
+        ? response.data.items
+        : Array.isArray(response?.items)
+          ? response.items
+          : Array.isArray(response)
+            ? response
+            : [];
+
+  return raw.map(normalizeServiceOption);
+};
+
+const buildPayload = (values, isEdit) => {
+  const groupCode = (values.groupCode || '').trim().toUpperCase();
+  const selectionType = (values.selectionType || '').trim().toUpperCase();
+  const isQuantity = selectionType === 'QUANTITY';
+  const isRevision = groupCode === 'REVISION';
+
+  const payload = {
+    code: (values.code || '').trim().toUpperCase(),
+    name: (values.name || '').trim(),
+    description: values.description?.trim() || null,
+    groupCode,
+    groupName: getGroupName(groupCode, values.groupName),
+    selectionType,
+    defaultPrice: Number(values.defaultPrice || 0),
+    minQuantity: isQuantity ? Number(values.minQuantity || 1) : 1,
+    maxQuantity: isQuantity && values.maxQuantity != null ? Number(values.maxQuantity) : null,
+    adjustmentRoundDelta: isRevision ? Number(values.adjustmentRoundDelta || 0) : null,
+    sortOrder: Number(values.sortOrder || 0),
+  };
+
+  if (isEdit) {
+    payload.isActive = Boolean(values.isActive);
+    payload.clearDescription = !payload.description;
+    payload.clearMaxQuantity = !isQuantity;
+    payload.clearAdjustmentRoundDelta = !isRevision;
+  }
+
+  return payload;
+};
+
+export default function AdminServices() {
   const { message } = App.useApp();
 
   const [options, setOptions] = useState([]);
@@ -42,81 +142,86 @@ const AdminServices = () => {
   const [optionSubmitLoading, setOptionSubmitLoading] = useState(false);
   const [optionForm] = Form.useForm();
 
-  useEffect(() => { fetchOptions(); }, []);
+  const watchedSelectionType = Form.useWatch('selectionType', optionForm);
+  const watchedGroupCode = Form.useWatch('groupCode', optionForm);
 
   const fetchOptions = async () => {
     setOptionsLoading(true);
     try {
-      const result = await getAllServiceOptionsApi();
-      setOptions(result.data || []);
-    } catch {
-      message.error('Không thể tải danh sách tùy chọn.');
+      const result = await getAllServiceOptionsApi({ pageNumber: 1, pageSize: 100, sortBy: 'Group' });
+      setOptions(extractServiceOptions(result));
+    } catch (err) {
+      message.error(getErrorMessage(err, 'Không thể tải danh sách tùy chọn dịch vụ.'));
     } finally {
       setOptionsLoading(false);
     }
   };
 
-  // Group by GroupCode
+  useEffect(() => {
+    fetchOptions();
+  }, []);
+
   const groupedOptions = useMemo(() => {
-    const groups = {};
-    options.forEach((opt) => {
-      const gc = opt.groupCode || 'OTHER';
-      if (!groups[gc]) groups[gc] = { groupCode: gc, groupName: opt.groupName || gc, options: [] };
-      groups[gc].options.push(opt);
+    const groups = new Map();
+
+    options.forEach((option) => {
+      const key = option.groupCode || 'OTHER';
+      if (!groups.has(key)) {
+        groups.set(key, {
+          groupCode: key,
+          groupName: option.groupName || key,
+          options: [],
+        });
+      }
+      groups.get(key).options.push(option);
     });
-    Object.values(groups).forEach((g) =>
-      g.options.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
-    );
-    return Object.values(groups);
+
+    return Array.from(groups.values()).map((group) => ({
+      ...group,
+      options: [...group.options].sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name)),
+    }));
   }, [options]);
 
   const handleOpenAdd = () => {
     setOptionMode('add');
     setEditingOptionId(null);
     optionForm.resetFields();
-    optionForm.setFieldsValue({ sortOrder: 0, isActive: true, minQuantity: 1 });
+    optionForm.setFieldsValue({
+      sortOrder: 0,
+      isActive: true,
+      minQuantity: 1,
+      selectionType: 'ADDON',
+      defaultPrice: 0,
+    });
     setOptionModal(true);
   };
 
   const handleOpenEdit = (record) => {
+    const option = normalizeServiceOption(record);
     setOptionMode('edit');
-    setEditingOptionId(record.id);
-    optionForm.setFieldsValue({
-      code: record.code,
-      name: record.name,
-      description: record.description,
-      groupCode: record.groupCode,
-      groupName: record.groupName,
-      selectionType: record.selectionType,
-      defaultPrice: record.defaultPrice,
-      minQuantity: record.minQuantity,
-      maxQuantity: record.maxQuantity,
-      adjustmentRoundDelta: record.adjustmentRoundDelta,
-      sortOrder: record.sortOrder,
-      isActive: record.isActive,
-    });
+    setEditingOptionId(option.id);
+    optionForm.setFieldsValue(option);
     setOptionModal(true);
   };
 
   const handleSaveOption = async (values) => {
     setOptionSubmitLoading(true);
     try {
-      const payload = {
-        ...values,
-        code: (values.code || '').toUpperCase(),
-      };
+      const isEdit = optionMode === 'edit';
+      const payload = buildPayload(values, isEdit);
 
-      if (optionMode === 'add') {
+      if (isEdit) {
+        await updateServiceOptionApi(editingOptionId, payload);
+        message.success('Đã cập nhật tùy chọn dịch vụ');
+      } else {
         await createServiceOptionApi(payload);
         message.success('Đã tạo tùy chọn dịch vụ');
-      } else {
-        await updateServiceOptionApi(editingOptionId, payload);
-        message.success('Đã cập nhật');
       }
+
       setOptionModal(false);
       fetchOptions();
     } catch (err) {
-      message.error(err?.response?.data?.message || 'Thao tác thất bại');
+      message.error(getErrorMessage(err));
     } finally {
       setOptionSubmitLoading(false);
     }
@@ -132,45 +237,97 @@ const AdminServices = () => {
       message.success('Đã thay đổi trạng thái');
       fetchOptions();
     } catch (err) {
-      message.error(err?.response?.data?.message || 'Thất bại');
+      message.error(getErrorMessage(err));
     }
   };
 
   const handleDelete = async (id) => {
     try {
       await deleteServiceOptionApi(id);
-      message.success('Đã xóa');
+      message.success('Đã xóa tùy chọn');
       fetchOptions();
     } catch (err) {
-      const msg = err?.response?.data?.message || '';
-      if (/order|đơn hàng|đã được/i.test(msg)) {
-        message.warning('Không thể xóa — tùy chọn đã được dùng trong đơn hàng. Hãy vô hiệu hóa.');
+      const msg = getErrorMessage(err, 'Xóa thất bại');
+      if (/order|đơn hàng|used|foreign|constraint/i.test(msg)) {
+        message.warning('Không thể xóa vì tùy chọn đã được sử dụng. Hãy vô hiệu hóa tùy chọn này.');
       } else {
-        message.error(msg || 'Xóa thất bại');
+        message.error(msg);
       }
     }
   };
 
   const optionColumns = [
-    { title: 'Mã', dataIndex: 'code', width: 120, render: (v) => <Text code>{v || '—'}</Text> },
-    { title: 'Tên', dataIndex: 'name', ellipsis: true },
     {
-      title: 'Kiểu chọn', dataIndex: 'selectionType', width: 110,
-      render: (t) => <Tag color={t === 'SINGLE' ? 'blue' : t === 'QUANTITY' ? 'orange' : t === 'MULTIPLE' ? 'cyan' : 'purple'}>{t}</Tag>,
+      title: 'Mã',
+      dataIndex: 'code',
+      width: 140,
+      render: (value) => <Text code>{value || '-'}</Text>,
     },
-    { title: 'Giá', dataIndex: 'defaultPrice', width: 120, align: 'right', render: formatVnd },
     {
-      title: 'Lượt sửa', dataIndex: 'adjustmentRoundDelta', width: 80, align: 'center',
-      render: (v) => v > 0 ? <Tag color="purple">+{v}</Tag> : '—',
+      title: 'Tên',
+      dataIndex: 'name',
+      ellipsis: true,
     },
-    { title: 'Thứ tự', dataIndex: 'sortOrder', width: 70, align: 'center' },
     {
-      title: '', key: 'actions', width: 140, align: 'center',
+      title: 'Kiểu chọn',
+      dataIndex: 'selectionType',
+      width: 130,
+      render: (type) => (
+        <Tag color={type === 'SINGLE' ? 'blue' : type === 'QUANTITY' ? 'orange' : type === 'MULTIPLE' ? 'cyan' : 'purple'}>
+          {type}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Giá',
+      dataIndex: 'defaultPrice',
+      width: 130,
+      align: 'right',
+      render: formatVnd,
+    },
+    {
+      title: 'Số lượng',
+      key: 'quantity',
+      width: 120,
+      align: 'center',
+      render: (_, record) => record.selectionType === 'QUANTITY'
+        ? `${record.minQuantity}${record.maxQuantity ? `-${record.maxQuantity}` : '+'}`
+        : '-',
+    },
+    {
+      title: 'Lượt sửa',
+      dataIndex: 'adjustmentRoundDelta',
+      width: 90,
+      align: 'center',
+      render: (value) => value > 0 ? <Tag color="purple">+{value}</Tag> : '-',
+    },
+    {
+      title: 'Thứ tự',
+      dataIndex: 'sortOrder',
+      width: 80,
+      align: 'center',
+    },
+    {
+      title: 'Thao tác',
+      key: 'actions',
+      width: 150,
+      align: 'center',
       render: (_, record) => (
         <Space size="small">
-          <Switch size="small" checked={record.isActive} onChange={() => handleToggle(record)} />
-          <Button type="text" icon={<EditOutlined />} onClick={() => handleOpenEdit(record)} />
-          <Popconfirm title="Xóa tùy chọn?" onConfirm={() => handleDelete(record.id)} okText="Xóa" okType="danger">
+          <Tooltip title={record.isActive ? 'Vô hiệu hóa' : 'Kích hoạt'}>
+            <Switch size="small" checked={record.isActive} onChange={() => handleToggle(record)} />
+          </Tooltip>
+          <Tooltip title="Sửa">
+            <Button type="text" icon={<EditOutlined />} onClick={() => handleOpenEdit(record)} />
+          </Tooltip>
+          <Popconfirm
+            title="Xóa tùy chọn?"
+            description="Nếu tùy chọn đã được dùng trong đơn hàng, hãy vô hiệu hóa thay vì xóa."
+            onConfirm={() => handleDelete(record.id)}
+            okText="Xóa"
+            okType="danger"
+            cancelText="Hủy"
+          >
             <Button type="text" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
@@ -182,8 +339,8 @@ const AdminServices = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 m-0">Quản lý Dịch vụ</h1>
-          <Text type="secondary">Tùy chọn dịch vụ thiết kế & in 3D — nhóm theo GroupCode</Text>
+          <h1 className="text-2xl font-bold text-gray-800 m-0">Quản lý dịch vụ</h1>
+          <Text type="secondary">Quản lý các tùy chọn dịch vụ thiết kế 3D theo nhóm.</Text>
         </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenAdd}>
           Thêm tùy chọn
@@ -191,12 +348,18 @@ const AdminServices = () => {
       </div>
 
       {groupedOptions.length === 0 && !optionsLoading ? (
-        <Card><Empty description="Chưa có tùy chọn dịch vụ nào" /></Card>
+        <Card>
+          <Empty description="Chưa có tùy chọn dịch vụ nào" />
+        </Card>
       ) : (
         groupedOptions.map((group) => (
           <Card
             key={group.groupCode}
-            title={<span>{group.groupName} <Tag className="ml-2">{group.groupCode}</Tag></span>}
+            title={(
+              <span>
+                {group.groupName} <Tag className="ml-2">{group.groupCode}</Tag>
+              </span>
+            )}
             size="small"
             className="mb-4 shadow-sm"
           >
@@ -212,26 +375,32 @@ const AdminServices = () => {
         ))
       )}
 
-      {/* Modal Thêm/Sửa */}
       <Modal
         title={optionMode === 'add' ? 'Tạo tùy chọn dịch vụ' : 'Sửa tùy chọn dịch vụ'}
         open={optionModal}
         onCancel={() => setOptionModal(false)}
         onOk={() => optionForm.submit()}
         confirmLoading={optionSubmitLoading}
-        width={640}
+        width={680}
         destroyOnClose
       >
         <Form form={optionForm} layout="vertical" onFinish={handleSaveOption} className="mt-2">
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="code" label="Mã (Code)" rules={[{ required: true }]}
-                extra="Tự động uppercase khi lưu">
+              <Form.Item
+                name="code"
+                label="Mã"
+                rules={[{ required: true, message: 'Vui lòng nhập mã tùy chọn' }]}
+              >
                 <Input placeholder="VD: PKG_BASIC" style={{ textTransform: 'uppercase' }} />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="name" label="Tên" rules={[{ required: true }]}>
+              <Form.Item
+                name="name"
+                label="Tên"
+                rules={[{ required: true, message: 'Vui lòng nhập tên tùy chọn' }]}
+              >
                 <Input placeholder="VD: Gói thiết kế cơ bản" />
               </Form.Item>
             </Col>
@@ -243,70 +412,91 @@ const AdminServices = () => {
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="groupCode" label="Nhóm (GroupCode)" rules={[{ required: true }]}>
-                <Select options={GROUP_CODES} placeholder="Chọn nhóm..." />
+              <Form.Item
+                name="groupCode"
+                label="Nhóm"
+                rules={[{ required: true, message: 'Vui lòng chọn nhóm' }]}
+              >
+                <Select
+                  options={GROUP_CODES}
+                  placeholder="Chọn nhóm"
+                  onChange={(value) => {
+                    optionForm.setFieldValue('groupName', getGroupName(value));
+                  }}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item name="groupName" label="Tên nhóm">
-                <Input placeholder="VD: Gói thiết kế" />
+                <Input placeholder="Tự điền theo nhóm nếu bỏ trống" />
               </Form.Item>
             </Col>
           </Row>
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="selectionType" label="Kiểu chọn" rules={[{ required: true }]}>
-                <Select options={SELECTION_TYPES} placeholder="Chọn kiểu..." />
+              <Form.Item
+                name="selectionType"
+                label="Kiểu chọn"
+                rules={[{ required: true, message: 'Vui lòng chọn kiểu' }]}
+              >
+                <Select options={SELECTION_TYPES} placeholder="Chọn kiểu" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="defaultPrice" label="Giá mặc định (VNĐ)" rules={[{ required: true }]}>
-                <InputNumber min={0} className="w-full"
-                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(v) => v?.replace(/,/g, '')}
+              <Form.Item
+                name="defaultPrice"
+                label="Giá mặc định (VNĐ)"
+                rules={[{ required: true, message: 'Vui lòng nhập giá' }]}
+              >
+                <InputNumber
+                  min={0}
+                  className="w-full"
+                  formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(value) => value?.replace(/,/g, '')}
                 />
               </Form.Item>
             </Col>
           </Row>
 
-          {/* Min/Max Quantity — chỉ hiện khi QUANTITY */}
-          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.selectionType !== cur.selectionType}>
-            {({ getFieldValue }) => getFieldValue('selectionType') === 'QUANTITY' && (
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item name="minQuantity" label="Min Quantity" initialValue={1}>
-                    <InputNumber min={1} className="w-full" />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item name="maxQuantity" label="Max Quantity">
-                    <InputNumber min={1} className="w-full" />
-                  </Form.Item>
-                </Col>
-              </Row>
-            )}
-          </Form.Item>
+          {watchedSelectionType === 'QUANTITY' && (
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  name="minQuantity"
+                  label="Số lượng tối thiểu"
+                  rules={[{ required: true, message: 'Vui lòng nhập số lượng tối thiểu' }]}
+                >
+                  <InputNumber min={1} className="w-full" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="maxQuantity" label="Số lượng tối đa">
+                  <InputNumber min={1} className="w-full" />
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
 
-          {/* AdjustmentRoundDelta — chỉ hiện khi REVISION */}
-          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.groupCode !== cur.groupCode}>
-            {({ getFieldValue }) => getFieldValue('groupCode') === 'REVISION' && (
-              <Form.Item name="adjustmentRoundDelta" label="Số lượt hiệu chỉnh"
-                rules={[{ required: true, message: 'Bắt buộc cho nhóm REVISION' }]}
-                extra="Số lượt sửa tăng thêm khi khách chọn option này">
-                <InputNumber min={1} className="w-full" />
-              </Form.Item>
-            )}
-          </Form.Item>
+          {watchedGroupCode === 'REVISION' && (
+            <Form.Item
+              name="adjustmentRoundDelta"
+              label="Số lượt hiệu chỉnh cộng thêm"
+              rules={[{ required: true, message: 'Nhóm REVISION bắt buộc có số lượt hiệu chỉnh' }]}
+              extra="REVISION phải có số lượt hiệu chỉnh lớn hơn 0."
+            >
+              <InputNumber min={1} className="w-full" />
+            </Form.Item>
+          )}
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="sortOrder" label="Thứ tự hiển thị" initialValue={0}>
+              <Form.Item name="sortOrder" label="Thứ tự hiển thị">
                 <InputNumber min={0} className="w-full" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="isActive" label="Trạng thái" valuePropName="checked" initialValue={true}>
+              <Form.Item name="isActive" label="Trạng thái" valuePropName="checked">
                 <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
               </Form.Item>
             </Col>
@@ -315,6 +505,4 @@ const AdminServices = () => {
       </Modal>
     </div>
   );
-};
-
-export default AdminServices;
+}
