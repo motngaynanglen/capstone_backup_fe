@@ -5,6 +5,7 @@ import { getDesignRequestDetail, assignStaffToRequest, submitQuote, postDesignRe
 import AdjustmentRequestCard from "../../components/Mainflow2/AdjustmentRequestCard";
 import TechnicalDraftCard from "../../components/Mainflow2/TechnicalDraftCard";
 import VersionUpdateCard from "../../components/Mainflow2/VersionUpdateCard";
+import SystemLogDivider from "../../components/Mainflow2/SystemLogDivider";
 import { useAuth } from "../../contexts/AuthContext";
 import useMainflow2Realtime from "../../hooks/useMainflow2Realtime";
 import CustomerRequestPanel from "../../components/Mainflow2/CustomerRequestPanel";
@@ -436,6 +437,11 @@ const StaffCustomOrderDetail = () => {
               const logType = (msg.logType || '').toUpperCase();
               const isQuote = logType.includes('QUOTE');
               const isAdjustment = logType === 'ADJUSTMENT_REQUEST';
+
+              // Log hệ thống/tự động → đường gạch ngang kèm thông báo, không phải bong bóng chat.
+              if (logType === 'SYSTEM' || logType === 'STATUS_CHANGE') {
+                return <SystemLogDivider key={msg.id || i} content={msg.content} created={msg.created} />;
+              }
 
               if (isAdjustment) {
                 return (

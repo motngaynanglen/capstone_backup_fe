@@ -5,6 +5,7 @@ import { getDesignRequestDetail, cancelDesignRequest, postDesignRequestMessage, 
 import AdjustmentRequestCard from '../components/Mainflow2/AdjustmentRequestCard';
 import TechnicalDraftCard from '../components/Mainflow2/TechnicalDraftCard';
 import VersionUpdateCard from '../components/Mainflow2/VersionUpdateCard';
+import SystemLogDivider from '../components/Mainflow2/SystemLogDivider';
 import { cancelOrderApi, checkoutDesignApi } from '../api/orderApi';
 
 import { getActiveServiceOptionsApi } from '../api/serviceApi';
@@ -592,6 +593,11 @@ const CustomOrderDetail = () => {
               const logType = (msg.logType || '').toUpperCase();
               const isAdjustment = logType === 'ADJUSTMENT_REQUEST';
               const isVersionUpdate = logType === 'VERSION_UPDATE';
+
+              // Log hệ thống/tự động → đường gạch ngang kèm thông báo, không phải bong bóng chat.
+              if (logType === 'SYSTEM' || logType === 'STATUS_CHANGE') {
+                return <SystemLogDivider key={msg.id || i} content={msg.content} created={msg.created} />;
+              }
 
               if (isAdjustment) {
                 return (
