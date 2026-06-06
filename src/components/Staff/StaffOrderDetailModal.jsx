@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Modal,
   Descriptions,
@@ -54,6 +55,7 @@ function renderFulfillment(status) {
 }
 
 export default function StaffOrderDetailModal({ open, orderId, onClose, onUpdated }) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState(null);
   const [busyItemId, setBusyItemId] = useState(null);
@@ -156,6 +158,18 @@ export default function StaffOrderDetailModal({ open, orderId, onClose, onUpdate
           {r.sourceType && (
             <div>
               <Text type="secondary" style={{ fontSize: 12 }}>{r.sourceType}</Text>
+            </div>
+          )}
+          {r.designWorkId && ['DESIGN_SERVICE', 'PRINT_SERVICE', 'CUSTOM_FILE_PRINT_MF2'].includes(r.sourceType) && (
+            <div>
+              <Button
+                type="link"
+                size="small"
+                style={{ padding: 0, fontSize: 12, height: 'auto' }}
+                onClick={() => { onClose?.(); navigate(`/staff/custom-orders/${r.designWorkId}`); }}
+              >
+                💬 Xem chat thiết kế
+              </Button>
             </div>
           )}
         </div>

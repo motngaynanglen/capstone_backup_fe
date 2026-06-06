@@ -122,16 +122,29 @@ const MyDesigns = () => {
                     <div className="text-lg font-bold text-indigo-600 mt-2">
                       {formatPrice(draft.finalPrice || draft.unitPrice || draft.price)}
                     </div>
-                    <Button
-                      type="primary"
-                      block
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        navigate(`/my-designs/${draft.id}`);
-                      }}
-                    >
-                      Xem chi tiết
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="primary"
+                        className="flex-1"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          navigate(`/my-designs/${draft.id}`);
+                        }}
+                      >
+                        Xem chi tiết
+                      </Button>
+                      {(draft.designWorkId || draft.DesignWorkId) && (
+                        <Button
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            navigate(`/custom-orders/${draft.designWorkId || draft.DesignWorkId}`);
+                          }}
+                          title="Xem cuộc trò chuyện thiết kế"
+                        >
+                          💬
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </Card>
               </Col>

@@ -83,7 +83,16 @@ const MyDesignDetail = () => {
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex items-center justify-between gap-4 mb-5">
           <div>
-            <Button onClick={() => navigate('/my-designs')} className="mb-3">Quay lại kho đồ</Button>
+            <div className="flex gap-2 mb-3">
+              <Button onClick={() => navigate('/my-designs')}>Quay lại kho đồ</Button>
+              {(draft.designWorkId || draft.DesignWorkId) && (
+                <Button
+                  onClick={() => navigate(`/custom-orders/${draft.designWorkId || draft.DesignWorkId}`)}
+                >
+                  💬 Xem cuộc trò chuyện
+                </Button>
+              )}
+            </div>
             <h1 className="text-2xl font-bold m-0">{draft.name || draft.designWorkName || 'Chi tiết thiết kế'}</h1>
             <Text type="secondary">Thiết kế riêng đã duyệt của bạn</Text>
           </div>

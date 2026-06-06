@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Breadcrumb, Spin, notification, Modal } from 'antd';
 import { getOrderDetailApi, cancelOrderApi } from '../api/orderApi';
 import { getShipmentByOrderApi } from '../api/shipmentApi';
@@ -212,6 +212,7 @@ const formatDate = (dateStr) => {
 
 const OrderDetail = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -581,9 +582,20 @@ const OrderDetail = () => {
                           SL: {itemQty}
                         </p>
                       </div>
-                      <p className="font-bold text-gray-900 text-sm flex-shrink-0">
-                        {formatPrice(itemPrice * itemQty)}
-                      </p>
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <p className="font-bold text-gray-900 text-sm m-0">
+                          {formatPrice(itemPrice * itemQty)}
+                        </p>
+                        {item.designWorkId && ['DESIGN_SERVICE', 'PRINT_SERVICE', 'CUSTOM_FILE_PRINT_MF2'].includes(itemSourceType) && (
+                          <button
+                            onClick={() => navigate(`/custom-orders/${item.designWorkId}`)}
+                            className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-transparent border-none cursor-pointer p-0"
+                            title="Xem cuộc trò chuyện thiết kế"
+                          >
+                            💬 Chat
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

@@ -319,6 +319,7 @@ function normalizeOrderItem(it) {
     unitPrice: it.unitPrice ?? it.UnitPrice,
     estimatedWeightPerUnit: it.estimatedWeightPerUnit ?? it.EstimatedWeightPerUnit,
     weight: it.weight ?? it.Weight,
+    designWorkId: it.designWorkId ?? it.DesignWorkId ?? null,
     fulfillmentStatus: it.fulfillmentStatus ?? it.FulfillmentStatus,
     canSubmitFeedback:
       it.canSubmitFeedback !== undefined
