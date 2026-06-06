@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Spin, message, Modal, Button } from "antd";
-import { getDesignRequestDetail, assignStaffToRequest, submitQuote, postDesignRequestMessage, cancelDesignRequest, uploadFile, getDesignVersions, reviewFileVersion, reviewAdjustment } from "../../api/mainflow2Api";
+import { getDesignRequestDetail, assignStaffToRequest, submitQuote, postDesignRequestMessage, cancelDesignRequest, uploadFile, getDesignVersions, reviewFileVersion, reviewAdjustment, createVersionUpdateLog } from "../../api/mainflow2Api";
 import AdjustmentRequestCard from "../../components/Mainflow2/AdjustmentRequestCard";
 import { useAuth } from "../../contexts/AuthContext";
 import useMainflow2Realtime from "../../hooks/useMainflow2Realtime";
@@ -86,24 +86,24 @@ const CUSTOM_STATUS_STEPS = [
 
 const STATUS_ORDER = CUSTOM_STATUS_STEPS.map(s => s.key);
 
-const STATUS_LABEL = {
-  SUBMITTED: 'Mới gửi',
-  ASSIGNED: 'Đã nhận việc',
-  QUOTED: 'Đã báo giá',
-  NEGOTIATING: 'Đang thương lượng',
-  APPROVED: 'Đã duyệt',
-  CANCELLED: 'Đã hủy',
+// Real BE status labels — no more fake FE mapping
+const BE_STATUS_LABEL = {
+  SKETCHING: 'Phác thảo',
+  PENDING: 'Chờ tiếp nhận',
+  IN_PROGRESS: 'Đang thực hiện',
+  REVIEWING: 'Đang kiểm duyệt',
+  COMPLETED: 'Đã nghiệm thu',
 };
 
 const formatPrice = (price) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
 
-const statusColor = (status) => {
-  if (status === 'SUBMITTED') return { background: '#f3f4f6', color: '#6b7280' };
-  if (status === 'ASSIGNED') return { background: '#eff6ff', color: '#2563eb' };
-  if (status === 'QUOTED') return { background: '#f5f3ff', color: '#7c3aed' };
-  if (status === 'NEGOTIATING') return { background: '#fffbeb', color: '#d97706' };
-  if (status === 'APPROVED') return { background: '#ecfdf5', color: '#059669' };
+const beStatusColor = (status) => {
+  if (status === 'SKETCHING') return { background: '#f3f4f6', color: '#6b7280' };
+  if (status === 'PENDING') return { background: '#fffbeb', color: '#d97706' };
+  if (status === 'IN_PROGRESS') return { background: '#eff6ff', color: '#2563eb' };
+  if (status === 'REVIEWING') return { background: '#f5f3ff', color: '#7c3aed' };
+  if (status === 'COMPLETED') return { background: '#ecfdf5', color: '#059669' };
   return { background: '#fef2f2', color: '#dc2626' };
 };
 
@@ -131,6 +131,13 @@ const StaffCustomOrderDetail = () => {
   const [rejectAdjustId, setRejectAdjustId] = useState(null);
   const [rejectAdjustOpen, setRejectAdjustOpen] = useState(false);
   const [rejectAdjustNote, setRejectAdjustNote] = useState('');
+
+  // Version upload
+  const [versionModalOpen, setVersionModalOpen] = useState(false);
+  const [versionTitle, setVersionTitle] = useState('');
+  const [versionNote, setVersionNote] = useState('');
+  const [versionFile, setVersionFile] = useState(null);
+  const [versionUploading, setVersionUploading] = useState(false);
 
   // Chat
   const [chatMessage, setChatMessage] = useState("");
@@ -226,6 +233,35 @@ const StaffCustomOrderDetail = () => {
     }
   };
 
+  const handleUploadVersion = async () => {
+    if (!versionFile) { message.warning('Vui long chon file 3D'); return; }
+    try {
+      setVersionUploading(true);
+      // 1. Upload file to storage
+      const up = await uploadFile(versionFile);
+      const fileUrl = up?.data?.publicUrl || up?.data?.url || up?.publicUrl || up?.url;
+      if (!fileUrl) { message.error('Upload file that bai'); return; }
+      // 2. Create version update log
+      await createVersionUpdateLog(order.designWorkId || id, {
+        title: versionTitle.trim() || undefined,
+        content: versionNote.trim() || undefined,
+        fileUrl,
+        isPreviewable: true,
+        isPrintable: false,
+      });
+      message.success('Da tao phien ban thiet ke moi!');
+      setVersionModalOpen(false);
+      setVersionTitle('');
+      setVersionNote('');
+      setVersionFile(null);
+      fetchDetail(true);
+    } catch (err) {
+      message.error(err?.response?.data?.detail || err?.response?.data?.message || 'Loi khi tao phien ban');
+    } finally {
+      setVersionUploading(false);
+    }
+  };
+
   const handleAssign = () => {
     Modal.confirm({
       title: 'Tiếp nhận yêu cầu',
@@ -235,7 +271,7 @@ const StaffCustomOrderDetail = () => {
         try {
           setProcessing(true);
           const res = await assignStaffToRequest(id);
-          if (res?.statusCode === 200) { message.success('Đã nhận việc!'); fetchDetail(); }
+          if (isSuccessResponse(res)) { message.success('Đã nhận việc!'); fetchDetail(); }
           else message.error(res?.message || 'Lỗi khi nhận việc');
         } catch { message.error('Lỗi khi tiếp nhận'); }
         finally { setProcessing(false); }
@@ -345,10 +381,10 @@ const StaffCustomOrderDetail = () => {
           <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.title}</p>
           <p style={{ margin: 0, fontSize: 11, color: '#9ca3af', fontFamily: 'monospace' }}>#{order.code || order.name || '—'}</p>
         </div>
-        <span style={{ padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, ...statusColor(order.status) }}>
-          {STATUS_LABEL[order.status] || order.status}
+        <span style={{ padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, ...beStatusColor(order.designWorkStatus) }}>
+          {BE_STATUS_LABEL[order.designWorkStatus] || order.designWorkStatus}
         </span>
-        {order.status !== 'CANCELLED' && order.status !== 'APPROVED' && (
+        {order.designWorkStatus !== 'COMPLETED' && !order.isLocked && (
           <button onClick={handleCancel} disabled={processing}
             style={{ padding: '4px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
             Hủy yêu cầu
@@ -434,58 +470,94 @@ const StaffCustomOrderDetail = () => {
             )}
           </div>
 
-          {/* Composer */}
-          {order.status === 'SUBMITTED' ? (() => {
-            const actuallyPaid = order.designServicePaid || order.designServicePaymentStatus === 'PAID';
-            return (
-              <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb' }}>
-                <div style={{
-                  padding: '10px 16px',
-                  background: actuallyPaid ? '#ecfdf5' : '#fffbeb',
-                  borderBottom: `1px solid ${actuallyPaid ? '#6ee7b7' : '#fde68a'}`,
-                  display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-                }}>
-                  <span style={{ color: actuallyPaid ? '#059669' : '#b45309', fontSize: 12, flex: 1, minWidth: 200 }}>
-                    {actuallyPaid
-                      ? <>Khach <b>da thanh toan</b> phi thiet ke. Trao doi voi khach de lam ro yeu cau.</>
-                      : <>Khach chua thanh toan phi thiet ke — ban van co the trao doi, nhung chi <b>tao duoc bao gia sau khi khach thanh toan</b>.</>
-                    }
-                  </span>
+          {/* Composer — uses real BE designWorkStatus */}
+          {(() => {
+            const raw = order.designWorkStatus;
+            const paid = order.designServicePaid || order.designServicePaymentStatus === 'PAID';
+
+            // COMPLETED — locked
+            if (raw === 'COMPLETED') {
+              return (
+                <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#059669', fontSize: 13, fontWeight: 600 }}>
+                  🎉 Khách đã duyệt! Giá cuối: {formatPrice(order.latestQuotedPrice)}
                 </div>
-                <ChatComposer
-                  value={chatMessage}
-                  onChange={setChatMessage}
-                  onSend={handleSendChat}
-                  uploading={uploading}
-                />
-              </div>
+              );
+            }
+
+            // Locked / cancelled
+            if (order.isLocked) {
+              return (
+                <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#dc2626', fontSize: 13, fontWeight: 500 }}>
+                  Yêu cầu đã đóng.
+                </div>
+              );
+            }
+
+            // SKETCHING — customer is preparing, staff can only chat
+            if (raw === 'SKETCHING') {
+              return (
+                <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb' }}>
+                  <div style={{ padding: '10px 16px', background: '#f3f4f6', borderBottom: '1px solid #e5e7eb' }}>
+                    <span style={{ color: '#6b7280', fontSize: 12 }}>Khách đang chuẩn bị yêu cầu. Bạn có thể trao đổi trước.</span>
+                  </div>
+                  <ChatComposer value={chatMessage} onChange={setChatMessage} onSend={handleSendChat} uploading={uploading} />
+                </div>
+              );
+            }
+
+            // PENDING — waiting for staff to accept
+            if (raw === 'PENDING') {
+              return (
+                <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb' }}>
+                  <div style={{
+                    padding: '10px 16px',
+                    background: paid ? '#ecfdf5' : '#fffbeb',
+                    borderBottom: `1px solid ${paid ? '#6ee7b7' : '#fde68a'}`,
+                    display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                  }}>
+                    <span style={{ color: paid ? '#059669' : '#b45309', fontSize: 12, flex: 1, minWidth: 200 }}>
+                      {paid
+                        ? <>Khách <b>đã thanh toán</b> phí thiết kế. Trao đổi với khách để làm rõ yêu cầu, sau đó bấm <b>Tiếp nhận</b>.</>
+                        : <>Khách chưa thanh toán phí thiết kế — bạn vẫn có thể trao đổi, nhưng chỉ <b>tiếp nhận được sau khi khách thanh toán</b>.</>
+                      }
+                    </span>
+                    {paid && (
+                      <Button type="primary" loading={processing} onClick={handleAssign} style={{ flexShrink: 0, fontWeight: 600 }}>
+                        ✋ Tiếp nhận
+                      </Button>
+                    )}
+                  </div>
+                  <ChatComposer value={chatMessage} onChange={setChatMessage} onSend={handleSendChat} uploading={uploading} />
+                </div>
+              );
+            }
+
+            // IN_PROGRESS or REVIEWING — staff can quote + upload version
+            return (
+              <ChatComposer
+                value={chatMessage}
+                onChange={setChatMessage}
+                onSend={handleSendChat}
+                uploading={uploading}
+                extraLeft={
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <Button
+                      onClick={() => setQuoteModalOpen(true)}
+                      style={{ flexShrink: 0, background: '#ecfdf5', borderColor: '#6ee7b7', color: '#059669', fontWeight: 600 }}
+                    >
+                      💰 Báo giá
+                    </Button>
+                    <Button
+                      onClick={() => setVersionModalOpen(true)}
+                      style={{ flexShrink: 0, background: '#eff6ff', borderColor: '#93c5fd', color: '#2563eb', fontWeight: 600 }}
+                    >
+                      📐 Tạo phiên bản 3D
+                    </Button>
+                  </div>
+                }
+              />
             );
-          })() : order.status === 'CANCELLED' ? (
-            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#dc2626', fontSize: 13, fontWeight: 500 }}>
-              Yêu cầu đã bị hủy.
-            </div>
-          ) : order.status === 'APPROVED' ? (
-            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#059669', fontSize: 13, fontWeight: 600 }}>
-              🎉 Khách đã duyệt! Giá cuối: {formatPrice(order.latestQuotedPrice)}
-            </div>
-          ) : (
-            <ChatComposer
-              value={chatMessage}
-              onChange={setChatMessage}
-              onSend={handleSendChat}
-              uploading={uploading}
-              extraLeft={
-                order.designServicePaid && ['ASSIGNED', 'QUOTED', 'NEGOTIATING'].includes(order.status) ? (
-                  <Button
-                    onClick={() => setQuoteModalOpen(true)}
-                    style={{ flexShrink: 0, background: '#ecfdf5', borderColor: '#6ee7b7', color: '#059669', fontWeight: 600 }}
-                  >
-                    💰 Báo giá
-                  </Button>
-                ) : null
-              }
-            />
-          )}
+          })()}
         </div>
 
         {/* RIGHT SIDEBAR */}
@@ -693,6 +765,54 @@ const StaffCustomOrderDetail = () => {
           rows={3}
           style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, resize: 'vertical' }}
         />
+      </Modal>
+
+      {/* Version upload modal */}
+      <Modal
+        title="Tao phien ban thiet ke 3D"
+        open={versionModalOpen}
+        onOk={handleUploadVersion}
+        onCancel={() => { setVersionModalOpen(false); setVersionTitle(''); setVersionNote(''); setVersionFile(null); }}
+        okText="Tao phien ban"
+        okButtonProps={{ loading: versionUploading, disabled: !versionFile }}
+        cancelText="Huy"
+        destroyOnClose
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 600, color: '#374151' }}>Tieu de (tuy chon)</p>
+            <input
+              value={versionTitle}
+              onChange={(e) => setVersionTitle(e.target.value)}
+              placeholder="VD: Ban thiet ke v2 - cap nhat mesh"
+              style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13 }}
+            />
+          </div>
+          <div>
+            <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 600, color: '#374151' }}>Ghi chu (tuy chon)</p>
+            <textarea
+              value={versionNote}
+              onChange={(e) => setVersionNote(e.target.value)}
+              placeholder="Mo ta thay doi trong phien ban nay..."
+              rows={3}
+              style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, resize: 'vertical' }}
+            />
+          </div>
+          <div>
+            <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 600, color: '#374151' }}>File 3D <span style={{ color: '#dc2626' }}>*</span></p>
+            <input
+              type="file"
+              accept=".stl,.obj,.fbx,.gltf,.glb,.3mf,.step,.stp"
+              onChange={(e) => setVersionFile(e.target.files?.[0] || null)}
+              style={{ fontSize: 13 }}
+            />
+            {versionFile && (
+              <p style={{ margin: '4px 0 0', fontSize: 11, color: '#6b7280' }}>
+                {versionFile.name} ({(versionFile.size / 1024 / 1024).toFixed(2)} MB)
+              </p>
+            )}
+          </div>
+        </div>
       </Modal>
     </div>
   );

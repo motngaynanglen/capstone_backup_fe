@@ -263,9 +263,10 @@ export const getDesignRequestDetail = async (id) => {
 // ─── Staff: Assign vào design work ──────────────────────────────────────
 // BE: PATCH /api/design-work/{id}/update  (gán AssignedStaffId)
 export const assignStaffToRequest = async (id) => {
+  // Chuyển PENDING → IN_PROGRESS: BE UpdateDesignWorkCommand kiểm tra state machine
+  // và tự gán MainAssignedStaffId từ user hiện tại
   const response = await axiosInstance.patch(`/api/design-work/${id}/update`, {
-    // BE tự gán staff hiện tại khi nhận update từ Staff role
-    // Hoặc có thể dùng field cụ thể nếu BE hỗ trợ
+    Status: 'IN_PROGRESS',
   });
   return response.data;
 };
@@ -449,6 +450,20 @@ export const reviewAdjustment = async (logId, { isApproved, decisionNote } = {})
   const response = await axiosInstance.post(`/api/design-log/${logId}/review-adjustment`, {
     IsApproved: isApproved,
     DecisionNote: decisionNote || undefined,
+  });
+  return response.data;
+};
+
+// ─── Staff: Tạo phiên bản thiết kế mới (VERSION_UPDATE) ─────────────────
+// BE: POST /api/design-log/createNewVersionUpdateLog
+export const createVersionUpdateLog = async (designWorkId, { title, content, fileUrl, isPreviewable = true, isPrintable = false } = {}) => {
+  const response = await axiosInstance.post('/api/design-log/createNewVersionUpdateLog', {
+    DesignWorkId: designWorkId,
+    Title: title || undefined,
+    Content: content || undefined,
+    FileUrl: fileUrl,
+    IsPreviewable: isPreviewable,
+    IsPrintable: isPrintable,
   });
   return response.data;
 };
