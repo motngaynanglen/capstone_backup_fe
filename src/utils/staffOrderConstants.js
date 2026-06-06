@@ -34,6 +34,7 @@ export const CUSTOM_SOURCE_TYPES = new Set([
   'CUSTOM_FILE_PRINT_MF2',
   'AI_GENERATED',
   'PRE_ORDER',
+  'PRINT_SERVICE', // Đơn in theo yêu cầu từ kho đồ (technical draft) — shop tự in
 ]);
 
 export const orderStatusMap = Object.fromEntries(ORDER_STATUSES.map((s) => [s.value, s]));
