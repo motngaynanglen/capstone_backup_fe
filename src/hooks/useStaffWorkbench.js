@@ -57,6 +57,11 @@ function mapWorkbenchPayload(res) {
   const critical = tasks.filter((t) => t.severity === 'critical').length;
   const high = tasks.filter((t) => t.severity === 'high').length;
   const total = tasks.reduce((sum, t) => sum + (Number(t.count) || 0), 0);
+  const shipmentActionCount =
+    byKey('shipments-preparing')
+    + byKey('shipments-ready')
+    + byKey('shipments-failed')
+    + byKey('shipments-returning');
 
   return {
     sla: {
@@ -72,6 +77,10 @@ function mapWorkbenchPayload(res) {
         pick(counts, 'productionQueueCount', 'ProductionQueueCount')
         ?? byKey('assigned-processing-orders'),
       mf2Submitted: pick(counts, 'mf2Submitted', 'Mf2Submitted') ?? byKey('mf2-overdue'),
+      overdueDesigns: byKey('mf2-overdue'),
+      staleProduction: byKey('production-stale'),
+      shippingOverdue: byKey('ghn-overdue'),
+      shipmentActionCount,
       mf2Pending:
         pick(counts, 'mf2Pending', 'Mf2Pending')
         ?? (byKey('assigned-design-in-progress') + byKey('assigned-design-reviewing')),

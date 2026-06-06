@@ -5,6 +5,45 @@ import { useStaffWorkbench } from "../../hooks/useStaffWorkbench";
 
 const { Title, Text } = Typography;
 
+const summaryCards = [
+  {
+    title: "Thiết kế quá hạn",
+    valueKey: "overdueDesigns",
+    description: "Chưa tiếp nhận quá SLA",
+    href: "/staff/custom-orders",
+  },
+  {
+    title: "Sản xuất chậm",
+    valueKey: "staleProduction",
+    description: "Quá 48h chưa in xong",
+    href: "/staff/production-queue",
+  },
+  {
+    title: "Chậm tạo vận đơn",
+    valueKey: "shippingOverdue",
+    description: "Quá 24h sau khi sẵn sàng giao",
+    href: "/staff/shop-orders",
+  },
+  {
+    title: "Vận đơn cần xử lý",
+    valueKey: "shipmentActionCount",
+    description: "Đóng gói, chờ lấy, lỗi, hoàn hàng",
+    href: "/staff/shop-orders",
+  },
+];
+
+function severityColor(severity) {
+  if (severity === "critical") return "red";
+  if (severity === "high") return "orange";
+  return "blue";
+}
+
+function severityLabel(severity) {
+  if (severity === "critical") return "Khẩn cấp";
+  if (severity === "high") return "Cần chú ý";
+  return "Theo dõi";
+}
+
 export default function OpsDashboardView({ role }) {
   const navigate = useNavigate();
   const { loading, error, workbench, reload } = useStaffWorkbench();
@@ -62,10 +101,10 @@ export default function OpsDashboardView({ role }) {
         {!health?.allClear && (
           <Alert
             type={health?.critical > 0 ? "error" : "warning"}
-            message={`Cảnh báo vận hành · ${health?.total ?? 0} điểm cần xem`}
+            message={`Cảnh báo vận hành · ${health?.total ?? 0} việc cần xem`}
             description={
               <span>
-                Critical: <b>{health?.critical ?? 0}</b> · High: <b>{health?.high ?? 0}</b>
+                Khẩn cấp: <b>{health?.critical ?? 0}</b> · Cần chú ý: <b>{health?.high ?? 0}</b>
               </span>
             }
             showIcon
@@ -73,32 +112,27 @@ export default function OpsDashboardView({ role }) {
         )}
 
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={6}>
-            <Card>
-              <Statistic title="Hàng chờ SX" value={counts.productionQueueCount ?? 0} />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <Card>
-              <Statistic title="Thiết kế mới gửi" value={counts.mf2Submitted ?? 0} />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <Card>
-              <Statistic title="Thiết kế chờ xử lý" value={counts.mf2Pending ?? 0} />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <Card>
-              <Statistic title="Sẵn sàng giao" value={counts.ordersReadyShipment ?? counts.ordersReadyGhn ?? 0} />
-            </Card>
-          </Col>
+          {summaryCards.map((card) => (
+            <Col xs={24} sm={12} md={6} key={card.valueKey}>
+              <Card
+                hoverable
+                onClick={() => navigate(card.href)}
+                style={{ height: "100%", cursor: "pointer" }}
+                bodyStyle={{ minHeight: 132 }}
+              >
+                <Statistic title={card.title} value={counts[card.valueKey] ?? 0} />
+                <Text type="secondary" style={{ display: "block", marginTop: 8, fontSize: 12 }}>
+                  {card.description}
+                </Text>
+              </Card>
+            </Col>
+          ))}
         </Row>
 
         <Card size="small" title="SLA (giờ)">
           <Space wrap>
-            <Tag>Phân công thiết kế ≤ {sla.mf2AssignHours ?? 4}h</Tag>
-            <Tag>Production stale &gt; {sla.productionStaleHours ?? 48}h</Tag>
+            <Tag>Tiếp nhận thiết kế ≤ {sla.mf2AssignHours ?? 4}h</Tag>
+            <Tag>Sản xuất chậm &gt; {sla.productionStaleHours ?? 48}h</Tag>
             <Tag>Vận chuyển sau FINISHED &gt; {sla.shippingAfterFinishedHours ?? sla.ghnAfterFinishedHours ?? 24}h</Tag>
           </Space>
         </Card>
@@ -106,7 +140,7 @@ export default function OpsDashboardView({ role }) {
         <Card title="Việc cần làm">
           <List
             dataSource={tasks}
-            locale={{ emptyText: "Không có task — mọi thứ ổn." }}
+            locale={{ emptyText: "Không có việc cần xử lý." }}
             renderItem={(task) => (
               <List.Item>
                 <List.Item.Meta
@@ -114,8 +148,12 @@ export default function OpsDashboardView({ role }) {
                     <Space wrap>
                       <Text strong>{task.title}</Text>
                       {task.priority != null && <Tag color="blue">P{task.priority}</Tag>}
-                      {task.severity && <Tag color="volcano">{task.severity}</Tag>}
-                      {task.count != null && <Tag>{task.count}</Tag>}
+                      {task.severity && (
+                        <Tag color={severityColor(task.severity)}>
+                          {severityLabel(task.severity)}
+                        </Tag>
+                      )}
+                      {task.count != null && <Tag>{task.count} việc</Tag>}
                     </Space>
                   }
                   description={
