@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Spin, message, Modal, Button } from "antd";
-import { getDesignRequestDetail, assignStaffToRequest, submitQuote, postDesignRequestMessage, cancelDesignRequest, uploadFile } from "../../api/mainflow2Api";
+import { getDesignRequestDetail, assignStaffToRequest, submitQuote, postDesignRequestMessage, cancelDesignRequest, uploadFile, getDesignVersions, reviewFileVersion, reviewAdjustment } from "../../api/mainflow2Api";
+import AdjustmentRequestCard from "../../components/Mainflow2/AdjustmentRequestCard";
 import { useAuth } from "../../contexts/AuthContext";
 import useMainflow2Realtime from "../../hooks/useMainflow2Realtime";
 import CustomerRequestPanel from "../../components/Mainflow2/CustomerRequestPanel";
@@ -56,6 +57,17 @@ const StaffCustomOrderDetail = () => {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
+  // Design versions (for file review)
+  const [designVersions, setDesignVersions] = useState([]);
+  const [reviewingId, setReviewingId] = useState(null);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectNote, setRejectNote] = useState('');
+
+  // Adjustment review
+  const [rejectAdjustId, setRejectAdjustId] = useState(null);
+  const [rejectAdjustOpen, setRejectAdjustOpen] = useState(false);
+  const [rejectAdjustNote, setRejectAdjustNote] = useState('');
+
   // Chat
   const [chatMessage, setChatMessage] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -83,11 +95,72 @@ const StaffCustomOrderDetail = () => {
     }
   }, [id]);
 
-  useEffect(() => {
-    fetchDetail();
+  const fetchVersions = useCallback(async () => {
+    try {
+      const res = await getDesignVersions(id);
+      setDesignVersions(Array.isArray(res) ? res : res?.data || []);
+    } catch { /* silent */ }
   }, [id]);
 
-  useMainflow2Realtime(id, () => fetchDetail(true));
+  useEffect(() => {
+    fetchDetail();
+    fetchVersions();
+  }, [id]);
+
+  useMainflow2Realtime(id, () => { fetchDetail(true); fetchVersions(); });
+
+  const handleReviewFile = async (versionId, isApproved, reviewNote = '') => {
+    try {
+      setProcessing(true);
+      await reviewFileVersion(versionId, {
+        ReviewStatus: isApproved ? 'ACCEPTED' : 'REJECTED',
+        ReviewNote: reviewNote || undefined,
+      });
+      message.success(isApproved ? 'Đã duyệt file' : 'Đã từ chối file');
+      fetchDetail(true);
+      fetchVersions();
+    } catch (err) {
+      message.error(err?.response?.data?.detail || err?.response?.data?.message || 'Lỗi khi review file');
+    } finally {
+      setProcessing(false);
+      setRejectModalOpen(false);
+      setRejectNote('');
+      setReviewingId(null);
+    }
+  };
+
+  const handleApproveAdjustment = async (logId) => {
+    try {
+      setProcessing(true);
+      await reviewAdjustment(logId, { isApproved: true });
+      message.success('Da dong y yeu cau hieu chinh');
+      fetchDetail(true);
+    } catch (err) {
+      message.error(err?.response?.data?.detail || err?.response?.data?.message || 'Loi khi duyet yeu cau');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleRejectAdjustment = async () => {
+    if (!rejectAdjustNote.trim()) {
+      message.warning('Vui long nhap ly do tu choi');
+      return;
+    }
+    try {
+      setProcessing(true);
+      await reviewAdjustment(rejectAdjustId, { isApproved: false, decisionNote: rejectAdjustNote });
+      message.success('Da tu choi yeu cau hieu chinh');
+      fetchDetail(true);
+    } catch (err) {
+      message.error(err?.response?.data?.detail || err?.response?.data?.message || 'Loi khi tu choi');
+    } finally {
+      setProcessing(false);
+      setRejectAdjustOpen(false);
+      setRejectAdjustNote('');
+      setRejectAdjustId(null);
+    }
+  };
 
   const handleAssign = () => {
     Modal.confirm({
@@ -247,10 +320,25 @@ const StaffCustomOrderDetail = () => {
               </div>
             )}
 
-            {/* Messages + inline quotes */}
+            {/* Messages + inline quotes + adjustment requests */}
             {order.messages?.length > 0 ? order.messages.map((msg, i) => {
               const isMe = getMessageAuthorId(msg) === user?.id;
-              const isQuote = msg.logType && msg.logType.toUpperCase().includes('QUOTE');
+              const logType = (msg.logType || '').toUpperCase();
+              const isQuote = logType.includes('QUOTE');
+              const isAdjustment = logType === 'ADJUSTMENT_REQUEST';
+
+              if (isAdjustment) {
+                return (
+                  <AdjustmentRequestCard
+                    key={msg.id || i}
+                    msg={msg}
+                    isStaff
+                    onApprove={handleApproveAdjustment}
+                    onReject={(logId) => { setRejectAdjustId(logId); setRejectAdjustOpen(true); }}
+                    processing={processing}
+                  />
+                );
+              }
 
               if (isQuote) {
                 let meta = null;
@@ -374,6 +462,34 @@ const StaffCustomOrderDetail = () => {
             </ul>
           </div>
 
+          {/* Design service payment */}
+          {order.designServicePaymentStatus && (
+            <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
+              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Phí dịch vụ thiết kế</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600,
+                  background: order.designServicePaid ? '#ecfdf5' : '#fffbeb',
+                  color: order.designServicePaid ? '#059669' : '#d97706',
+                }}>
+                  {order.designServicePaid ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                </span>
+                {order.designServiceTotalAmount != null && (
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>
+                    {formatPrice(order.designServiceTotalAmount)}
+                  </span>
+                )}
+              </div>
+              {order.designServiceOrderCode && (
+                <p style={{ margin: '6px 0 0', fontSize: 11, color: '#6b7280' }}>
+                  Đơn phí: <Link to={`/staff/shop-orders/${order.designServiceOrderId}`} style={{ color: '#4f46e5', textDecoration: 'none' }}>
+                    #{order.designServiceOrderCode}
+                  </Link>
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Quote summary */}
           {order.latestQuotedPrice != null && (
             <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
@@ -393,19 +509,54 @@ const StaffCustomOrderDetail = () => {
             </div>
           )}
 
-          {/* File versions */}
-          {fileVersions.length > 0 && (
+          {/* File versions with review */}
+          {(designVersions.length > 0 || fileVersions.length > 0) && (
             <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
-              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Bản thiết kế (NV)</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {fileVersions.map((f, i) => (
-                  <div key={i}>
-                    <Model3DPreview fileUrl={f.fileUrl || f.url} height={120} />
-                    <p style={{ margin: '4px 0 0', fontSize: 10, color: '#6b7280' }}>
-                      {f.title || `File v${f.versionNumber}`} · v{f.versionNumber}
-                    </p>
-                  </div>
-                ))}
+              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>
+                Bản thiết kế ({designVersions.length || fileVersions.length})
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {(designVersions.length > 0 ? designVersions : fileVersions).map((f, i) => {
+                  const reviewStatus = f.fileReviewStatus || (f.isApproved ? 'ACCEPTED' : null);
+                  const canReview = !reviewStatus || (reviewStatus !== 'ACCEPTED' && reviewStatus !== 'REJECTED');
+                  return (
+                    <div key={f.id || i} style={{ background: '#f9fafb', borderRadius: 8, padding: 8, border: '1px solid #e5e7eb' }}>
+                      <Model3DPreview fileUrl={f.fileUrl || f.url} height={120} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                        <p style={{ margin: 0, fontSize: 11, color: '#374151', fontWeight: 600, flex: 1 }}>
+                          {f.title || `File v${f.versionNumber}`}
+                        </p>
+                        {reviewStatus === 'ACCEPTED' && (
+                          <span style={{ padding: '1px 8px', borderRadius: 10, fontSize: 10, fontWeight: 600, background: '#ecfdf5', color: '#059669' }}>Đã duyệt</span>
+                        )}
+                        {reviewStatus === 'REJECTED' && (
+                          <span style={{ padding: '1px 8px', borderRadius: 10, fontSize: 10, fontWeight: 600, background: '#fef2f2', color: '#dc2626' }}>Từ chối</span>
+                        )}
+                        {!reviewStatus && (
+                          <span style={{ padding: '1px 8px', borderRadius: 10, fontSize: 10, fontWeight: 600, background: '#fffbeb', color: '#d97706' }}>Chờ duyệt</span>
+                        )}
+                      </div>
+                      {canReview && (
+                        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                          <button
+                            onClick={() => handleReviewFile(f.id, true)}
+                            disabled={processing}
+                            style={{ flex: 1, padding: '4px 0', borderRadius: 6, border: '1px solid #6ee7b7', background: '#ecfdf5', color: '#059669', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            ✓ Duyệt
+                          </button>
+                          <button
+                            onClick={() => { setReviewingId(f.id); setRejectModalOpen(true); }}
+                            disabled={processing}
+                            style={{ flex: 1, padding: '4px 0', borderRadius: 6, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            ✕ Từ chối
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -429,6 +580,46 @@ const StaffCustomOrderDetail = () => {
         designWorkTitle={order.title}
         sourceType={order.sourceType}
       />
+
+      {/* Reject file modal */}
+      <Modal
+        title="Tu choi file thiet ke"
+        open={rejectModalOpen}
+        onOk={() => handleReviewFile(reviewingId, false, rejectNote)}
+        onCancel={() => { setRejectModalOpen(false); setRejectNote(''); setReviewingId(null); }}
+        okText="Xac nhan tu choi"
+        okButtonProps={{ danger: true, disabled: !rejectNote.trim() }}
+        cancelText="Huy"
+      >
+        <p style={{ margin: '0 0 8px', fontSize: 13, color: '#374151' }}>Nhap ly do tu choi file:</p>
+        <textarea
+          value={rejectNote}
+          onChange={(e) => setRejectNote(e.target.value)}
+          placeholder="VD: File bi loi mesh, thieu chi tiet..."
+          rows={3}
+          style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, resize: 'vertical' }}
+        />
+      </Modal>
+
+      {/* Reject adjustment modal */}
+      <Modal
+        title="Tu choi yeu cau hieu chinh"
+        open={rejectAdjustOpen}
+        onOk={handleRejectAdjustment}
+        onCancel={() => { setRejectAdjustOpen(false); setRejectAdjustNote(''); setRejectAdjustId(null); }}
+        okText="Xac nhan tu choi"
+        okButtonProps={{ danger: true, disabled: !rejectAdjustNote.trim() }}
+        cancelText="Huy"
+      >
+        <p style={{ margin: '0 0 8px', fontSize: 13, color: '#374151' }}>Nhap ly do tu choi yeu cau hieu chinh:</p>
+        <textarea
+          value={rejectAdjustNote}
+          onChange={(e) => setRejectAdjustNote(e.target.value)}
+          placeholder="VD: Yeu cau vuot pham vi brief ban dau..."
+          rows={3}
+          style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, resize: 'vertical' }}
+        />
+      </Modal>
     </div>
   );
 };

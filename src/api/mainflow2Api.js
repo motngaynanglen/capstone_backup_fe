@@ -144,6 +144,12 @@ function normalizeDesignLog(log) {
     metadataJson: metadata,
     imageUrls,
     versions: log?.versions || log?.Versions || [],
+    // Adjustment request fields
+    adjustmentRequestStatus: log?.adjustmentRequestStatus || log?.AdjustmentRequestStatus || null,
+    adjustmentDecisionNote: log?.adjustmentDecisionNote || log?.AdjustmentDecisionNote || null,
+    adjustmentReviewedAt: log?.adjustmentReviewedAt || log?.AdjustmentReviewedAt || null,
+    adjustmentReviewedByAccountId: log?.adjustmentReviewedByAccountId || log?.AdjustmentReviewedByAccountId || null,
+    adjustmentConsumedServiceSelectionId: log?.adjustmentConsumedServiceSelectionId || log?.AdjustmentConsumedServiceSelectionId || null,
   };
 }
 
@@ -185,6 +191,7 @@ function normalizeDesignWork(work, messages = []) {
     isLocked: work?.isLocked ?? work?.IsLocked ?? false,
     baseImageUrl: work?.baseImageUrl || work?.BaseImageUrl,
     resultDraftId: work?.resultDraftId || work?.ResultDraftId,
+    workType: work?.workType || work?.WorkType || null,
     selections: work?.selections || work?.Selections || [],
     subRevisions: work?.subRevisions || work?.SubRevisions || [],
     designServiceOrderId: work?.designServiceOrderId || work?.DesignServiceOrderId,
@@ -421,5 +428,27 @@ export const requestRework = async (designWorkId, payload) => {
 // BE: POST /api/design-work/{versionHistoryId}/review-file
 export const reviewFileVersion = async (versionHistoryId, payload) => {
   const response = await axiosInstance.post(`/api/design-work/${versionHistoryId}/review-file`, payload);
+  return response.data;
+};
+
+// ─── Yêu cầu hiệu chỉnh (Customer/Staff) ───────────────────────────────
+// BE: POST /api/design-log/request-adjustment
+export const requestAdjustment = async (designWorkId, { content, imageUrls, parentLogId } = {}) => {
+  const response = await axiosInstance.post('/api/design-log/request-adjustment', {
+    DesignWorkId: designWorkId,
+    ParentLogId: parentLogId || undefined,
+    Content: content,
+    ImageUrls: imageUrls || [],
+  });
+  return response.data;
+};
+
+// ─── Duyệt yêu cầu hiệu chỉnh (Staff) ─────────────────────────────────
+// BE: POST /api/design-log/{id}/review-adjustment
+export const reviewAdjustment = async (logId, { isApproved, decisionNote } = {}) => {
+  const response = await axiosInstance.post(`/api/design-log/${logId}/review-adjustment`, {
+    IsApproved: isApproved,
+    DecisionNote: decisionNote || undefined,
+  });
   return response.data;
 };

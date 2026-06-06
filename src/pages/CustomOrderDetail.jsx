@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Spin, message, Modal, Button } from 'antd';
-import { getDesignRequestDetail, approveQuote, cancelDesignRequest, postDesignRequestMessage, uploadFile, lockDesignWork } from '../api/mainflow2Api';
+import { getDesignRequestDetail, approveQuote, cancelDesignRequest, postDesignRequestMessage, uploadFile, lockDesignWork, requestAdjustment, addFilesToQuickPrint } from '../api/mainflow2Api';
+import AdjustmentRequestCard from '../components/Mainflow2/AdjustmentRequestCard';
 import { cancelOrderApi, checkoutDesignApi } from '../api/orderApi';
 import technicalDraftApi from '../api/technicalDraftApi';
 import { getActiveServiceOptionsApi } from '../api/serviceApi';
@@ -92,6 +93,15 @@ const CustomOrderDetail = () => {
   const [uploading, setUploading] = useState(false);
   const messagesContainerRef = useRef(null);
 
+  // Adjustment request
+  const [adjustModalOpen, setAdjustModalOpen] = useState(false);
+  const [adjustContent, setAdjustContent] = useState('');
+  const [adjustFiles, setAdjustFiles] = useState([]);
+
+  // Re-upload (PRINT_SERVICE — file rejected)
+  const [reuploadFiles, setReuploadFiles] = useState([]);
+  const [reuploadNote, setReuploadNote] = useState('');
+
   useEffect(() => {
     const el = messagesContainerRef.current;
     if (!el) return;
@@ -141,6 +151,58 @@ const CustomOrderDetail = () => {
   }, [fetchTechnicalDrafts]);
 
   useMainflow2Realtime(id, () => fetchDetail(true));
+
+  const handleRequestAdjustment = async () => {
+    if (!adjustContent.trim() && adjustFiles.length === 0) {
+      message.warning('Vui long nhap noi dung hoac dinh kem hinh anh');
+      return;
+    }
+    try {
+      setProcessing(true);
+      // Upload images if any
+      let imageUrls = [];
+      for (const file of adjustFiles) {
+        const up = await uploadFile(file);
+        const url = up?.data?.publicUrl || up?.data?.url || up?.publicUrl || up?.url;
+        if (url) imageUrls.push(url);
+      }
+      await requestAdjustment(id, { content: adjustContent.trim(), imageUrls });
+      message.success('Da gui yeu cau hieu chinh');
+      setAdjustModalOpen(false);
+      setAdjustContent('');
+      setAdjustFiles([]);
+      fetchDetail(true);
+    } catch (err) {
+      message.error(err?.response?.data?.detail || err?.response?.data?.message || 'Loi khi gui yeu cau');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleReuploadFiles = async () => {
+    if (reuploadFiles.length === 0) {
+      message.warning('Vui long chon file de upload');
+      return;
+    }
+    try {
+      setProcessing(true);
+      let fileUrls = [];
+      for (const file of reuploadFiles) {
+        const up = await uploadFile(file);
+        const url = up?.data?.publicUrl || up?.data?.url || up?.publicUrl || up?.url;
+        if (url) fileUrls.push(url);
+      }
+      await addFilesToQuickPrint(id, fileUrls, reuploadNote.trim() || undefined);
+      message.success('Da upload lai file thanh cong');
+      setReuploadFiles([]);
+      setReuploadNote('');
+      fetchDetail(true);
+    } catch (err) {
+      message.error(err?.response?.data?.detail || err?.response?.data?.message || 'Loi khi upload file');
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   const handleSendChat = async ({ content, file }) => {
     const text = content?.trim();
@@ -436,7 +498,7 @@ const CustomOrderDetail = () => {
           </Link>
         )}
         {/* Chỉ cho hủy khi: chưa bị cancelled, chưa vào sản xuất, và đơn dịch vụ chưa được thanh toán */}
-        {order.status !== 'CANCELLED' && !showProduction && !isPaid && ['SUBMITTED', 'PENDING', 'APPROVED'].includes(order.status?.toUpperCase?.() || order.status) && (
+        {order.status !== 'CANCELLED' && !showProduction && !isPaid && !designFeePaid && ['SUBMITTED', 'PENDING', 'APPROVED'].includes(order.status?.toUpperCase?.() || order.status) && (
           <button onClick={handleCancel} disabled={processing}
             style={{ padding: '4px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
             {showAwaitingPayment ? 'Hủy đơn hàng' : 'Hủy yêu cầu'}
@@ -454,10 +516,23 @@ const CustomOrderDetail = () => {
           <div ref={messagesContainerRef}
             style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-{/* Messages + inline quotes */}
+{/* Messages + inline quotes + adjustment requests */}
             {order.messages?.length > 0 ? order.messages.map((msg, i) => {
               const isMe = getMessageAuthorId(msg) === user?.id;
-              const isQuote = msg.logType && msg.logType.toUpperCase().includes('QUOTE');
+              const logType = (msg.logType || '').toUpperCase();
+              const isQuote = logType.includes('QUOTE');
+              const isAdjustment = logType === 'ADJUSTMENT_REQUEST';
+
+              if (isAdjustment) {
+                return (
+                  <AdjustmentRequestCard
+                    key={msg.id || i}
+                    msg={msg}
+                    isStaff={false}
+                    processing={processing}
+                  />
+                );
+              }
 
               if (isQuote) {
                 let meta = null;
@@ -551,12 +626,52 @@ const CustomOrderDetail = () => {
               Yêu cầu đã duyệt. Liên hệ shop nếu cần hỗ trợ đơn hàng.
             </div>
           ) : (
-            <ChatComposer
-              value={chatMessage}
-              onChange={setChatMessage}
-              onSend={handleSendChat}
-              uploading={uploading}
-            />
+            <>
+              {/* Re-upload panel khi file bi tu choi (PRINT_SERVICE + SKETCHING) */}
+              {['PRINT_SERVICE', 'CUSTOM_FILE_PRINT_MF2'].includes(order.workType || order.WorkType || order.sourceType || '') && order.designWorkStatus === 'SKETCHING' && designFeePaid && (
+                <div style={{ flexShrink: 0, background: '#fef2f2', borderTop: '1px solid #fca5a5', padding: '12px 16px' }}>
+                  <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: '#dc2626' }}>
+                    File cua ban bi tu choi. Vui long upload lai file moi:
+                  </p>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <input
+                      type="file"
+                      accept=".glb,.gltf,.stl,.obj,.step,.stp,.igs,.iges,.3mf"
+                      multiple
+                      onChange={(e) => setReuploadFiles(Array.from(e.target.files || []))}
+                      style={{ fontSize: 12 }}
+                    />
+                    {reuploadFiles.length > 0 && (
+                      <Button
+                        type="primary"
+                        size="small"
+                        loading={processing}
+                        style={{ background: '#4f46e5', borderColor: '#4f46e5' }}
+                        onClick={handleReuploadFiles}
+                      >
+                        Upload lai ({reuploadFiles.length} file)
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+              <ChatComposer
+                value={chatMessage}
+                onChange={setChatMessage}
+                onSend={handleSendChat}
+                uploading={uploading}
+                extraLeft={
+                  designFeePaid && !order.isLocked && ['IN_PROGRESS', 'REVIEWING', 'COMPLETED'].includes(order.designWorkStatus) ? (
+                    <Button
+                      onClick={() => setAdjustModalOpen(true)}
+                      style={{ flexShrink: 0, background: '#fffbeb', borderColor: '#fde68a', color: '#d97706', fontWeight: 600 }}
+                    >
+                      Yeu cau hieu chinh
+                    </Button>
+                  ) : null
+                }
+              />
+            </>
           )}
         </div>
 
@@ -797,6 +912,43 @@ const CustomOrderDetail = () => {
         width={760}
       >
         <ServiceOptionPicker value={pendingServiceSelections} onChange={handlePendingServiceChange} />
+      </Modal>
+
+      {/* Adjustment request modal */}
+      <Modal
+        title="Yeu cau hieu chinh thiet ke"
+        open={adjustModalOpen}
+        onOk={handleRequestAdjustment}
+        onCancel={() => { setAdjustModalOpen(false); setAdjustContent(''); setAdjustFiles([]); }}
+        okText="Gui yeu cau"
+        cancelText="Huy"
+        okButtonProps={{ disabled: !adjustContent.trim() && adjustFiles.length === 0, loading: processing }}
+      >
+        <p style={{ margin: '0 0 12px', fontSize: 13, color: '#374151' }}>
+          Mo ta noi dung can hieu chinh. Luu y: moi lan hieu chinh se tieu mot luot trong goi dich vu.
+        </p>
+        <textarea
+          value={adjustContent}
+          onChange={(e) => setAdjustContent(e.target.value)}
+          placeholder="VD: Dieu chinh kich thuoc phan de mo hinh, them logo o mat truoc..."
+          rows={4}
+          style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, resize: 'vertical', marginBottom: 12 }}
+        />
+        <div>
+          <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 600, color: '#374151' }}>Hinh anh minh hoa (tuy chon):</p>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={(e) => setAdjustFiles(Array.from(e.target.files || []))}
+            style={{ fontSize: 12 }}
+          />
+          {adjustFiles.length > 0 && (
+            <p style={{ margin: '4px 0 0', fontSize: 11, color: '#6b7280' }}>
+              Da chon {adjustFiles.length} hinh anh
+            </p>
+          )}
+        </div>
       </Modal>
     </div>
   );
