@@ -117,11 +117,12 @@ export default function VersionUpdateCard({
             const badge = reviewBadge(vReview);
 
             const staffCanQuote = role === 'staff' && !isPrintService && !vDraft && !isLocked && canQuoteStatus;
-            // Khách "duyệt file 3D" = duyệt báo giá của version (BE confirm duyệt luôn file).
-            // Không có API duyệt-file riêng cho khách (reviewFileVersion là [Staff/Manager]).
-            const customerCanApprove = role === 'customer' && vDraft && !draftConfirmed && !isLocked && canQuoteStatus && !fileApproved;
-            // Staff duyệt/từ chối file kỹ thuật CHỈ cho đơn in theo yêu cầu (khách upload file để in).
-            const staffCanReviewFile = role === 'staff' && isPrintService && onReviewFile && !isLocked && !fileApproved && !fileRejected;
+            const customerCanApprove = role === 'customer' && vDraft && !draftConfirmed && !isLocked && canQuoteStatus;
+            // Duyệt/từ chối file 3D theo loại công việc (BE reviewFileVersion phân quyền theo WorkType):
+            //  - design service: KHÁCH duyệt thiết kế của nhân viên
+            //  - in theo yêu cầu : STAFF duyệt file khách upload
+            const canReviewFile = onReviewFile && !isLocked && !fileApproved && !fileRejected
+              && ((role === 'customer' && !isPrintService) || (role === 'staff' && isPrintService));
 
             return (
               <div key={vId || i}>
@@ -158,20 +159,8 @@ export default function VersionUpdateCard({
                       💰 Tạo bản báo giá
                     </Button>
                   )}
-                  {/* Khách: duyệt file 3D — dùng confirmTechnicalDraft (BE duyệt luôn file + báo giá) */}
-                  {customerCanApprove && (
-                    <Button
-                      size="small"
-                      type="primary"
-                      loading={processing}
-                      onClick={() => onApproveDraft?.(vDraft.id || vDraft.Id)}
-                      style={{ background: '#059669', borderColor: '#059669', fontWeight: 600 }}
-                    >
-                      ✅ Duyệt file 3D
-                    </Button>
-                  )}
-                  {/* Staff (đơn in theo yêu cầu): duyệt/từ chối file khách upload */}
-                  {staffCanReviewFile && (
+                  {/* Duyệt/từ chối file 3D: khách (design service) hoặc staff (in theo yêu cầu) */}
+                  {canReviewFile && (
                     <>
                       <Button
                         size="small"
@@ -180,7 +169,7 @@ export default function VersionUpdateCard({
                         onClick={() => onReviewFile(vId, 'ACCEPTED')}
                         style={{ background: '#059669', borderColor: '#059669', fontWeight: 600 }}
                       >
-                        ✅ Duyệt file
+                        ✅ Duyệt file 3D
                       </Button>
                       <Button
                         size="small"
