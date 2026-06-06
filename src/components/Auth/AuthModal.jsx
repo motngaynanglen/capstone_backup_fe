@@ -84,6 +84,17 @@ const AuthModal = () => {
         <Form.Item name="password" label="Mật khẩu" rules={[{ required: true, message: 'Nhập mật khẩu' }]}>
           <Input.Password prefix={<LockOutlined />} placeholder="••••••••" autoComplete={isLogin ? 'current-password' : 'new-password'} />
         </Form.Item>
+        {isLogin && (
+          <div className="text-right -mt-2 mb-3">
+            <button
+              type="button"
+              className="text-indigo-600 text-sm font-medium bg-transparent border-0 cursor-pointer hover:text-indigo-800"
+              onClick={() => { handleClose(); navigate('/forgot-password'); }}
+            >
+              Quên mật khẩu?
+            </button>
+          </div>
+        )}
         <Button type="primary" htmlType="submit" loading={loading} block className="mt-2">
           {isLogin ? 'Đăng nhập' : 'Đăng ký'}
         </Button>

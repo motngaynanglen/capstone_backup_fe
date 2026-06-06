@@ -10,8 +10,9 @@ const ResetPasswordPage = () => {
     const navigate = useNavigate();
 
     const [searchParams] = useSearchParams();
-    // Lấy username hoặc email từ URL (nếu có)
+    // Lấy username/email và token từ URL (truyền sang từ trang Quên mật khẩu).
     const defaultUsername = searchParams.get('username') || searchParams.get('email') || '';
+    const defaultToken = searchParams.get('token') || '';
 
     const onFinish = async (values) => {
         setLoading(true);
@@ -53,7 +54,7 @@ const ResetPasswordPage = () => {
                     onFinish={onFinish}
                     layout="vertical"
                     size="large"
-                    initialValues={{ username: defaultUsername }}
+                    initialValues={{ username: defaultUsername, token: defaultToken }}
                 >
                     <Form.Item
                         name="username"
