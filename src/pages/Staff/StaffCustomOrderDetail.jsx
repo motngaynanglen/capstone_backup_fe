@@ -12,12 +12,76 @@ import ChatMessageBubble, { ChatComposer } from "../../components/Mainflow2/Chat
 import { getMessageAuthorId } from "../../components/Mainflow2/messageMetadataUtils";
 import Model3DPreview from "../../components/Mainflow2/Model3DPreview";
 
+// Raw BE statuses and their rank for timeline
+const BE_STATUS_RANK = {
+  SKETCHING: 0,
+  PENDING: 1,
+  IN_PROGRESS: 2,
+  REVIEWING: 3,
+  COMPLETED: 4,
+};
+
+/**
+ * Build timeline steps dynamically based on actual BE state.
+ * Returns array of { key, label, done, isCurrent }.
+ */
+function buildStaffTimeline(order) {
+  const raw = order?.designWorkStatus || '';
+  const rank = BE_STATUS_RANK[raw] ?? -1;
+  const paid = order?.designServicePaid || order?.designServicePaymentStatus === 'PAID';
+
+  const steps = [
+    {
+      key: 'request',
+      label: 'Gui yeu cau',
+      done: true,
+      isCurrent: rank <= 0 && !paid,
+    },
+    {
+      key: 'paid',
+      label: paid ? 'Da thanh toan phi TK' : 'Cho thanh toan phi TK',
+      done: paid,
+      isCurrent: !paid && rank <= 1,
+    },
+    {
+      key: 'assigned',
+      label: rank >= 2 ? 'Da tiep nhan' : 'Cho tiep nhan',
+      done: rank >= 2,
+      isCurrent: paid && rank < 2,
+    },
+    {
+      key: 'quoted',
+      label: rank >= 3 ? 'Da bao gia' : 'Bao gia',
+      done: rank >= 3,
+      isCurrent: rank === 2,
+    },
+    {
+      key: 'completed',
+      label: rank >= 4 ? 'Hoan tat' : 'Cho duyet',
+      done: rank >= 4,
+      isCurrent: rank === 3,
+    },
+  ];
+
+  // Ensure exactly one isCurrent when not cancelled/completed
+  if (raw !== 'CANCELLED' && rank < 4) {
+    const hasAnyCurrent = steps.some(s => s.isCurrent);
+    if (!hasAnyCurrent) {
+      const firstNotDone = steps.find(s => !s.done);
+      if (firstNotDone) firstNotDone.isCurrent = true;
+    }
+  }
+
+  return steps;
+}
+
+// Legacy — still used for topbar badge
 const CUSTOM_STATUS_STEPS = [
-  { key: 'SUBMITTED', label: 'Gửi yêu cầu' },
-  { key: 'ASSIGNED', label: 'Đã phân công' },
-  { key: 'QUOTED', label: 'Đã báo giá' },
-  { key: 'NEGOTIATING', label: 'Thương lượng' },
-  { key: 'APPROVED', label: 'Đã duyệt' },
+  { key: 'SUBMITTED', label: 'Gui yeu cau' },
+  { key: 'ASSIGNED', label: 'Da phan cong' },
+  { key: 'QUOTED', label: 'Da bao gia' },
+  { key: 'NEGOTIATING', label: 'Thuong luong' },
+  { key: 'APPROVED', label: 'Da duyet' },
 ];
 
 const STATUS_ORDER = CUSTOM_STATUS_STEPS.map(s => s.key);
@@ -439,39 +503,34 @@ const StaffCustomOrderDetail = () => {
             <CustomerRequestPanel order={order} compact />
           </div>
 
-          {/* Timeline */}
+          {/* Timeline — based on actual BE status + payment */}
           <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
-            <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Tiến trình</p>
+            <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Tien trinh</p>
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {CUSTOM_STATUS_STEPS.map((step, idx) => {
-                const currentIdx = STATUS_ORDER.indexOf(order.status);
-                const isDone = idx < currentIdx || (idx === currentIdx && order.status !== 'CANCELLED');
-                const isCurrent = idx === currentIdx && order.status !== 'CANCELLED';
-                return (
-                  <li key={step.key} style={{ display: 'flex', gap: 12, paddingBottom: idx < CUSTOM_STATUS_STEPS.length - 1 ? 16 : 0, position: 'relative' }}>
-                    {idx < CUSTOM_STATUS_STEPS.length - 1 && (
-                      <div style={{ position: 'absolute', left: 11, top: 24, width: 2, bottom: 0, background: isDone ? '#4f46e5' : '#e5e7eb' }} />
-                    )}
-                    <div style={{
-                      width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12,
-                      background: isCurrent ? '#4f46e5' : isDone ? '#4f46e5' : '#f3f4f6',
-                      color: isDone || isCurrent ? '#fff' : '#9ca3af',
-                      border: isCurrent ? '2px solid #a5b4fc' : 'none',
-                      zIndex: 1
-                    }}>
-                      {isDone && !isCurrent ? '✓' : idx + 1}
-                    </div>
-                    <p style={{ margin: 'auto 0', fontSize: 13, fontWeight: isCurrent ? 700 : 500, color: isCurrent ? '#4f46e5' : isDone ? '#111827' : '#9ca3af' }}>
-                      {step.label}
-                    </p>
-                  </li>
-                );
-              })}
-              {order.status === 'CANCELLED' && (
+              {buildStaffTimeline(order).map((step, idx, arr) => (
+                <li key={step.key} style={{ display: 'flex', gap: 12, paddingBottom: idx < arr.length - 1 ? 16 : 0, position: 'relative' }}>
+                  {idx < arr.length - 1 && (
+                    <div style={{ position: 'absolute', left: 11, top: 24, width: 2, bottom: 0, background: step.done ? '#4f46e5' : '#e5e7eb' }} />
+                  )}
+                  <div style={{
+                    width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12,
+                    background: step.isCurrent ? '#4f46e5' : step.done ? '#4f46e5' : '#f3f4f6',
+                    color: step.done || step.isCurrent ? '#fff' : '#9ca3af',
+                    border: step.isCurrent ? '2px solid #a5b4fc' : 'none',
+                    zIndex: 1,
+                  }}>
+                    {step.done && !step.isCurrent ? '✓' : idx + 1}
+                  </div>
+                  <p style={{ margin: 'auto 0', fontSize: 13, fontWeight: step.isCurrent ? 700 : 500, color: step.isCurrent ? '#4f46e5' : step.done ? '#111827' : '#9ca3af' }}>
+                    {step.label}
+                  </p>
+                </li>
+              ))}
+              {order.designWorkStatus === 'CANCELLED' && (
                 <li style={{ display: 'flex', gap: 12, marginTop: 8 }}>
                   <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#fef2f2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#dc2626' }}>✕</div>
-                  <p style={{ margin: 'auto 0', fontSize: 13, fontWeight: 600, color: '#dc2626' }}>Đã hủy</p>
+                  <p style={{ margin: 'auto 0', fontSize: 13, fontWeight: 600, color: '#dc2626' }}>Da huy</p>
                 </li>
               )}
             </ul>
