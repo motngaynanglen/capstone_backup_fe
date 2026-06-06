@@ -4,6 +4,7 @@ import { Spin, message, Modal, Button } from 'antd';
 import { getDesignRequestDetail, cancelDesignRequest, postDesignRequestMessage, uploadFile, lockDesignWork, requestAdjustment, addFilesToQuickPrint, confirmTechnicalDraft, getTechnicalDraftsByDesignWork } from '../api/mainflow2Api';
 import AdjustmentRequestCard from '../components/Mainflow2/AdjustmentRequestCard';
 import TechnicalDraftCard from '../components/Mainflow2/TechnicalDraftCard';
+import VersionUpdateCard from '../components/Mainflow2/VersionUpdateCard';
 import { cancelOrderApi, checkoutDesignApi } from '../api/orderApi';
 
 import { getActiveServiceOptionsApi } from '../api/serviceApi';
@@ -586,30 +587,24 @@ const CustomOrderDetail = () => {
                 );
               }
 
-              // VERSION_UPDATE log — check if there's a TechnicalDraft for any version in this log
-              if (isVersionUpdate && technicalDrafts.length > 0) {
-                const msgVersionIds = (msg.versions || []).map(v => v.id || v.Id);
-                const matchingDraft = technicalDrafts.find(d =>
-                  msgVersionIds.includes(d.designVersionHistoryId || d.DesignVersionHistoryId)
+              // VERSION_UPDATE log — card đầy đủ: nội dung + 3D + nút Xem + duyệt báo giá kèm theo.
+              // Tin từ nhân viên → căn trái (isMe=false). Khách duyệt thiết kế = duyệt báo giá kỹ thuật.
+              if (isVersionUpdate) {
+                return (
+                  <VersionUpdateCard
+                    key={msg.id || i}
+                    msg={msg}
+                    isMe={isMe}
+                    role="customer"
+                    drafts={technicalDrafts}
+                    isPrintService={isWorkTypePrint(order)}
+                    designWorkStatus={order.designWorkStatus}
+                    isLocked={order.isLocked}
+                    processing={processing}
+                    onApproveDraft={handleApproveDraft}
+                    onRejectDraft={handleRejectDraft}
+                  />
                 );
-                if (matchingDraft) {
-                  const rawStatus = order.designWorkStatus;
-                  const canApprove = !matchingDraft.isConfirmed
-                    && (rawStatus === 'REVIEWING' || rawStatus === 'IN_PROGRESS')
-                    && !order.isLocked;
-                  return (
-                    <TechnicalDraftCard
-                      key={msg.id || i}
-                      draft={matchingDraft}
-                      showApprove={canApprove}
-                      onApprove={handleApproveDraft}
-                      onReject={handleRejectDraft}
-                      loading={processing}
-                      senderName={msg.senderName || 'Nhân viên'}
-                      createdAt={msg.created}
-                    />
-                  );
-                }
               }
 
               // Fallback: also check for QUOTE logType (legacy)

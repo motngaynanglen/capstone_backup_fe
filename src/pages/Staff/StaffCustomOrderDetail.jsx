@@ -4,6 +4,7 @@ import { Spin, message, Modal, Button } from "antd";
 import { getDesignRequestDetail, assignStaffToRequest, submitQuote, postDesignRequestMessage, cancelDesignRequest, uploadFile, getDesignVersions, reviewFileVersion, reviewAdjustment, createVersionUpdateLog, getTechnicalDraftsByDesignWork } from "../../api/mainflow2Api";
 import AdjustmentRequestCard from "../../components/Mainflow2/AdjustmentRequestCard";
 import TechnicalDraftCard from "../../components/Mainflow2/TechnicalDraftCard";
+import VersionUpdateCard from "../../components/Mainflow2/VersionUpdateCard";
 import { useAuth } from "../../contexts/AuthContext";
 import useMainflow2Realtime from "../../hooks/useMainflow2Realtime";
 import CustomerRequestPanel from "../../components/Mainflow2/CustomerRequestPanel";
@@ -446,36 +447,37 @@ const StaffCustomOrderDetail = () => {
                 );
               }
 
-              // VERSION_UPDATE — check for associated TechnicalDraft
-              if (logType === 'VERSION_UPDATE' && technicalDrafts.length > 0) {
-                const msgVersionIds = (msg.versions || []).map(v => v.id || v.Id);
-                const matchingDraft = technicalDrafts.find(d =>
-                  msgVersionIds.includes(d.designVersionHistoryId || d.DesignVersionHistoryId)
+              // VERSION_UPDATE — card đầy đủ: nội dung + 3D + nút Xem + nút Tạo báo giá.
+              // Báo giá do nhân viên đưa ra → căn phải (isMe) bên của nhân viên.
+              if (logType === 'VERSION_UPDATE') {
+                return (
+                  <VersionUpdateCard
+                    key={msg.id || i}
+                    msg={msg}
+                    isMe={isMe}
+                    role="staff"
+                    drafts={technicalDrafts}
+                    isPrintService={isWorkTypePrint(order)}
+                    designWorkStatus={order.designWorkStatus}
+                    isLocked={order.isLocked}
+                    processing={processing}
+                    onCreateQuote={(versionId) => { setQuoteVersionId(versionId); setQuoteModalOpen(true); }}
+                  />
                 );
-                if (matchingDraft) {
-                  return (
-                    <TechnicalDraftCard
-                      key={msg.id || i}
-                      draft={matchingDraft}
-                      showApprove={false}
-                      senderName={msg.senderName || 'Bạn'}
-                      createdAt={msg.created}
-                    />
-                  );
-                }
               }
 
-              // Legacy QUOTE type fallback
+              // Legacy QUOTE type fallback — báo giá kỹ thuật, căn phải (của nhân viên)
               if (isQuote && technicalDrafts.length > 0) {
                 const latestDraft = technicalDrafts[technicalDrafts.length - 1];
                 return (
-                  <TechnicalDraftCard
-                    key={msg.id || i}
-                    draft={latestDraft}
-                    showApprove={false}
-                    senderName={msg.senderName || 'Bạn'}
-                    createdAt={msg.created}
-                  />
+                  <div key={msg.id || i} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                    <TechnicalDraftCard
+                      draft={latestDraft}
+                      showApprove={false}
+                      senderName={isMe ? 'Tôi' : (msg.senderName || 'Nhân viên')}
+                      createdAt={msg.created}
+                    />
+                  </div>
                 );
               }
 
@@ -498,20 +500,24 @@ const StaffCustomOrderDetail = () => {
             const isPrint = isWorkTypePrint(order);
             const paid = isPrint ? true : (order.designServicePaid || order.designServicePaymentStatus === 'PAID');
 
-            // COMPLETED — locked
-            if (raw === 'COMPLETED') {
+            // Đã khóa thủ công — cuộc trò chuyện đóng hoàn toàn (cả khách & nhân viên)
+            if (order.isLocked) {
               return (
-                <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#059669', fontSize: 13, fontWeight: 600 }}>
-                  🎉 Khách đã duyệt! Giá cuối: {formatPrice(order.latestQuotedPrice)}
+                <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#6b7280', fontSize: 13, fontWeight: 500 }}>
+                  Cuộc trò chuyện đã được khóa.
                 </div>
               );
             }
 
-            // Locked / cancelled
-            if (order.isLocked) {
+            // COMPLETED nhưng CHƯA khóa — khách vẫn nhắn được nên nhân viên cũng phải nhắn được.
+            // Hiện banner nghiệm thu + vẫn cho phép gửi tin (cho tới khi khách khóa thủ công).
+            if (raw === 'COMPLETED') {
               return (
-                <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#dc2626', fontSize: 13, fontWeight: 500 }}>
-                  Yêu cầu đã đóng.
+                <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb' }}>
+                  <div style={{ padding: '8px 16px', background: '#ecfdf5', borderBottom: '1px solid #6ee7b7', textAlign: 'center', color: '#059669', fontSize: 12, fontWeight: 600 }}>
+                    🎉 Khách đã duyệt! Giá cuối: {formatPrice(order.latestQuotedPrice)} · Cuộc trò chuyện vẫn mở cho tới khi được khóa.
+                  </div>
+                  <ChatComposer value={chatMessage} onChange={setChatMessage} onSend={handleSendChat} uploading={uploading} />
                 </div>
               );
             }
@@ -697,7 +703,9 @@ const StaffCustomOrderDetail = () => {
                           <span style={{ padding: '1px 8px', borderRadius: 10, fontSize: 10, fontWeight: 600, background: '#fffbeb', color: '#d97706' }}>Chờ duyệt</span>
                         )}
                       </div>
-                      {canReview && (
+                      {/* Duyệt/Từ chối file CHỈ dành cho đơn in theo yêu cầu (khách upload file, NV kiểm tra
+                          tiêu chuẩn in). Trong dịch vụ thiết kế, nhân viên KHÔNG duyệt thiết kế — đó là việc của khách. */}
+                      {isWorkTypePrint(order) && canReview && (
                         <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                           <button
                             onClick={() => handleReviewFile(f.id, true)}
