@@ -10,11 +10,66 @@ import {
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import feedbackApi from '../../api/feedbackApi';
+import { resolvePublicMediaUrl } from '../../utils/mediaUrl';
 
 const { TextArea } = Input;
 const { Option } = Select;
 const { confirm } = Modal;
 const { Title, Text } = Typography;
+
+const normalizeFeedback = (item = {}) => {
+  const imageUrls = item.imageUrls ?? item.ImageUrls ?? [];
+
+  return {
+    ...item,
+    id: item.id ?? item.Id,
+    customerId: item.customerId ?? item.CustomerId,
+    designTemplateId: item.designTemplateId ?? item.DesignTemplateId,
+    accountId: item.accountId ?? item.AccountId,
+    rating: item.rating ?? item.Rating ?? 0,
+    content: item.content ?? item.comment ?? item.Comment ?? '',
+    comment: item.comment ?? item.Comment ?? item.content ?? '',
+    replyContent: item.replyContent ?? item.staffReply ?? item.StaffReply ?? '',
+    staffReply: item.staffReply ?? item.StaffReply ?? item.replyContent ?? '',
+    repliedDate: item.repliedDate ?? item.RepliedDate,
+    customerName:
+      item.customerName
+      ?? item.customerFullName
+      ?? item.CustomerFullName
+      ?? item.rawCustomerName
+      ?? item.RawCustomerName
+      ?? 'Khách hàng',
+    rawCustomerName: item.rawCustomerName ?? item.RawCustomerName,
+    customerAvatar: item.customerAvatar ?? item.CustomerAvatar,
+    customerPhone: item.customerPhone ?? item.CustomerPhone ?? '',
+    isHidden: item.isHidden ?? item.IsHidden ?? false,
+    createdAt: item.createdAt ?? item.created ?? item.Created ?? item.lastModified ?? item.LastModified,
+    created: item.created ?? item.Created ?? item.createdAt,
+    lastModified: item.lastModified ?? item.LastModified,
+    imageUrls: Array.isArray(imageUrls)
+      ? imageUrls.map((url) => resolvePublicMediaUrl(url) || url)
+      : [],
+  };
+};
+
+const normalizeFeedbackQueryResponse = (res) => {
+  const rawList =
+    Array.isArray(res?.data)
+      ? res.data
+      : Array.isArray(res?.data?.items)
+        ? res.data.items
+        : Array.isArray(res?.items)
+          ? res.items
+          : Array.isArray(res)
+            ? res
+            : [];
+  const paging = res?.additionalData?.paging ?? res?.data?.paging ?? res?.paging ?? {};
+
+  return {
+    list: rawList.map(normalizeFeedback),
+    paging,
+  };
+};
 
 const FeedbackList = () => {
   const [feedbacks, setFeedbacks] = useState([]);
@@ -42,12 +97,13 @@ const FeedbackList = () => {
         pageNumber: page,
         pageSize: pagination.pageSize,
       });
-      const list = res?.data || [];
+      const { list, paging } = normalizeFeedbackQueryResponse(res);
       setFeedbacks(list);
       setPagination(prev => ({
         ...prev,
         current: page,
-        total: res?.additionalData?.paging?.totalCount || list.length,
+        pageSize: paging.pageSize || prev.pageSize,
+        total: paging.totalCount || list.length,
       }));
     } catch (err) {
       message.error('Không thể tải danh sách feedback');
@@ -65,13 +121,14 @@ const FeedbackList = () => {
   };
 
   const handleViewDetails = (record) => {
-    setSelectedFeedback(record);
+    setSelectedFeedback(normalizeFeedback(record));
     setIsDetailModalOpen(true);
   };
 
   const handleOpenReply = (record) => {
-    setSelectedFeedback(record);
-    setReplyText(record.replyContent || '');
+    const normalized = normalizeFeedback(record);
+    setSelectedFeedback(normalized);
+    setReplyText(normalized.replyContent || '');
     setIsReplyModalOpen(true);
   };
 
