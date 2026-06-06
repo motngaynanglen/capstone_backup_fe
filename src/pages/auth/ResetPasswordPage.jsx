@@ -10,17 +10,19 @@ const ResetPasswordPage = () => {
     const navigate = useNavigate();
 
     const [searchParams] = useSearchParams();
-    // Lấy username/email và token từ URL (truyền sang từ trang Quên mật khẩu).
-    const defaultUsername = searchParams.get('username') || searchParams.get('email') || '';
+    // Token truyền sang từ trang Quên mật khẩu. KHÔNG prefill username bằng email:
+    // BE đặt lại mật khẩu khớp theo TÊN ĐĂNG NHẬP (Username), không phải email.
     const defaultToken = searchParams.get('token') || '';
+    const defaultUsername = searchParams.get('username') || '';
+    const email = searchParams.get('email') || '';
 
     const onFinish = async (values) => {
         setLoading(true);
         try {
             // Khớp 100% với body JSON bạn vừa cung cấp
             const result = await resetPasswordApi({
-                username: values.username,
-                token: values.token,
+                username: values.username.trim(),
+                token: values.token.trim(),
                 newPassword: values.newPassword
             });
 
@@ -46,14 +48,21 @@ const ResetPasswordPage = () => {
                     </div>
                     <h2 className="text-2xl font-extrabold text-gray-800">Tạo mật khẩu mới</h2>
                     <p className="text-gray-500 mt-2 text-sm">
-                        Vui lòng nhập Tên đăng nhập, mã Token từ email và mật khẩu mới của bạn.
+                        Nhập <b>tên đăng nhập</b> (tài khoản bạn dùng để đăng nhập, <b>không phải email</b>),
+                        mã Token từ email và mật khẩu mới.
                     </p>
+                    {email && (
+                        <p className="text-gray-400 mt-1 text-xs">
+                            Mã đã gửi tới: <span className="font-medium text-gray-500">{email}</span>
+                        </p>
+                    )}
                 </div>
 
                 <Form
                     onFinish={onFinish}
                     layout="vertical"
                     size="large"
+                    autoComplete="off"
                     initialValues={{ username: defaultUsername, token: defaultToken }}
                 >
                     <Form.Item
@@ -62,8 +71,10 @@ const ResetPasswordPage = () => {
                     >
                         <Input
                             prefix={<UserOutlined className="text-gray-400" />}
-                            placeholder="Tên đăng nhập (Username)"
+                            placeholder="Tên đăng nhập (không phải email)"
                             className="h-12 rounded-lg"
+                            autoComplete="off"
+                            name="reset-username-no-autofill"
                         />
                     </Form.Item>
 
