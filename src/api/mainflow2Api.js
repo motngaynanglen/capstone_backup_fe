@@ -260,11 +260,20 @@ export const getDesignRequestDetail = async (id) => {
   return { data: { ...match, messages }, statusCode: 200 };
 };
 
-// ─── Staff: Assign vào design work ──────────────────────────────────────
-// BE: PATCH /api/design-work/{id}/update  (gán AssignedStaffId)
+// ─── Staff: Tiếp nhận design work ───────────────────────────────────────
+// BE state machine: SKETCHING → PENDING → IN_PROGRESS (phải đi qua 2 bước)
+// Hàm này chain 2 API calls để chuyển trạng thái liền mạch cho staff.
 export const assignStaffToRequest = async (id) => {
-  // Chuyển PENDING → IN_PROGRESS: BE UpdateDesignWorkCommand kiểm tra state machine
-  // và tự gán MainAssignedStaffId từ user hiện tại
+  // Bước 1: Lấy trạng thái hiện tại để xác định cần chuyển bao nhiêu bước
+  const detailRes = await axiosInstance.get(`/api/design-work/${id}/detail`);
+  const currentStatus = detailRes.data?.data?.status || detailRes.data?.status;
+
+  if (currentStatus === 'SKETCHING') {
+    // SKETCHING → PENDING
+    await axiosInstance.patch(`/api/design-work/${id}/update`, { Status: 'PENDING' });
+  }
+
+  // PENDING → IN_PROGRESS (gán staff hiện tại)
   const response = await axiosInstance.patch(`/api/design-work/${id}/update`, {
     Status: 'IN_PROGRESS',
   });

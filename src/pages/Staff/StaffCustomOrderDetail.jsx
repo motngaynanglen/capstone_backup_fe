@@ -12,59 +12,63 @@ import ChatMessageBubble, { ChatComposer } from "../../components/Mainflow2/Chat
 import { getMessageAuthorId } from "../../components/Mainflow2/messageMetadataUtils";
 import Model3DPreview from "../../components/Mainflow2/Model3DPreview";
 
-// Raw BE statuses and their rank for timeline
-const BE_STATUS_RANK = {
-  SKETCHING: 0,
-  PENDING: 1,
-  IN_PROGRESS: 2,
-  REVIEWING: 3,
-  COMPLETED: 4,
-};
-
 /**
- * Build timeline steps dynamically based on actual BE state.
- * Returns array of { key, label, done, isCurrent }.
+ * Build timeline steps based on real BE designWorkStatus + payment.
+ *
+ * BE statuses: SKETCHING → PENDING → IN_PROGRESS → REVIEWING → COMPLETED
+ * Nhưng thực tế PENDING chỉ là trạng thái trung gian, DesignWork thường ở
+ * SKETCHING cho tới khi staff tiếp nhận (→ IN_PROGRESS).
+ *
+ * Timeline 5 bước hiển thị cho staff:
+ * 1. Gửi yêu cầu     — luôn done
+ * 2. Thanh toán phí TK — done khi paid
+ * 3. Tiếp nhận         — done khi IN_PROGRESS+
+ * 4. Báo giá           — done khi REVIEWING+
+ * 5. Hoàn tất          — done khi COMPLETED
  */
 function buildStaffTimeline(order) {
   const raw = order?.designWorkStatus || '';
-  const rank = BE_STATUS_RANK[raw] ?? -1;
   const paid = order?.designServicePaid || order?.designServicePaymentStatus === 'PAID';
+
+  // Simplified rank: SKETCHING/PENDING = 0 (chưa tiếp nhận)
+  const rankMap = { SKETCHING: 0, PENDING: 0, IN_PROGRESS: 1, REVIEWING: 2, COMPLETED: 3 };
+  const rank = rankMap[raw] ?? -1;
 
   const steps = [
     {
       key: 'request',
-      label: 'Gui yeu cau',
+      label: 'Gửi yêu cầu',
       done: true,
-      isCurrent: rank <= 0 && !paid,
+      isCurrent: false,
     },
     {
       key: 'paid',
-      label: paid ? 'Da thanh toan phi TK' : 'Cho thanh toan phi TK',
+      label: paid ? 'Đã thanh toán phí TK' : 'Chờ thanh toán phí TK',
       done: paid,
-      isCurrent: !paid && rank <= 1,
+      isCurrent: !paid && rank === 0,
     },
     {
       key: 'assigned',
-      label: rank >= 2 ? 'Da tiep nhan' : 'Cho tiep nhan',
-      done: rank >= 2,
-      isCurrent: paid && rank < 2,
+      label: rank >= 1 ? 'Đã tiếp nhận' : 'Chờ tiếp nhận',
+      done: rank >= 1,
+      isCurrent: paid && rank === 0,
     },
     {
       key: 'quoted',
-      label: rank >= 3 ? 'Da bao gia' : 'Bao gia',
-      done: rank >= 3,
-      isCurrent: rank === 2,
+      label: rank >= 2 ? 'Đã báo giá' : 'Báo giá',
+      done: rank >= 2,
+      isCurrent: rank === 1,
     },
     {
       key: 'completed',
-      label: rank >= 4 ? 'Hoan tat' : 'Cho duyet',
-      done: rank >= 4,
-      isCurrent: rank === 3,
+      label: rank >= 3 ? 'Hoàn tất' : 'Chờ duyệt',
+      done: rank >= 3,
+      isCurrent: rank === 2,
     },
   ];
 
-  // Ensure exactly one isCurrent when not cancelled/completed
-  if (raw !== 'CANCELLED' && rank < 4) {
+  // Ensure exactly one isCurrent when not completed
+  if (rank < 3) {
     const hasAnyCurrent = steps.some(s => s.isCurrent);
     if (!hasAnyCurrent) {
       const firstNotDone = steps.find(s => !s.done);
@@ -382,7 +386,9 @@ const StaffCustomOrderDetail = () => {
           <p style={{ margin: 0, fontSize: 11, color: '#9ca3af', fontFamily: 'monospace' }}>#{order.code || order.name || '—'}</p>
         </div>
         <span style={{ padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, ...beStatusColor(order.designWorkStatus) }}>
-          {BE_STATUS_LABEL[order.designWorkStatus] || order.designWorkStatus}
+          {order.isLocked && order.designWorkStatus !== 'COMPLETED'
+            ? 'Đã đóng'
+            : (BE_STATUS_LABEL[order.designWorkStatus] || order.designWorkStatus)}
         </span>
         {order.designWorkStatus !== 'COMPLETED' && !order.isLocked && (
           <button onClick={handleCancel} disabled={processing}
@@ -493,20 +499,10 @@ const StaffCustomOrderDetail = () => {
               );
             }
 
-            // SKETCHING — customer is preparing, staff can only chat
-            if (raw === 'SKETCHING') {
-              return (
-                <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb' }}>
-                  <div style={{ padding: '10px 16px', background: '#f3f4f6', borderBottom: '1px solid #e5e7eb' }}>
-                    <span style={{ color: '#6b7280', fontSize: 12 }}>Khách đang chuẩn bị yêu cầu. Bạn có thể trao đổi trước.</span>
-                  </div>
-                  <ChatComposer value={chatMessage} onChange={setChatMessage} onSend={handleSendChat} uploading={uploading} />
-                </div>
-              );
-            }
-
-            // PENDING — waiting for staff to accept
-            if (raw === 'PENDING') {
+            // SKETCHING hoặc PENDING — chưa tiếp nhận
+            // Thực tế DesignWork ở SKETCHING ngay cả khi đã thanh toán.
+            // PENDING chỉ là trạng thái trung gian (order), hiếm khi thấy trên DesignWork.
+            if (raw === 'SKETCHING' || raw === 'PENDING') {
               return (
                 <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb' }}>
                   <div style={{
@@ -594,10 +590,10 @@ const StaffCustomOrderDetail = () => {
                   </p>
                 </li>
               ))}
-              {order.designWorkStatus === 'CANCELLED' && (
+              {order.isLocked && order.designWorkStatus !== 'COMPLETED' && (
                 <li style={{ display: 'flex', gap: 12, marginTop: 8 }}>
                   <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#fef2f2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#dc2626' }}>✕</div>
-                  <p style={{ margin: 'auto 0', fontSize: 13, fontWeight: 600, color: '#dc2626' }}>Da huy</p>
+                  <p style={{ margin: 'auto 0', fontSize: 13, fontWeight: 600, color: '#dc2626' }}>Đã đóng</p>
                 </li>
               )}
             </ul>
