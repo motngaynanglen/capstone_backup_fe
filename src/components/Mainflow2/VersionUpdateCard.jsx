@@ -106,15 +106,22 @@ export default function VersionUpdateCard({
             const vId = v.id || v.Id;
             const vUrl = v.fileUrl || v.FileUrl || v.url || v.Url;
             const vNum = v.versionNumber || v.VersionNumber;
-            const vReview = v.fileReviewStatus || v.FileReviewStatus
-              || ((v.isApproved || v.IsApproved) ? 'ACCEPTED' : null);
+            // BE mặc định fileReviewStatus = "PENDING" (coi như CHƯA quyết).
+            // Duyệt báo giá (confirmTechnicalDraft) cũng set version.IsApproved=true → coi là ACCEPTED.
+            const reviewRaw = v.fileReviewStatus || v.FileReviewStatus || '';
+            const fileApproved = reviewRaw === 'ACCEPTED' || v.isApproved || v.IsApproved;
+            const fileRejected = reviewRaw === 'REJECTED';
+            const vReview = fileApproved ? 'ACCEPTED' : (fileRejected ? 'REJECTED' : null);
             const vDraft = findDraft(vId);
             const draftConfirmed = vDraft?.isConfirmed || vDraft?.IsConfirmed;
             const badge = reviewBadge(vReview);
 
             const staffCanQuote = role === 'staff' && !isPrintService && !vDraft && !isLocked && canQuoteStatus;
-            const customerCanApprove = role === 'customer' && vDraft && !draftConfirmed && !isLocked && canQuoteStatus;
-            const canReviewFile = onReviewFile && !isLocked && !vReview;
+            // Khách "duyệt file 3D" = duyệt báo giá của version (BE confirm duyệt luôn file).
+            // Không có API duyệt-file riêng cho khách (reviewFileVersion là [Staff/Manager]).
+            const customerCanApprove = role === 'customer' && vDraft && !draftConfirmed && !isLocked && canQuoteStatus && !fileApproved;
+            // Staff duyệt/từ chối file kỹ thuật CHỈ cho đơn in theo yêu cầu (khách upload file để in).
+            const staffCanReviewFile = role === 'staff' && isPrintService && onReviewFile && !isLocked && !fileApproved && !fileRejected;
 
             return (
               <div key={vId || i}>
@@ -151,7 +158,20 @@ export default function VersionUpdateCard({
                       💰 Tạo bản báo giá
                     </Button>
                   )}
-                  {canReviewFile && (
+                  {/* Khách: duyệt file 3D — dùng confirmTechnicalDraft (BE duyệt luôn file + báo giá) */}
+                  {customerCanApprove && (
+                    <Button
+                      size="small"
+                      type="primary"
+                      loading={processing}
+                      onClick={() => onApproveDraft?.(vDraft.id || vDraft.Id)}
+                      style={{ background: '#059669', borderColor: '#059669', fontWeight: 600 }}
+                    >
+                      ✅ Duyệt file 3D
+                    </Button>
+                  )}
+                  {/* Staff (đơn in theo yêu cầu): duyệt/từ chối file khách upload */}
+                  {staffCanReviewFile && (
                     <>
                       <Button
                         size="small"
