@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Modal } from 'antd';
+import { Button, Input, Modal } from 'antd';
 import Model3DPreview from './Model3DPreview';
 import TechnicalDraftCard from './TechnicalDraftCard';
 
@@ -45,6 +45,7 @@ export default function VersionUpdateCard({
   onCreateQuote,
   onApproveDraft,
   onRejectDraft,
+  onReviewFile,
   onOpenFile,
 }) {
   const versions = msg?.versions || msg?.Versions || [];
@@ -111,8 +112,9 @@ export default function VersionUpdateCard({
             const draftConfirmed = vDraft?.isConfirmed || vDraft?.IsConfirmed;
             const badge = reviewBadge(vReview);
 
-            const staffCanQuote = role === 'staff' && !isPrintService && !vDraft && !isLocked && canQuoteStatus;  // manager không có nút này
+            const staffCanQuote = role === 'staff' && !isPrintService && !vDraft && !isLocked && canQuoteStatus;
             const customerCanApprove = role === 'customer' && vDraft && !draftConfirmed && !isLocked && canQuoteStatus;
+            const canReviewFile = onReviewFile && !isLocked && !vReview;
 
             return (
               <div key={vId || i}>
@@ -148,6 +150,42 @@ export default function VersionUpdateCard({
                     >
                       💰 Tạo bản báo giá
                     </Button>
+                  )}
+                  {canReviewFile && (
+                    <>
+                      <Button
+                        size="small"
+                        type="primary"
+                        loading={processing}
+                        onClick={() => onReviewFile(vId, 'ACCEPTED')}
+                        style={{ background: '#059669', borderColor: '#059669', fontWeight: 600 }}
+                      >
+                        ✅ Duyệt file
+                      </Button>
+                      <Button
+                        size="small"
+                        danger
+                        loading={processing}
+                        onClick={() => {
+                          let reason = '';
+                          Modal.confirm({
+                            title: 'Từ chối file thiết kế',
+                            content: (
+                              <Input.TextArea
+                                placeholder="Lý do từ chối..."
+                                rows={3}
+                                onChange={(e) => { reason = e.target.value; }}
+                              />
+                            ),
+                            okText: 'Từ chối',
+                            okButtonProps: { danger: true },
+                            onOk: () => onReviewFile(vId, 'REJECTED', reason),
+                          });
+                        }}
+                      >
+                        ❌ Từ chối
+                      </Button>
+                    </>
                   )}
                 </div>
 

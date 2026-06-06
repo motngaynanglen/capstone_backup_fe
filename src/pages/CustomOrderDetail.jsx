@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Spin, message, Modal, Button } from 'antd';
-import { getDesignRequestDetail, cancelDesignRequest, postDesignRequestMessage, uploadFile, lockDesignWork, requestAdjustment, addFilesToQuickPrint, confirmTechnicalDraft, getTechnicalDraftsByDesignWork } from '../api/mainflow2Api';
+import { getDesignRequestDetail, cancelDesignRequest, postDesignRequestMessage, uploadFile, lockDesignWork, requestAdjustment, addFilesToQuickPrint, confirmTechnicalDraft, getTechnicalDraftsByDesignWork, reviewFileVersion } from '../api/mainflow2Api';
 import AdjustmentRequestCard from '../components/Mainflow2/AdjustmentRequestCard';
 import TechnicalDraftCard from '../components/Mainflow2/TechnicalDraftCard';
 import VersionUpdateCard from '../components/Mainflow2/VersionUpdateCard';
@@ -298,6 +298,19 @@ const CustomOrderDetail = () => {
       fetchTechnicalDrafts();
     } catch (err) {
       message.error(err?.response?.data?.message || 'Lỗi khi gửi yêu cầu');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleReviewFile = async (versionId, status, note) => {
+    try {
+      setProcessing(true);
+      await reviewFileVersion(versionId, { ReviewStatus: status, ReviewNote: note || null });
+      message.success(status === 'ACCEPTED' ? 'Đã duyệt file thành công!' : 'Đã từ chối file');
+      fetchDetail(true);
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Lỗi khi duyệt file');
     } finally {
       setProcessing(false);
     }
@@ -603,6 +616,7 @@ const CustomOrderDetail = () => {
                     processing={processing}
                     onApproveDraft={handleApproveDraft}
                     onRejectDraft={handleRejectDraft}
+                    onReviewFile={handleReviewFile}
                   />
                 );
               }

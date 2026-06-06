@@ -457,7 +457,7 @@ const StaffCustomOrderDetail = () => {
                   <VersionUpdateCard
                     key={msg.id || i}
                     msg={msg}
-                    isMe={true}  // VERSION_UPDATE luôn do staff tạo (BE [Authorize StaffOrManager])
+                    isMe={true}
                     role={isManager ? 'manager' : 'staff'}
                     drafts={technicalDrafts}
                     isPrintService={isWorkTypePrint(order)}
@@ -465,6 +465,7 @@ const StaffCustomOrderDetail = () => {
                     isLocked={order.isLocked}
                     processing={processing}
                     onCreateQuote={(versionId) => { setQuoteVersionId(versionId); setQuoteModalOpen(true); }}
+                    onReviewFile={!isManager ? (vId, status, note) => handleReviewFile(vId, status === 'ACCEPTED', note) : undefined}
                   />
                 );
               }
