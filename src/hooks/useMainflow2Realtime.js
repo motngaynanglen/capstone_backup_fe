@@ -21,7 +21,7 @@ export default function useMainflow2Realtime(designWorkId, onEvent) {
     if (!designWorkId) return undefined;
 
     const token = localStorage.getItem('token');
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://api.3dprintshop.store/';
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://api-stable.3dprintshop.store/';
     const hubUrl = `${baseUrl.replace(/\/$/, '')}/hubs/design-work-chat`;
 
     const connection = new HubConnectionBuilder()
