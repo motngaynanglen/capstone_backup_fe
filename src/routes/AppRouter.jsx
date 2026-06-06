@@ -332,7 +332,7 @@ const AppRouter = () => {
             </PrivateRoute>
           }
         >
-          <Route index element={<DashboardOverview />} />
+          <Route index element={<Navigate to="/admin/users" replace />} />
           <Route path="users" element={<ManageUsers />} />
           <Route path="orders" element={<AdminOrderList />} />
           <Route path="orders/:id" element={<AdminOrderDetail />} />

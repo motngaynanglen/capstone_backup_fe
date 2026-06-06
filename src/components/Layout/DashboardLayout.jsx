@@ -17,52 +17,13 @@ const DashboardLayout = () => {
     navigate('/admin/login');
   };
 
-  // Menu items cho sidebar navigation
+  // Menu items cho sidebar navigation.
+  // Admin chỉ quản lý Tài khoản người dùng & Cài đặt hệ thống — các tab khác đã ẩn.
   const menuItems = [
-    {
-      path: '/admin',
-      label: 'Tổng quan',
-      icon: '📊'
-    },
     {
       path: '/admin/users',
       label: 'Quản lý Tài khoản',
       icon: '👥'
-    },
-    {
-      path: '/admin/orders',
-      label: 'Quản lý Đơn hàng',
-      icon: '📦'
-    },
-    {
-      path: '/admin/products',
-      label: 'Quản lý Sản phẩm',
-      icon: '🛍️'
-    },
-    {
-      path: '/admin/materials',
-      label: 'Quản lý Vật liệu',
-      icon: '🧱'
-    },
-    {
-      path: '/admin/shipments',
-      label: 'Quản lý Vận đơn',
-      icon: '🚚'
-    },
-    {
-      path: '/admin/inventory',
-      label: 'Quản lý Kho',
-      icon: '📊'
-    },
-    {
-      path: '/admin/services',
-      label: 'Quản lý Dịch vụ',
-      icon: '⚙️'
-    },
-    {
-      path: '/admin/feedback',
-      label: 'Phản hồi',
-      icon: '💬'
     },
     {
       path: '/admin/settings',
