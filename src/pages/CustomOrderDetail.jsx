@@ -276,6 +276,23 @@ const CustomOrderDetail = () => {
     });
   };
 
+  const handleRejectDraft = async (draftId, reason) => {
+    try {
+      setProcessing(true);
+      await requestAdjustment(id, {
+        content: `[Không duyệt báo giá] ${reason}`,
+        imageUrls: [],
+      });
+      message.success('Đã gửi yêu cầu hiệu chỉnh cho nhân viên');
+      fetchDetail(true);
+      fetchTechnicalDrafts();
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Lỗi khi gửi yêu cầu');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const handleLockChat = () => {
     Modal.confirm({
       title: 'Khóa cuộc trò chuyện',
@@ -569,6 +586,7 @@ const CustomOrderDetail = () => {
                       draft={matchingDraft}
                       showApprove={canApprove}
                       onApprove={handleApproveDraft}
+                      onReject={handleRejectDraft}
                       loading={processing}
                       senderName={msg.senderName || 'Nhân viên'}
                       createdAt={msg.created}
@@ -592,6 +610,7 @@ const CustomOrderDetail = () => {
                       draft={latestDraft}
                       showApprove={canApprove}
                       onApprove={handleApproveDraft}
+                      onReject={handleRejectDraft}
                       loading={processing}
                       senderName={msg.senderName || 'Nhân viên'}
                       createdAt={msg.created}
@@ -828,18 +847,37 @@ const CustomOrderDetail = () => {
                       </div>
                       {isConfirmedDraft ? (
                         <div style={{ marginTop: 8, color: '#059669', fontSize: 12, fontWeight: 800 }}>
-                          Bao gia thanh cong
+                          ✓ Đã duyệt báo giá
                         </div>
                       ) : (
-                        <Button
-                          block
-                          type="primary"
-                          loading={processing}
-                          style={{ marginTop: 8, background: '#059669', borderColor: '#059669', fontWeight: 700 }}
-                          onClick={() => handleApproveDraft(draft.id || draft.Id)}
-                        >
-                          Duyet bao gia
-                        </Button>
+                        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                          <Button
+                            block
+                            danger
+                            loading={processing}
+                            onClick={() => {
+                              Modal.confirm({
+                                title: 'Không duyệt báo giá',
+                                content: 'Bạn muốn yêu cầu nhân viên hiệu chỉnh lại báo giá?',
+                                okText: 'Yêu cầu hiệu chỉnh',
+                                okType: 'danger',
+                                cancelText: 'Hủy',
+                                onOk: () => handleRejectDraft(draft.id || draft.Id, 'Yêu cầu hiệu chỉnh báo giá'),
+                              });
+                            }}
+                          >
+                            Không duyệt
+                          </Button>
+                          <Button
+                            block
+                            type="primary"
+                            loading={processing}
+                            style={{ background: '#059669', borderColor: '#059669', fontWeight: 700 }}
+                            onClick={() => handleApproveDraft(draft.id || draft.Id)}
+                          >
+                            Duyệt
+                          </Button>
+                        </div>
                       )}
                     </div>
                   );

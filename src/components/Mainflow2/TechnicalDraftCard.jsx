@@ -1,5 +1,5 @@
-import React from 'react';
-import { Button, Tag } from 'antd';
+import React, { useState } from 'react';
+import { Button, Tag, Input, Modal } from 'antd';
 
 const formatVnd = (v) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(v) || 0);
@@ -7,16 +7,11 @@ const formatVnd = (v) =>
 /**
  * Card hiển thị thông tin TechnicalDraft (báo giá kỹ thuật) trong chat.
  *
- * Dữ liệu từ BE TechnicalDraftDTO:
- * - materialName, materialBaseCostPerGram, materialTotalServiceCostPerGram
- * - estimatedWeightPerUnit, infillDensity, layerHeight
- * - unitPrice, markupPercentage, finalPrice
- * - technicalNote, isConfirmed, versionNumber
- *
  * @param {object}   draft         — TechnicalDraftDTO (camelCase)
- * @param {boolean}  showApprove   — true = hiện nút "Duyệt báo giá"
+ * @param {boolean}  showApprove   — true = hiện nút "Duyệt" + "Không duyệt"
  * @param {function} onApprove     — (draftId) => void
- * @param {boolean}  loading       — loading state for approve button
+ * @param {function} onReject      — (draftId, reason) => void — yêu cầu hiệu chỉnh
+ * @param {boolean}  loading       — loading state for buttons
  * @param {string}   senderName    — tên nhân viên gửi
  * @param {string}   createdAt     — thời gian tạo
  */
@@ -24,10 +19,15 @@ export default function TechnicalDraftCard({
   draft,
   showApprove = false,
   onApprove,
+  onReject,
   loading = false,
   senderName,
   createdAt,
 }) {
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejecting, setRejecting] = useState(false);
+
   if (!draft) return null;
 
   const d = {
@@ -59,6 +59,18 @@ export default function TechnicalDraftCard({
   if (d.printTime > 0) {
     rows.push({ label: 'Thời gian in ước tính', value: `${d.printTime} phút` });
   }
+
+  const handleRejectSubmit = async () => {
+    if (!rejectReason.trim()) return;
+    setRejecting(true);
+    try {
+      await onReject?.(d.id, rejectReason.trim());
+      setRejectModalOpen(false);
+      setRejectReason('');
+    } finally {
+      setRejecting(false);
+    }
+  };
 
   return (
     <div style={{ width: '100%', maxWidth: 480, marginBottom: 8 }}>
@@ -123,22 +135,37 @@ export default function TechnicalDraftCard({
           </div>
         )}
 
-        {/* Approve button or confirmed badge */}
-        <div style={{ padding: '0 14px 12px', display: 'flex', justifyContent: 'flex-end' }}>
+        {/* Approve / Reject buttons or confirmed badge */}
+        <div style={{ padding: '0 14px 12px', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           {d.confirmed ? (
             <span style={{ fontSize: 12, fontWeight: 600, color: '#059669' }}>
               ✓ Báo giá đã được duyệt
             </span>
-          ) : showApprove && onApprove ? (
-            <Button
-              type="primary"
-              size="small"
-              loading={loading}
-              onClick={() => onApprove(d.id)}
-              style={{ background: '#059669', borderColor: '#059669', fontWeight: 600 }}
-            >
-              Duyệt báo giá
-            </Button>
+          ) : showApprove ? (
+            <>
+              {onReject && (
+                <Button
+                  size="small"
+                  danger
+                  loading={loading}
+                  onClick={() => setRejectModalOpen(true)}
+                  style={{ fontWeight: 600 }}
+                >
+                  Không duyệt
+                </Button>
+              )}
+              {onApprove && (
+                <Button
+                  type="primary"
+                  size="small"
+                  loading={loading}
+                  onClick={() => onApprove(d.id)}
+                  style={{ background: '#059669', borderColor: '#059669', fontWeight: 600 }}
+                >
+                  Duyệt báo giá
+                </Button>
+              )}
+            </>
           ) : null}
         </div>
       </div>
@@ -150,6 +177,28 @@ export default function TechnicalDraftCard({
           {senderName && ` · ${senderName}`}
         </div>
       )}
+
+      {/* Reject reason modal */}
+      <Modal
+        title="Không duyệt báo giá"
+        open={rejectModalOpen}
+        onOk={handleRejectSubmit}
+        onCancel={() => { setRejectModalOpen(false); setRejectReason(''); }}
+        okText="Gửi yêu cầu hiệu chỉnh"
+        okButtonProps={{ danger: true, disabled: !rejectReason.trim(), loading: rejecting }}
+        cancelText="Hủy"
+        destroyOnClose
+      >
+        <p style={{ margin: '0 0 12px', fontSize: 13, color: '#374151' }}>
+          Vui lòng mô tả lý do không duyệt hoặc nội dung cần hiệu chỉnh. Nhân viên sẽ xem xét và gửi lại báo giá mới.
+        </p>
+        <Input.TextArea
+          rows={3}
+          value={rejectReason}
+          onChange={(e) => setRejectReason(e.target.value)}
+          placeholder="VD: Giá quá cao, muốn dùng vật liệu khác, cần giảm infill..."
+        />
+      </Modal>
     </div>
   );
 }
