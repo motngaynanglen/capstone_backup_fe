@@ -1,5 +1,5 @@
-import React from 'react';
-import { Button } from 'antd';
+import React, { useState } from 'react';
+import { Button, Modal } from 'antd';
 import Model3DPreview from './Model3DPreview';
 import TechnicalDraftCard from './TechnicalDraftCard';
 
@@ -51,7 +51,11 @@ export default function VersionUpdateCard({
   const content = msg?.content?.trim();
   const canQuoteStatus = ['IN_PROGRESS', 'REVIEWING'].includes(designWorkStatus);
 
-  const openFile = (url) => {
+  // Modal xem 3D tại chỗ
+  const [viewerUrl, setViewerUrl] = useState(null);
+
+  // "Tải file 3D": mở URL trực tiếp — trình duyệt sẽ tải file .glb/.stl về.
+  const downloadFile = (url) => {
     if (!url) return;
     if (onOpenFile) onOpenFile(url);
     else window.open(url, '_blank', 'noopener,noreferrer');
@@ -125,9 +129,14 @@ export default function VersionUpdateCard({
 
                 <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                   {vUrl && (
-                    <Button size="small" onClick={() => openFile(vUrl)}>
-                      👁 Xem file 3D
-                    </Button>
+                    <>
+                      <Button size="small" type="primary" onClick={() => setViewerUrl(vUrl)}>
+                        👁 Xem file 3D
+                      </Button>
+                      <Button size="small" onClick={() => downloadFile(vUrl)}>
+                        ⬇ Tải file 3D
+                      </Button>
+                    </>
                   )}
                   {staffCanQuote && (
                     <Button
@@ -165,6 +174,24 @@ export default function VersionUpdateCard({
         {msg?.created && new Date(msg.created).toLocaleString('vi-VN')}
         {msg?.senderName ? ` · ${isMe ? 'Tôi' : msg.senderName}` : ''}
       </span>
+
+      {/* Modal xem 3D tại chỗ */}
+      <Modal
+        open={!!viewerUrl}
+        onCancel={() => setViewerUrl(null)}
+        footer={null}
+        width="90vw"
+        style={{ top: 24, maxWidth: 1200 }}
+        title="Xem file 3D"
+        destroyOnClose
+        styles={{ body: { padding: 0 } }}
+      >
+        {viewerUrl && (
+          <div style={{ width: '100%', height: '78vh', background: '#0f172a' }}>
+            <Model3DPreview fileUrl={viewerUrl} height="100%" />
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
