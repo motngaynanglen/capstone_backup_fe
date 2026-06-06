@@ -435,37 +435,32 @@ const StaffCustomOrderDetail = () => {
           </div>
 
           {/* Composer */}
-          {order.status === 'SUBMITTED' && !order.designServicePaid && order.designServicePaymentStatus !== 'PAID' ? (
-            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb' }}>
-              <div style={{ padding: '10px 16px', background: '#fffbeb', borderBottom: '1px solid #fde68a', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <span style={{ color: '#b45309', fontSize: 12, flex: 1, minWidth: 200 }}>
-                  Khach chua thanh toan phi thiet ke — ban van co the trao doi, nhung chi <b>tao duoc bao gia sau khi khach thanh toan</b>.
-                </span>
-                <Button size="small" type="primary" style={{ background: '#4f46e5' }} onClick={handleAssign} loading={processing}>Tiep nhan</Button>
+          {order.status === 'SUBMITTED' ? (() => {
+            const actuallyPaid = order.designServicePaid || order.designServicePaymentStatus === 'PAID';
+            return (
+              <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb' }}>
+                <div style={{
+                  padding: '10px 16px',
+                  background: actuallyPaid ? '#ecfdf5' : '#fffbeb',
+                  borderBottom: `1px solid ${actuallyPaid ? '#6ee7b7' : '#fde68a'}`,
+                  display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                }}>
+                  <span style={{ color: actuallyPaid ? '#059669' : '#b45309', fontSize: 12, flex: 1, minWidth: 200 }}>
+                    {actuallyPaid
+                      ? <>Khach <b>da thanh toan</b> phi thiet ke. Trao doi voi khach de lam ro yeu cau.</>
+                      : <>Khach chua thanh toan phi thiet ke — ban van co the trao doi, nhung chi <b>tao duoc bao gia sau khi khach thanh toan</b>.</>
+                    }
+                  </span>
+                </div>
+                <ChatComposer
+                  value={chatMessage}
+                  onChange={setChatMessage}
+                  onSend={handleSendChat}
+                  uploading={uploading}
+                />
               </div>
-              <ChatComposer
-                value={chatMessage}
-                onChange={setChatMessage}
-                onSend={handleSendChat}
-                uploading={uploading}
-              />
-            </div>
-          ) : order.status === 'SUBMITTED' && (order.designServicePaid || order.designServicePaymentStatus === 'PAID') ? (
-            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb' }}>
-              <div style={{ padding: '10px 16px', background: '#ecfdf5', borderBottom: '1px solid #6ee7b7', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <span style={{ color: '#059669', fontSize: 12, flex: 1, minWidth: 200 }}>
-                  Khach da thanh toan phi thiet ke. Ban co the <b>tiep nhan va bat dau lam viec</b>.
-                </span>
-                <Button size="small" type="primary" style={{ background: '#4f46e5' }} onClick={handleAssign} loading={processing}>Tiep nhan</Button>
-              </div>
-              <ChatComposer
-                value={chatMessage}
-                onChange={setChatMessage}
-                onSend={handleSendChat}
-                uploading={uploading}
-              />
-            </div>
-          ) : order.status === 'CANCELLED' ? (
+            );
+          })() : order.status === 'CANCELLED' ? (
             <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#dc2626', fontSize: 13, fontWeight: 500 }}>
               Yêu cầu đã bị hủy.
             </div>
@@ -537,17 +532,22 @@ const StaffCustomOrderDetail = () => {
           </div>
 
           {/* Design service payment */}
-          {order.designServicePaymentStatus && (
+          {(order.designServicePaymentStatus || order.designServiceOrderCode) && (
             <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
-              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Phí dịch vụ thiết kế</p>
+              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Phi dich vu thiet ke</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{
-                  padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600,
-                  background: order.designServicePaid ? '#ecfdf5' : '#fffbeb',
-                  color: order.designServicePaid ? '#059669' : '#d97706',
-                }}>
-                  {order.designServicePaid ? 'Đã thanh toán' : 'Chưa thanh toán'}
-                </span>
+                {(() => {
+                  const actuallyPaid = order.designServicePaid || order.designServicePaymentStatus === 'PAID';
+                  return (
+                    <span style={{
+                      padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600,
+                      background: actuallyPaid ? '#ecfdf5' : '#fffbeb',
+                      color: actuallyPaid ? '#059669' : '#d97706',
+                    }}>
+                      {actuallyPaid ? 'Da thanh toan' : 'Chua thanh toan'}
+                    </span>
+                  );
+                })()}
                 {order.designServiceTotalAmount != null && (
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>
                     {formatPrice(order.designServiceTotalAmount)}
