@@ -138,12 +138,21 @@ const ManagerDashboard = () => {
       {actionItems.length > 0 && (
         <Card title="Cảnh báo cần xử lý" style={{ marginTop: 16 }} size="small">
           <Space wrap>
-            {actionItems.map((a) => (
-              <Tag key={a.key ?? a.Key} color={(a.severity ?? a.Severity) === 'CRITICAL' ? 'red' : (a.severity ?? a.Severity) === 'WARNING' ? 'orange' : 'default'}
-                style={{ padding: '4px 10px', fontSize: 13 }}>
-                {(a.label ?? a.Label)}: <b>{formatNum(a.count ?? a.Count)}</b>
-              </Tag>
-            ))}
+            {actionItems.map((a) => {
+              const sev = (a.severity ?? a.Severity ?? 'INFO').toUpperCase();
+              const count = a.count ?? a.Count ?? 0;
+              // count=0 → không có gì để xử lý → để xám, tránh "cảnh báo giả".
+              const color = count === 0
+                ? 'default'
+                : (sev === 'DANGER' || sev === 'CRITICAL') ? 'red'
+                  : sev === 'WARNING' ? 'orange'
+                    : 'blue';
+              return (
+                <Tag key={a.key ?? a.Key} color={color} style={{ padding: '4px 10px', fontSize: 13 }}>
+                  {(a.label ?? a.Label)}: <b>{formatNum(count)}</b>
+                </Tag>
+              );
+            })}
           </Space>
         </Card>
       )}
