@@ -330,6 +330,7 @@ export const submitQuote = async (id, payload = {}) => {
     UnitPrice: payload.unitPrice ?? payload.UnitPrice ?? payload.quotedPrice ?? null,
     MarkupPercentage: Number(payload.markupPercentage ?? payload.MarkupPercentage ?? 0),
     TechnicalNote: payload.technicalNote || payload.TechnicalNote || payload.staffNote || '',
+    PreviewModelUrl: payload.previewModelUrl || payload.PreviewModelUrl || null,
   };
 
   if (!body.MaterialId) {

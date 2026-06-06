@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Input, InputNumber, Select, Typography, message } from 'antd';
+import { Button, Input, InputNumber, Radio, Select, Typography, Upload, message } from 'antd';
+import { UploadOutlined } from '@ant-design/icons';
 import materialApi from '../../api/materialApi';
+import { uploadFile } from '../../api/mainflow2Api';
 
 const { Text } = Typography;
 
@@ -33,6 +35,9 @@ const Mainflow2QuoteBuilder = ({ onSubmit, submitting, onCancel, designVersionHi
   const [markup, setMarkup] = useState(10);               // MarkupPercentage (%)
   const [unitPriceOverride, setUnitPriceOverride] = useState(null); // UnitPrice (null = auto)
   const [note, setNote] = useState('');                   // TechnicalNote
+  const [previewSource, setPreviewSource] = useState('version'); // 'version' | 'upload'
+  const [previewModelUrl, setPreviewModelUrl] = useState(null);
+  const [uploadingPreview, setUploadingPreview] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -96,6 +101,7 @@ const Mainflow2QuoteBuilder = ({ onSubmit, submitting, onCancel, designVersionHi
       unitPrice: unitPriceOverride,
       markupPercentage: markup,
       technicalNote: note.trim(),
+      previewModelUrl: previewSource === 'upload' ? previewModelUrl : null,
     };
 
     // Gắn version nếu có
@@ -252,6 +258,56 @@ const Mainflow2QuoteBuilder = ({ onSubmit, submitting, onCancel, designVersionHi
           </div>
         </div>
       )}
+
+      {/* Preview model source */}
+      <div>
+        <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
+          File preview 3D
+        </label>
+        <Radio.Group value={previewSource} onChange={(e) => { setPreviewSource(e.target.value); if (e.target.value === 'version') setPreviewModelUrl(null); }}>
+          <Radio value="version">Dùng mẫu từ phiên bản thiết kế</Radio>
+          <Radio value="upload">Tải lên file preview riêng</Radio>
+        </Radio.Group>
+        {previewSource === 'upload' && (
+          <div style={{ marginTop: 8 }}>
+            {previewModelUrl ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#059669' }}>
+                <span>✓ Đã tải lên</span>
+                <Button size="small" danger onClick={() => setPreviewModelUrl(null)}>Xóa</Button>
+              </div>
+            ) : (
+              <Upload
+                accept=".glb,.stl,.obj,.gltf"
+                maxCount={1}
+                showUploadList={false}
+                customRequest={async ({ file, onSuccess, onError }) => {
+                  try {
+                    setUploadingPreview(true);
+                    const res = await uploadFile(file);
+                    const url = res?.data?.url || res?.data?.fileUrl || res?.url || res?.fileUrl;
+                    if (url) {
+                      setPreviewModelUrl(url);
+                      onSuccess?.();
+                      message.success('Upload thành công');
+                    } else {
+                      throw new Error('Không nhận được URL');
+                    }
+                  } catch (e) {
+                    onError?.(e);
+                    message.error('Upload thất bại');
+                  } finally {
+                    setUploadingPreview(false);
+                  }
+                }}
+              >
+                <Button icon={<UploadOutlined />} loading={uploadingPreview} size="small">
+                  Chọn file .glb / .stl
+                </Button>
+              </Upload>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Note */}
       <div>

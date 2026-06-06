@@ -783,6 +783,30 @@ const CustomOrderDetail = () => {
             </ul>
           </div>
 
+          {/* Adjustment rounds remaining */}
+          {(() => {
+            const sels = order.selections || [];
+            const totalLimit = sels.reduce((s, x) => s + (x.adjustmentRoundLimit || 0), 0);
+            const totalRemaining = sels.reduce((s, x) => s + (x.remainingAdjustmentRoundCount || 0), 0);
+            if (totalLimit <= 0) return null;
+            return (
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  Lượt hiệu chỉnh
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600,
+                    background: totalRemaining > 0 ? '#ecfdf5' : '#fef2f2',
+                    color: totalRemaining > 0 ? '#059669' : '#dc2626',
+                  }}>
+                    {totalRemaining}/{totalLimit} còn lại
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Design service fee — only for DESIGN_SERVICE */}
           {!isPrintService && (
           <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
