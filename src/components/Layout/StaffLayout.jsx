@@ -10,8 +10,10 @@ const MENU = [
   { path: '/staff/custom-orders', label: 'Đơn thiết kế riêng', icon: '💬' },
   { path: '/staff/production-queue', label: 'Hàng đợi SX', icon: '🖨️' },
   { path: '/staff/shop-orders', label: 'Đơn shop & vận chuyển', icon: '🛒' },
-  { path: '/staff/templates', label: 'Mẫu thiết kế', icon: '🎨' },
-  { path: '/staff/design-reviews', label: 'Duyệt thiết kế', icon: '✅' },
+  // Ẩn các trang còn dùng dữ liệu mẫu (mock): Mẫu thiết kế & Duyệt thiết kế.
+  // (Duyệt thiết kế đã nằm trong luồng /staff/custom-orders/:id.)
+  // { path: '/staff/templates', label: 'Mẫu thiết kế', icon: '🎨' },
+  // { path: '/staff/design-reviews', label: 'Duyệt thiết kế', icon: '✅' },
 ];
 
 const StaffLayout = ({ children }) => {

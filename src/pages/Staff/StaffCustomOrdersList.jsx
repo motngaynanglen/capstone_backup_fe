@@ -3,14 +3,20 @@ import { Link } from 'react-router-dom';
 import { message, Spin, Modal } from 'antd';
 import { getDesignRequests, assignStaffToRequest } from '../../api/mainflow2Api';
 
+// Trạng thái thật từ BE (DesignWork.Status) — không còn dùng key giả SUBMITTED/QUOTED...
 const STATUS_CONFIG = {
-  SUBMITTED: { label: 'Mới gửi (Chờ nhận)', color: 'bg-gray-100 text-gray-800', icon: '📥' },
-  ASSIGNED: { label: 'Đã phân công', color: 'bg-blue-100 text-blue-800', icon: '👤' },
-  QUOTED: { label: 'Đã báo giá', color: 'bg-purple-100 text-purple-800', icon: '💰' },
-  NEGOTIATING: { label: 'Đang thương lượng', color: 'bg-yellow-100 text-yellow-800', icon: '💬' },
-  APPROVED: { label: 'Khách đã duyệt', color: 'bg-green-100 text-green-800', icon: '✅' },
+  SKETCHING: { label: 'Mới gửi / Phác thảo', color: 'bg-gray-100 text-gray-800', icon: '📥' },
+  PENDING: { label: 'Chờ tiếp nhận', color: 'bg-amber-100 text-amber-800', icon: '⏳' },
+  IN_PROGRESS: { label: 'Đang thực hiện', color: 'bg-blue-100 text-blue-800', icon: '👤' },
+  REVIEWING: { label: 'Đang kiểm duyệt', color: 'bg-purple-100 text-purple-800', icon: '💰' },
+  COMPLETED: { label: 'Đã nghiệm thu', color: 'bg-green-100 text-green-800', icon: '✅' },
   CANCELLED: { label: 'Đã hủy', color: 'bg-red-100 text-red-800', icon: '❌' },
 };
+
+// Trạng thái coi là "chưa tiếp nhận" → cho phép nhận việc.
+const UNASSIGNED_STATUSES = ['SKETCHING', 'PENDING'];
+
+const shortId = (id) => (id ? `${String(id).slice(0, 8)}…` : '—');
 
 const StaffCustomOrdersList = () => {
   const [filter, setFilter] = useState('all');
@@ -26,7 +32,8 @@ const StaffCustomOrdersList = () => {
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      const params = { pageNumber: 1, pageSize: 100 };
+      // Sắp xếp theo thời gian tạo mới nhất lên đầu.
+      const params = { pageNumber: 1, pageSize: 100, sortBy: 'Created', sortDescending: true };
       if (filter !== 'all') {
         params.status = filter;
       }
@@ -70,8 +77,8 @@ const StaffCustomOrdersList = () => {
   };
 
   const filteredRequests = requests.filter(req => {
-    if (searchTerm && !req.id.toLowerCase().includes(searchTerm.toLowerCase()) &&
-        !(req.title || '').toLowerCase().includes(searchTerm.toLowerCase())) {
+    if (searchTerm && !String(req.id || '').toLowerCase().includes(searchTerm.toLowerCase()) &&
+        !(req.name || '').toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
     }
     return true;
@@ -79,9 +86,9 @@ const StaffCustomOrdersList = () => {
 
   const stats = {
     total: requests.length,
-    submitted: requests.filter(r => r.status === 'SUBMITTED').length,
-    assigned: requests.filter(r => r.status === 'ASSIGNED' || r.status === 'NEGOTIATING').length,
-    quoted: requests.filter(r => r.status === 'QUOTED').length,
+    submitted: requests.filter(r => UNASSIGNED_STATUSES.includes(r.status)).length,
+    assigned: requests.filter(r => r.status === 'IN_PROGRESS').length,
+    quoted: requests.filter(r => r.status === 'REVIEWING').length,
   };
 
   return (
@@ -161,7 +168,7 @@ const StaffCustomOrdersList = () => {
           <div className="flex items-center gap-2">
             <span className="text-gray-500 text-sm">Trạng thái:</span>
             <div className="flex flex-wrap gap-1">
-              {['all', 'SUBMITTED', 'ASSIGNED', 'QUOTED', 'NEGOTIATING', 'APPROVED'].map(status => (
+              {['all', 'SKETCHING', 'IN_PROGRESS', 'REVIEWING', 'COMPLETED', 'CANCELLED'].map(status => (
                 <button
                   key={status}
                   onClick={() => setFilter(status)}
@@ -209,10 +216,10 @@ const StaffCustomOrdersList = () => {
               filteredRequests.map(req => (
                 <tr key={req.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
-                    <span className="font-mono font-medium text-gray-800">{req.code || req.name || '—'}</span>
+                    <span className="font-mono font-medium text-gray-800" title={req.id}>{shortId(req.id)}</span>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="text-gray-800 font-medium max-w-[200px] truncate" title={req.title}>{req.title || 'Không có tiêu đề'}</p>
+                    <p className="text-gray-800 font-medium max-w-[220px] truncate" title={req.name}>{req.name || 'Không có tiêu đề'}</p>
                   </td>
                   <td className="px-4 py-3">
                     <span className="text-gray-800 font-medium">
@@ -224,13 +231,13 @@ const StaffCustomOrdersList = () => {
                     {new Date(req.created).toLocaleString('vi-VN')}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${STATUS_CONFIG[req.status]?.color}`}>
-                      {STATUS_CONFIG[req.status]?.icon} {STATUS_CONFIG[req.status]?.label}
+                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${STATUS_CONFIG[req.status]?.color || 'bg-gray-100 text-gray-600'}`}>
+                      {STATUS_CONFIG[req.status]?.icon} {STATUS_CONFIG[req.status]?.label || req.status || '—'}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      {req.status === 'SUBMITTED' ? (
+                      {UNASSIGNED_STATUSES.includes(req.status) ? (
                         <button
                           onClick={() => handleAssign(req.id)}
                           disabled={assigningId === req.id}

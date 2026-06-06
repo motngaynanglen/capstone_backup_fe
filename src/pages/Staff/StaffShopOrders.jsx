@@ -24,7 +24,7 @@ import {
 import { queryOrdersApi } from '../../api/orderApi';
 import StaffOrderDetailModal from '../../components/Staff/StaffOrderDetailModal';
 import { normalizeOrderRow } from '../../utils/orderNormalize';
-import { ORDER_STATUSES, orderStatusMap, normStatus } from '../../utils/staffOrderConstants';
+import { ORDER_STATUSES, orderStatusMap, shipmentStatusMap, normStatus } from '../../utils/staffOrderConstants';
 import { formatVnd, formatDateTime, shortId } from '../../utils/formatters';
 
 const { Title, Text } = Typography;
@@ -153,18 +153,22 @@ export default function StaffShopOrders() {
       width: 90,
       render: (_, r) => {
         const ps = normStatus(r.invoice?.paymentStatus);
-        return <Tag color={ps === 'PAID' ? 'success' : 'warning'}>{ps || '—'}</Tag>;
+        if (!ps) return <Text type="secondary">—</Text>;
+        return <Tag color={ps === 'PAID' ? 'success' : 'warning'}>{ps === 'PAID' ? 'Đã TT' : 'Chưa TT'}</Tag>;
       },
     },
     {
       title: 'Vận chuyển',
       key: 'shipment',
-      width: 100,
+      width: 120,
       render: (_, r) => {
-        const hasShipment = Boolean(r.shipment?.id);
-        const ready = normStatus(r.orderStatus) === 'FINISHED' && !hasShipment;
-        if (hasShipment) return <Tag color="green">Đã có</Tag>;
-        if (ready) return <Tag color="orange" icon={<TruckOutlined />}>Chờ xử lý</Tag>;
+        const ss = normStatus(r.shipment?.shipmentStatus);
+        if (ss) {
+          const m = shipmentStatusMap[ss];
+          return <Tag color={m?.color}>{m?.label || ss}</Tag>;
+        }
+        const ready = normStatus(r.orderStatus) === 'FINISHED';
+        if (ready) return <Tag color="orange" icon={<TruckOutlined />}>Chờ tạo vận đơn</Tag>;
         return <Text type="secondary">—</Text>;
       },
     },
