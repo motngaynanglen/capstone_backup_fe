@@ -41,7 +41,7 @@ const feedbackApi = {
 
   // Phản hồi 1 feedback
   reply: async (id, replyContent) => {
-    const response = await axiosInstance.patch(`/api/feedback/${id}/reply`, { replyContent });
+    const response = await axiosInstance.patch(`/api/feedback/${id}/reply`, { staffReply: replyContent });
     return response.data;
   },
 
