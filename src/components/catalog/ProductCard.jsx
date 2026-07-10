@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import '@google/model-viewer';
-import { formatPrice } from '../../utils/catalogProduct';
+import { formatPrice, formatStockLabel } from '../../utils/catalogProduct';
+import ProductModelViewer from './ProductModelViewer';
 
 /** Thẻ sản phẩm — click vùng ảnh/tên → chi tiết; chỉ nút "Mua ngay" mới vào checkout. */
 const ProductCard = ({ product, viewMode = 'grid', onQuickBuy, onAddToCart }) => {
@@ -36,15 +36,14 @@ const ProductCard = ({ product, viewMode = 'grid', onQuickBuy, onAddToCart }) =>
         onMouseLeave={() => setHovered(false)}
         className={`relative bg-slate-50 flex-shrink-0 overflow-hidden cursor-pointer ${isGrid ? 'aspect-[4/3]' : 'w-32 sm:w-44 h-28 sm:h-36'}`}
       >
-        <model-viewer
+        <ProductModelViewer
+          className="absolute inset-0"
           src={product.modelSrc}
-          camera-controls={hovered ? true : undefined}
-          auto-rotate
-          shadow-intensity="0.8"
-          environment-image="neutral"
-          exposure="1.1"
-          interaction-prompt="none"
-          style={{ width: '100%', height: '100%', pointerEvents: hovered ? 'auto' : 'none' }}
+          fallbackId={product.id}
+          poster={product.thumbnailUrl}
+          cameraControls={hovered}
+          showLoading={false}
+          style={{ pointerEvents: hovered ? 'auto' : 'none' }}
         />
         {hovered && (
           <div className="absolute top-2 right-2 bg-indigo-600 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded-full z-10 pointer-events-none">
@@ -75,7 +74,7 @@ const ProductCard = ({ product, viewMode = 'grid', onQuickBuy, onAddToCart }) =>
         <p className={`text-[11px] font-medium m-0 ${lowStock ? 'text-rose-500' : outOfStock ? 'text-slate-400' : 'text-emerald-600'}`}>
           {outOfStock
             ? (product.isAllowPreOrder ? 'Có thể đặt trước' : 'Hết hàng')
-            : lowStock ? `Chỉ còn ${product.stock}` : `Còn ${product.stock} sản phẩm`}
+            : formatStockLabel(product.stock)}
         </p>
 
         <div className="mt-1 flex items-center justify-between gap-2">

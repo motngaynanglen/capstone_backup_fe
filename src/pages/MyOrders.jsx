@@ -127,31 +127,21 @@ const MyOrders = () => {
         priority: null,
         sortDescending: true,
         sortBy: 'created',
-        paging: {
-          pageNumber: page,
-          pageSize: 10,
-        },
+        pageNumber: page,
+        pageSize: 10,
       };
 
       const response = await queryOrdersApi(payload);
-      console.log('Orders query response:', response);
+      const items = Array.isArray(response?.data) ? response.data : [];
+      const paging = response?.additionalData?.paging || {};
 
-      const data = response?.data || response;
-
-      // Response có thể là { items: [...], totalCount, pageNumber, ... } hoặc array trực tiếp
-      if (Array.isArray(data)) {
-        setOrders(data);
-        setPagination({ pageNumber: 1, pageSize: 10, totalCount: data.length, totalPages: 1 });
-      } else {
-        const items = data?.items || data?.data || [];
-        setOrders(Array.isArray(items) ? items : []);
-        setPagination({
-          pageNumber: data?.pageNumber || data?.paging?.pageNumber || page,
-          pageSize: data?.pageSize || data?.paging?.pageSize || 10,
-          totalCount: data?.totalCount || data?.total || items.length,
-          totalPages: data?.totalPages || Math.ceil((data?.totalCount || items.length) / 10),
-        });
-      }
+      setOrders(items);
+      setPagination({
+        pageNumber: paging.pageNumber || page,
+        pageSize: paging.pageSize || 10,
+        totalCount: paging.totalCount ?? items.length,
+        totalPages: paging.totalPages || Math.ceil((paging.totalCount ?? items.length) / 10) || 1,
+      });
     } catch (err) {
       console.error('Failed to fetch orders:', err);
       setError(err?.response?.data?.message || err?.response?.data?.title || 'Không thể tải danh sách đơn hàng.');

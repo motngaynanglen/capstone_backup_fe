@@ -25,7 +25,7 @@ import { queryOrdersApi } from '../../api/orderApi';
 import StaffOrderDetailModal from '../../components/Staff/StaffOrderDetailModal';
 import { normalizeOrderRow } from '../../utils/orderNormalize';
 import { ORDER_STATUSES, orderStatusMap, normStatus } from '../../utils/staffOrderConstants';
-import { formatVnd, formatDateTime, shortId } from '../../utils/formatters';
+import { formatVnd, formatDateTime } from '../../utils/formatters';
 
 const { Title, Text } = Typography;
 
@@ -36,6 +36,39 @@ const STAFF_STATUS_FILTER = ORDER_STATUSES.filter((s) =>
 function renderStatus(status) {
   const s = orderStatusMap[normStatus(status)];
   return s ? <Tag color={s.color}>{s.label}</Tag> : <Tag>{status || '—'}</Tag>;
+}
+
+function shortOrderCode(order) {
+  const code = order?.code || order?.id;
+  if (!code) return '—';
+  const s = String(code);
+  return s.length > 12 ? `${s.slice(0, 10)}…` : s;
+}
+
+function renderPaymentTag(invoice) {
+  const ps = normStatus(invoice?.paymentStatus);
+  if (!ps) return null;
+  if (ps === 'PAID') return <Tag color="success">Đã TT</Tag>;
+  if (ps === 'PARTIALLY_PAID') return <Tag color="warning">Cọc</Tag>;
+  return <Tag color="warning">Chưa TT</Tag>;
+}
+
+function renderGhnTag(order) {
+  const hasGhn = Boolean(order.shipment?.carrierOrderCode);
+  const ready = normStatus(order.orderStatus) === 'FINISHED' && !hasGhn;
+  if (hasGhn) return <Tag color="green">GHN đã tạo</Tag>;
+  if (ready) return <Tag color="orange" icon={<TruckOutlined />}>Chờ GHN</Tag>;
+  return null;
+}
+
+function renderCombinedStatus(order) {
+  return (
+    <Space size={[4, 4]} wrap>
+      {renderStatus(order.orderStatus)}
+      {renderPaymentTag(order.invoice)}
+      {renderGhnTag(order)}
+    </Space>
+  );
 }
 
 export default function StaffShopOrders() {
@@ -117,16 +150,29 @@ export default function StaffShopOrders() {
     {
       title: 'Mã đơn',
       key: 'code',
-      width: 130,
-      render: (_, r) => (
-        <Button type="link" style={{ padding: 0 }} onClick={() => openDetail(r.id)}>
-          <Text strong>{r.code || shortId(r.id)}</Text>
-        </Button>
-      ),
+      width: 140,
+      ellipsis: true,
+      render: (_, r) => {
+        const fullCode = r.code || String(r.id);
+        return (
+          <Tooltip title={fullCode}>
+            <Button
+              type="link"
+              style={{ padding: 0, maxWidth: '100%', height: 'auto' }}
+              onClick={() => openDetail(r.id)}
+            >
+              <Text strong ellipsis style={{ maxWidth: 130 }}>
+                {shortOrderCode(r)}
+              </Text>
+            </Button>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Khách hàng',
       dataIndex: 'customerName',
+      width: 110,
       ellipsis: true,
     },
     {
@@ -138,30 +184,9 @@ export default function StaffShopOrders() {
     },
     {
       title: 'Trạng thái',
-      key: 'orderStatus',
-      width: 150,
-      render: (_, r) => renderStatus(r.orderStatus),
-    },
-    {
-      title: 'TT',
-      key: 'payment',
-      width: 90,
-      render: (_, r) => {
-        const ps = normStatus(r.invoice?.paymentStatus);
-        return <Tag color={ps === 'PAID' ? 'success' : 'warning'}>{ps || '—'}</Tag>;
-      },
-    },
-    {
-      title: 'GHN',
-      key: 'ghn',
-      width: 100,
-      render: (_, r) => {
-        const hasGhn = Boolean(r.shipment?.carrierOrderCode);
-        const ready = normStatus(r.orderStatus) === 'FINISHED' && !hasGhn;
-        if (hasGhn) return <Tag color="green">Đã tạo</Tag>;
-        if (ready) return <Tag color="orange" icon={<TruckOutlined />}>Chờ GHN</Tag>;
-        return <Text type="secondary">—</Text>;
-      },
+      key: 'status',
+      width: 240,
+      render: (_, r) => renderCombinedStatus(r),
     },
     {
       title: 'Ngày tạo',
@@ -252,7 +277,8 @@ export default function StaffShopOrders() {
           loading={loading}
           columns={columns}
           dataSource={orders}
-          scroll={{ x: 960 }}
+          tableLayout="fixed"
+          scroll={{ x: 840 }}
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,

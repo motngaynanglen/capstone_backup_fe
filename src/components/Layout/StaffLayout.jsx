@@ -1,17 +1,16 @@
-import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Layout as AntLayout, message } from 'antd';
-import { useAuth } from '../../contexts/AuthContext';
+import React from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Layout as AntLayout, message } from "antd";
+import { useAuth } from "../../contexts/AuthContext";
 
 const { Sider, Content } = AntLayout;
 
 const MENU = [
-  { path: '/staff/dashboard', label: 'Bàn làm việc', icon: '📋' },
-  { path: '/staff/custom-orders', label: 'Custom Mainflow2', icon: '💬' },
-  { path: '/staff/production-queue', label: 'Hàng đợi SX', icon: '🖨️' },
-  { path: '/staff/shop-orders', label: 'Đơn shop & GHN', icon: '🛒' },
-  { path: '/staff/templates', label: 'Mẫu thiết kế', icon: '🎨' },
-  { path: '/staff/design-reviews', label: 'Duyệt thiết kế', icon: '✅' },
+  { path: "/staff/dashboard", label: "Bàn làm việc", icon: "📋" },
+  { path: "/staff/custom-orders", label: "Thiết kế theo yêu cầu", icon: "💬" },
+  { path: "/staff/production-queue", label: "Hàng đợi SX", icon: "🖨️" },
+  { path: "/staff/shop-orders", label: "Đơn shop & GHN", icon: "🛒" },
+  { path: "/staff/templates", label: "Mẫu thiết kế", icon: "🎨" },
 ];
 
 const StaffLayout = ({ children }) => {
@@ -21,30 +20,32 @@ const StaffLayout = ({ children }) => {
 
   const handleLogout = () => {
     logout();
-    message.success('Đã đăng xuất');
-    navigate('/admin/login');
+    message.success("Đã đăng xuất");
+    navigate("/admin/login");
   };
 
   return (
-    <AntLayout style={{ minHeight: '100vh' }}>
+    <AntLayout style={{ minHeight: "100vh" }}>
       <Sider
         width={248}
         theme="light"
         style={{
-          height: '100vh',
-          position: 'fixed',
+          height: "100vh",
+          position: "fixed",
           left: 0,
           top: 0,
           bottom: 0,
-          boxShadow: '2px 0 8px rgba(0,0,0,0.06)',
+          boxShadow: "2px 0 8px rgba(0,0,0,0.06)",
           zIndex: 1000,
-          borderRight: '1px solid #eef0f6',
+          borderRight: "1px solid #eef0f6",
         }}
       >
         <div className="flex flex-col h-full">
           <div className="p-5 border-b border-slate-100 shrink-0">
             <Link to="/" className="no-underline">
-              <h1 className="text-lg font-bold text-slate-800 m-0">3D Print Shop</h1>
+              <h1 className="text-lg font-bold text-slate-800 m-0">
+                3D Print Shop
+              </h1>
               <p className="text-xs text-slate-500 mt-1 mb-0 uppercase tracking-wide">
                 Khu vực KTV
               </p>
@@ -54,15 +55,16 @@ const StaffLayout = ({ children }) => {
             {MENU.map((item) => {
               const active =
                 location.pathname === item.path ||
-                (item.path !== '/staff/dashboard' && location.pathname.startsWith(item.path));
+                (item.path !== "/staff/dashboard" &&
+                  location.pathname.startsWith(item.path));
               return (
                 <Link
                   key={item.path}
                   to={item.path}
                   className={`flex items-center gap-3 px-3 py-2.5 mb-1 rounded-lg no-underline transition-colors ${
                     active
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-slate-700 hover:bg-slate-100'
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "text-slate-700 hover:bg-slate-100"
                   }`}
                 >
                   <span>{item.icon}</span>
@@ -75,7 +77,9 @@ const StaffLayout = ({ children }) => {
             <p className="text-sm font-medium text-slate-800 m-0 truncate">
               {user?.fullName || user?.username}
             </p>
-            <p className="text-xs text-slate-500 capitalize m-0 mb-3">{user?.role}</p>
+            <p className="text-xs text-slate-500 capitalize m-0 mb-3">
+              {user?.role}
+            </p>
             <button
               type="button"
               onClick={handleLogout}
@@ -86,8 +90,10 @@ const StaffLayout = ({ children }) => {
           </div>
         </div>
       </Sider>
-      <AntLayout style={{ marginLeft: 248, minHeight: '100vh', background: '#f4f6fb' }}>
-        <Content style={{ margin: '20px 16px' }}>
+      <AntLayout
+        style={{ marginLeft: 248, minHeight: "100vh", background: "#f4f6fb" }}
+      >
+        <Content style={{ margin: "20px 16px" }}>
           <div className="max-w-7xl mx-auto">{children}</div>
         </Content>
       </AntLayout>

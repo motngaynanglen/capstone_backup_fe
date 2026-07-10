@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import designVariantApi from '../api/designVariantApi';
-import { normalizeVariant, formatPrice } from '../utils/catalogProduct';
+import { normalizeVariant, formatPrice, formatStockLabel, getPreOrderQuantity, needsAdditionalPrinting } from '../utils/catalogProduct';
 import {
   Button,
   InputNumber,
@@ -17,6 +17,7 @@ import {
   Spin,
   Result,
   notification,
+  Alert,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -26,7 +27,8 @@ import {
   InfoCircleOutlined,
   CheckCircleOutlined,
 } from '@ant-design/icons';
-import '@google/model-viewer';
+import FeedbackCommentsList from '../components/Feedback/FeedbackCommentsList';
+import ProductModelViewer from '../components/catalog/ProductModelViewer';
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -78,7 +80,9 @@ const ProductDetail = () => {
     quantity,
     material: product.material,
     modelSrc: product.modelSrc,
-    sourceType: product.stock > 0 ? 'IN_STOCK' : 'PRE_ORDER',
+    stock: product.stock,
+    isAllowPreOrder: product.isAllowPreOrder,
+    sourceType: 'IN_STOCK',
   });
 
   const handleBuyNow = () => {
@@ -100,16 +104,22 @@ const ProductDetail = () => {
         modelSrc: product.modelSrc,
         sourceType: product.stock > 0 ? 'in_stock' : 'pre_order',
         stock: product.stock,
+        isAllowPreOrder: product.isAllowPreOrder,
         materials: [product.material],
       },
-      quantity,
-      product.material
+      product.material,
+      quantity
     );
     notification.success({ message: 'Đã thêm vào giỏ hàng' });
   };
 
   const outOfStock = product && product.stock <= 0;
   const canOrder = product && (product.stock > 0 || product.isAllowPreOrder);
+  const preOrderQty = product ? getPreOrderQuantity(quantity, product.stock) : 0;
+  const showPreOrderNote = product && needsAdditionalPrinting(quantity, product.stock, product.isAllowPreOrder);
+  const maxQuantity = product
+    ? (product.isAllowPreOrder ? 99 : Math.max(product.stock, 1))
+    : 1;
   const showBuyNow = isCustomer;
 
   if (loading) {
@@ -167,16 +177,13 @@ const ProductDetail = () => {
             <Col xs={24} lg={12}>
               <div className="sticky top-24">
                 <div className="mb-4 overflow-hidden rounded-xl border border-gray-200 bg-slate-50 relative aspect-square w-full">
-                  <model-viewer
+                  <ProductModelViewer
+                    className="absolute inset-0"
                     src={product.modelSrc}
-                    camera-controls
-                    auto-rotate
-                    shadow-intensity="1"
-                    environment-image="neutral"
-                    exposure="1.2"
-                    style={{ width: '100%', height: '100%', backgroundColor: '#f8fafc' }}
+                    fallbackId={product.id}
+                    poster={product.thumbnailUrl}
                   />
-                  <div className="absolute top-3 right-3 bg-indigo-600 text-white text-[11px] font-semibold px-2 py-1 rounded-full shadow-sm">
+                  <div className="absolute top-3 right-3 z-10 bg-indigo-600 text-white text-[11px] font-semibold px-2 py-1 rounded-full shadow-sm pointer-events-none">
                     3D Interactive
                   </div>
                 </div>
@@ -214,7 +221,7 @@ const ProductDetail = () => {
                   <div className="flex items-center gap-4 flex-wrap">
                     <InputNumber
                       min={1}
-                      max={product.stock > 0 ? product.stock : 99}
+                      max={maxQuantity}
                       value={quantity}
                       onChange={(v) => setQuantity(v || 1)}
                       size="large"
@@ -226,9 +233,22 @@ const ProductDetail = () => {
                     >
                       {outOfStock
                         ? (product.isAllowPreOrder ? 'Hết hàng — đặt trước' : 'Hết hàng')
-                        : `Còn ${product.stock} sản phẩm`}
+                        : formatStockLabel(product.stock)}
                     </Tag>
                   </div>
+                  {showPreOrderNote && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      className="mt-3"
+                      message="Một phần sản phẩm cần in thêm"
+                      description={
+                        product.stock > 0
+                          ? `Kho còn ${product.stock} sản phẩm. ${preOrderQty} sản phẩm sẽ được in thêm sau khi đặt hàng — thời gian nhận hàng có thể lâu hơn bình thường.`
+                          : `Toàn bộ ${quantity} sản phẩm sẽ được in thêm sau khi đặt hàng — thời gian nhận hàng có thể lâu hơn bình thường.`
+                      }
+                    />
+                  )}
                 </div>
 
                 <Divider />
@@ -263,7 +283,20 @@ const ProductDetail = () => {
                   <Button
                     size="large"
                     icon={<EyeOutlined />}
-                    onClick={() => navigate(`/preview/${id}`)}
+                    onClick={() =>
+                      navigate(`/preview/${id}`, {
+                        state: {
+                          modelSrc: product.modelSrc,
+                          productName: displayName,
+                          breadcrumb: [
+                            { title: 'Trang chủ', path: '/' },
+                            { title: 'Sản phẩm', path: '/products' },
+                            { title: displayName, path: `/products/${id}` },
+                            { title: 'Xem mô hình 3D', path: null },
+                          ],
+                        },
+                      })
+                    }
                     block
                     style={{ height: 50 }}
                   >
@@ -288,6 +321,13 @@ const ProductDetail = () => {
             </Col>
           </Row>
         </Card>
+
+        {product.designTemplateId && (
+          <FeedbackCommentsList
+            templateId={product.designTemplateId}
+            title="Đánh giá & nhận xét"
+          />
+        )}
       </div>
     </div>
   );

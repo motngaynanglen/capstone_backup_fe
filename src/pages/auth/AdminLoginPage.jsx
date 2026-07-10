@@ -16,9 +16,10 @@ const AdminLoginPage = () => {
     const onFinish = async (values) => {
         setLoading(true);
 
-        let result = await login(values.username, values.password);
+        // Admin portal: ưu tiên system-login (admin config + manager/staff DB)
+        let result = await systemLogin(values.username.trim(), values.password);
         if (!result.success) {
-            result = await systemLogin(values.username, values.password);
+            result = await login(values.username.trim(), values.password);
         }
 
         if (result.success) {
@@ -41,8 +42,13 @@ const AdminLoginPage = () => {
                         SYSTEM PORTAL
                     </h2>
                     <p className="text-gray-500 mt-2 text-sm font-medium">
-                        Khu vực đăng nhập dành cho nhân viên
+                        Khu vực đăng nhập dành cho Admin / Manager / Staff
                     </p>
+                    {import.meta.env.DEV && (
+                        <p className="text-xs text-gray-400 mt-3 mb-0">
+                            Dev: admin / Admin@123 · manager01 / Pass@123
+                        </p>
+                    )}
                 </div>
 
                 {/* Form của Ant Design tự lo việc quản lý State và Validate */}

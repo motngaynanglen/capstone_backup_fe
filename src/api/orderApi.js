@@ -26,7 +26,11 @@ export const checkoutOrderApi = async (payload) => {
 
 // 5. Thực hiện thanh toán đơn hàng
 export const performTransactionApi = async (payload) => {
-  const response = await axiosInstance.post('/api/transaction/perform-transaction', payload);
+  const response = await axiosInstance.post('/api/transaction/perform-transaction', {
+    orderId: payload.orderId,
+    paymentMethod: payload.paymentMethod,
+    paymentPhase: payload.paymentPhase || 'FULL',
+  });
   return response.data;
 };
 

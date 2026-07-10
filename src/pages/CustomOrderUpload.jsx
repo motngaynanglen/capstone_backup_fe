@@ -1,10 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { notification } from 'antd';
-import materialApi from '../api/materialApi';
 import { uploadFile, createCustomFilePrintRequest } from '../api/mainflow2Api';
 
-const ALLOWED_EXT = ['.stl', '.obj'];
+const ALLOWED_EXT = ['.stl', '.obj', '.glb'];
+
+const formatPrintSize = ({ length, width, height }) => {
+  const parts = [length, width, height].map((v) => v?.trim()).filter(Boolean);
+  return parts.length ? `${parts.join('×')} cm` : '';
+};
 
 const SpinnerIcon = () => (
   <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -17,28 +21,16 @@ const CustomOrderUpload = () => {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState(null); // { name, publicUrl }
-  const [materials, setMaterials] = useState([]);
+  const [uploadedFile, setUploadedFile] = useState(null);
   const [formData, setFormData] = useState({
-    file: null,
-    materialId: '',
+    title: '',
+    quantity: 1,
+    printSizeLength: '',
+    printSizeWidth: '',
+    printSizeHeight: '',
     technicalRequirements: '',
     note: '',
-    title: '',
   });
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await materialApi.getAll();
-        const list = res?.data || [];
-        setMaterials(list);
-        if (list.length > 0) setFormData((f) => ({ ...f, materialId: list[0].id }));
-      } catch (e) {
-        console.error('Lỗi tải vật liệu:', e);
-      }
-    })();
-  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -51,7 +43,7 @@ const CustomOrderUpload = () => {
     if (!ALLOWED_EXT.includes(`.${ext}`)) {
       notification.error({
         message: 'Định dạng không hỗ trợ',
-        description: 'Chỉ chấp nhận file .stl hoặc .obj',
+        description: 'Chỉ chấp nhận file .stl, .obj hoặc .glb',
       });
       return;
     }
@@ -62,12 +54,8 @@ const CustomOrderUpload = () => {
       const publicUrl = data?.publicUrl || data?.url;
       if (!publicUrl) throw new Error('Server không trả về URL file.');
       setUploadedFile({ name: file.name, publicUrl });
-      setFormData((f) => ({ ...f, file, title: f.title || file.name }));
-      notification.success({
-        message: 'Tải file thành công',
-        description: file.name,
-        duration: 2,
-      });
+      setFormData((f) => ({ ...f, title: f.title || file.name }));
+      notification.success({ message: 'Tải file thành công', description: file.name, duration: 2 });
     } catch (err) {
       console.error(err);
       notification.error({
@@ -82,15 +70,21 @@ const CustomOrderUpload = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!uploadedFile?.publicUrl) {
-      notification.warning({ message: 'Bạn cần tải lên file STL/OBJ trước.' });
+      notification.warning({ message: 'Bạn cần tải lên file 3D trước.' });
       return;
     }
     setSubmitting(true);
     try {
+      const printSize = formatPrintSize({
+        length: formData.printSizeLength,
+        width: formData.printSizeWidth,
+        height: formData.printSizeHeight,
+      });
       const payload = {
         title: formData.title || uploadedFile.name,
         customerFileUrl: uploadedFile.publicUrl,
-        materialId: formData.materialId || undefined,
+        quantity: Number(formData.quantity) || 1,
+        printSize: printSize || undefined,
         technicalRequirements: formData.technicalRequirements || undefined,
         note: formData.note || undefined,
       };
@@ -101,7 +95,7 @@ const CustomOrderUpload = () => {
       }
       notification.success({
         message: 'Đã gửi yêu cầu in 3D',
-        description: 'Kỹ thuật viên sẽ xem xét và báo giá. Bạn có thể chat trực tiếp ngay sau đây.',
+        description: 'Manager sẽ giao việc cho kỹ thuật viên báo giá. Bạn có thể chat ngay sau đây.',
       });
       navigate(`/custom-orders/${designWorkId}`);
     } catch (err) {
@@ -120,17 +114,17 @@ const CustomOrderUpload = () => {
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-800 mb-1">Đăng tải File 3D</h1>
         <p className="text-sm text-gray-500">
-          Tải file STL/OBJ của bạn. Kỹ thuật viên sẽ duyệt mesh, kiểm tra wall thickness và gửi báo giá ngay trên hệ thống.
+          Tải file STL/OBJ/GLB. Mô tả nhu cầu in — kỹ thuật viên sẽ chọn vật liệu và báo giá phù hợp.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 space-y-6">
         <div>
-          <label className="block mb-2 font-medium text-gray-800">File 3D (STL/OBJ)</label>
+          <label className="block mb-2 font-medium text-gray-800">File 3D (STL / OBJ / GLB)</label>
           <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-indigo-500 transition-colors">
             <input
               type="file"
-              accept=".stl,.obj"
+              accept=".stl,.obj,.glb"
               onChange={(e) => handleFile(e.target.files?.[0])}
               className="hidden"
               id="file-upload"
@@ -142,18 +136,7 @@ const CustomOrderUpload = () => {
                 {uploadingFile ? 'Đang tải file lên...' :
                   uploadedFile ? uploadedFile.name : 'Nhấn để tải lên hoặc kéo thả file vào đây'}
               </p>
-              <p className="text-xs text-gray-500 mt-2">Chỉ hỗ trợ .stl, .obj — tối đa 20MB</p>
-              {uploadedFile && (
-                <a
-                  href={uploadedFile.publicUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-block mt-2 text-xs text-indigo-600 hover:underline"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  Mở file đã upload
-                </a>
-              )}
+              <p className="text-xs text-gray-500 mt-2">Hỗ trợ .stl, .obj, .glb</p>
             </label>
           </div>
         </div>
@@ -171,29 +154,55 @@ const CustomOrderUpload = () => {
             />
           </div>
           <div>
-            <label className="block mb-2 font-medium text-gray-800">Vật liệu mong muốn</label>
-            <select
-              name="materialId"
-              value={formData.materialId}
+            <label className="block mb-2 font-medium text-gray-800">Số lượng in</label>
+            <input
+              type="number"
+              name="quantity"
+              min={1}
+              max={99}
+              value={formData.quantity}
               onChange={handleChange}
               className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500"
-            >
-              <option value="">— Để KTV tư vấn —</option>
-              {materials.map((m) => (
-                <option key={m.id} value={m.id}>{m.name}</option>
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block mb-2 font-medium text-gray-800">Kích thước in (tuỳ chọn)</label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { name: 'printSizeLength', label: 'Dài' },
+                { name: 'printSizeWidth', label: 'Rộng' },
+                { name: 'printSizeHeight', label: 'Cao' },
+              ].map(({ name, label }) => (
+                <div key={name}>
+                  <span className="block text-xs text-gray-500 mb-1">{label}</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      name={name}
+                      min={0}
+                      step="0.1"
+                      value={formData[name]}
+                      onChange={handleChange}
+                      placeholder="0"
+                      className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500"
+                    />
+                    <span className="shrink-0 text-sm font-medium text-gray-600">cm</span>
+                  </div>
+                </div>
               ))}
-            </select>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">Nhập kích thước mong muốn theo đơn vị centimet (cm).</p>
           </div>
         </div>
 
         <div>
-          <label className="block mb-2 font-medium text-gray-800">Yêu cầu kỹ thuật</label>
+          <label className="block mb-2 font-medium text-gray-800">Yêu cầu kỹ thuật (tuỳ chọn)</label>
           <textarea
             name="technicalRequirements"
             value={formData.technicalRequirements}
             onChange={handleChange}
-            rows={3}
-            placeholder="VD: layer height 0.2mm, in nhiều màu, độ phân giải cao..."
+            rows={2}
+            placeholder="VD: layer height 0.2mm, in nhiều màu..."
             className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 resize-none"
           />
         </div>
@@ -204,11 +213,15 @@ const CustomOrderUpload = () => {
             name="note"
             value={formData.note}
             onChange={handleChange}
-            rows={3}
-            placeholder="Bạn muốn nhận sản phẩm khi nào? Có yêu cầu đặc biệt gì không?"
+            rows={2}
+            placeholder="Thời gian cần hàng, yêu cầu đặc biệt..."
             className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 resize-none"
           />
         </div>
+
+        <p className="text-xs text-indigo-700 bg-indigo-50 rounded-lg px-3 py-2">
+          Bạn không cần chọn vật liệu — kỹ thuật viên sẽ tư vấn vật liệu phù hợp khi báo giá.
+        </p>
 
         <div className="flex gap-4">
           <button
@@ -231,16 +244,6 @@ const CustomOrderUpload = () => {
           </button>
         </div>
       </form>
-
-      <div className="mt-6 rounded-2xl bg-indigo-50 border border-indigo-100 p-5 text-sm text-indigo-900">
-        <p className="font-semibold mb-1">Quy trình sau khi gửi:</p>
-        <ol className="list-decimal pl-5 space-y-1 text-indigo-800">
-          <li>KTV nhận yêu cầu & kiểm duyệt file (mesh, wall thickness).</li>
-          <li>KTV gửi báo giá — bạn chat thương lượng nếu cần.</li>
-          <li>Khi bạn duyệt giá, hệ thống tạo đơn hàng + link thanh toán PayOS.</li>
-          <li>Theo dõi tiến độ in 3D & giao hàng trực tiếp tại "Đơn theo yêu cầu".</li>
-        </ol>
-      </div>
     </div>
   );
 };

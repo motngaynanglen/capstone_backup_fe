@@ -20,7 +20,7 @@ export default function StaffQuoteModal({
 
   return (
     <Modal
-      title={designWorkTitle ? `Báo giá chi tiết — ${designWorkTitle}` : "Báo giá chi tiết"}
+      title={designWorkTitle ? `Báo giá thiết kế + in — ${designWorkTitle}` : "Báo giá thiết kế + in"}
       open={open}
       onCancel={onClose}
       footer={null}

@@ -134,14 +134,29 @@ export function ChatComposer({
           }}
           placeholder={placeholder}
           disabled={disabled}
-          style={{ flex: 1, resize: 'none', borderRadius: 12, fontSize: 14 }}
+          style={{
+            flex: 1,
+            resize: 'none',
+            borderRadius: 12,
+            fontSize: 14,
+            color: '#111827',
+          }}
         />
         <Button
           type="primary"
-          style={{ background: '#4f46e5', flexShrink: 0, height: 36, borderRadius: 12 }}
-          disabled={!canSend}
           loading={uploading}
-          onClick={handleSend}
+          onClick={() => canSend && handleSend()}
+          style={{
+            flexShrink: 0,
+            height: 36,
+            borderRadius: 12,
+            fontWeight: 600,
+            background: canSend ? '#4f46e5' : '#eef2ff',
+            borderColor: canSend ? '#4f46e5' : '#a5b4fc',
+            color: canSend ? '#ffffff' : '#4338ca',
+            cursor: canSend ? 'pointer' : 'not-allowed',
+            opacity: 1,
+          }}
         >
           Gửi →
         </Button>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Spin } from 'antd';
 
@@ -9,30 +9,48 @@ import { useCart } from '../contexts/CartContext';
 import ProductCard from '../components/catalog/ProductCard';
 import { normalizeVariant } from '../utils/catalogProduct';
 
+const sameId = (a, b) => String(a ?? '') === String(b ?? '');
+
+const buildVariantQuery = ({ materialId, conceptTagId, designTemplateId }) => {
+  const params = { isActive: true };
+  if (materialId) params.materialId = String(materialId);
+  if (designTemplateId) params.designTemplateId = String(designTemplateId);
+  if (conceptTagId) params.conceptTagId = String(conceptTagId);
+  return params;
+};
+
 const ProductCatalog = () => {
   const [viewMode, setViewMode] = useState('grid');
   const [selectedMaterialId, setSelectedMaterialId] = useState('');
   const [materials, setMaterials] = useState([]);
+  const [conceptTags, setConceptTags] = useState([]);
   const [variants, setVariants] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchKeyword, setSearchKeyword] = useState('');
-  const [filterLabel, setFilterLabel] = useState('');
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { addToCart } = useCart();
 
-  const conceptTagId = searchParams.get('conceptTag') || null;
+  const conceptTagId = searchParams.get('conceptTag') || '';
   const designTemplateId =
-    searchParams.get('template') || searchParams.get('designTemplate') || null;
+    searchParams.get('template') || searchParams.get('designTemplate') || '';
+  const urlQuery = searchParams.get('q') || '';
+  const [searchKeyword, setSearchKeyword] = useState(urlQuery);
 
-  const fetchVariants = async (materialId, templateId, tagId) => {
+  const activeConceptTag = useMemo(
+    () => conceptTags.find((t) => sameId(t.id, conceptTagId)),
+    [conceptTags, conceptTagId]
+  );
+
+  const fetchVariants = useCallback(async (materialId, templateId, tagId) => {
     setLoading(true);
     try {
-      const params = { isActive: true };
-      if (materialId) params.materialId = materialId;
-      if (templateId) params.designTemplateId = templateId;
-      if (tagId) params.conceptTagId = tagId;
-      const response = await designVariantApi.getAll(params);
+      const response = await designVariantApi.getAll(
+        buildVariantQuery({
+          materialId: materialId || null,
+          designTemplateId: templateId || null,
+          conceptTagId: tagId || null,
+        })
+      );
       const list = Array.isArray(response?.data) ? response.data : [];
       setVariants(list.map(normalizeVariant));
     } catch (err) {
@@ -41,46 +59,89 @@ const ProductCatalog = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    setSearchKeyword(urlQuery);
+  }, [urlQuery]);
+
+  useEffect(() => {
+    let cancelled = false;
+
     (async () => {
       try {
-        const matRes = await materialApi.getAll();
-        setMaterials(matRes?.data || []);
+        const [matRes, tagRes] = await Promise.all([
+          materialApi.getAll(),
+          conceptTagApi.getAll(),
+        ]);
+        if (cancelled) return;
+
+        const matList = (matRes?.data || []).filter((m) => m.isActive !== false);
+        const tagList = (tagRes?.data || [])
+          .filter((t) => t.isActive !== false)
+          .sort((a, b) => {
+            if (a.isMainTag !== b.isMainTag) return (b.isMainTag ? 1 : 0) - (a.isMainTag ? 1 : 0);
+            return (a.name || '').localeCompare(b.name || '', 'vi');
+          });
+
+        setMaterials(matList);
+        setConceptTags(tagList);
       } catch (e) {
-        console.error('Lỗi materials:', e);
+        console.error('Lỗi tải bộ lọc:', e);
       }
-
-      if (conceptTagId) {
-        try {
-          const tagRes = await conceptTagApi.getAll();
-          const tag = (tagRes?.data || []).find((t) => String(t.id) === conceptTagId);
-          setFilterLabel(tag?.name ? `Danh mục: ${tag.name}` : '');
-        } catch {
-          setFilterLabel('');
-        }
-      } else {
-        setFilterLabel('');
-      }
-
-      await fetchVariants(null, designTemplateId, conceptTagId);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conceptTagId, designTemplateId]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    setSelectedMaterialId('');
+    fetchVariants(null, designTemplateId || null, conceptTagId || null);
+  }, [conceptTagId, designTemplateId, fetchVariants]);
 
   const handleMaterialChange = (materialId) => {
-    setSelectedMaterialId(materialId || '');
-    fetchVariants(materialId || null, designTemplateId, conceptTagId);
+    const next = materialId ? String(materialId) : '';
+    setSelectedMaterialId(next);
+    fetchVariants(next || null, designTemplateId || null, conceptTagId || null);
+  };
+
+  const handleConceptTagChange = (tagId) => {
+    const next = new URLSearchParams(searchParams);
+    if (tagId) next.set('conceptTag', String(tagId));
+    else next.delete('conceptTag');
+    setSearchParams(next);
+  };
+
+  const handleSearchChange = (value) => {
+    setSearchKeyword(value);
+    const next = new URLSearchParams(searchParams);
+    const trimmed = value.trim();
+    if (trimmed) next.set('q', trimmed);
+    else next.delete('q');
+    setSearchParams(next, { replace: true });
+  };
+
+  const clearAllFilters = () => {
+    setSelectedMaterialId('');
+    setSearchKeyword('');
+    navigate('/products');
   };
 
   const filtered = useMemo(() => {
-    if (!searchKeyword.trim()) return variants;
     const q = searchKeyword.trim().toLowerCase();
-    return variants.filter(v =>
-      [v.name, v.designTemplateName, v.code, v.material].some(s => (s || '').toLowerCase().includes(q))
+    if (!q) return variants;
+    return variants.filter((v) =>
+      [v.name, v.designTemplateName, v.code, v.material, v.description].some((s) =>
+        (s || '').toLowerCase().includes(q)
+      )
     );
   }, [variants, searchKeyword]);
+
+  const hasActiveFilters = Boolean(
+    conceptTagId || designTemplateId || selectedMaterialId || searchKeyword.trim()
+  );
 
   const quickBuy = (product) => {
     navigate('/checkout', {
@@ -100,16 +161,21 @@ const ProductCatalog = () => {
   };
 
   const handleAddToCart = (product) => {
-    addToCart({
-      id: product.id,
-      name: product.name,
-      designTemplateName: product.designTemplateName,
-      price: product.price,
-      modelSrc: product.modelSrc,
-      sourceType: product.stock > 0 ? 'in_stock' : 'pre_order',
-      stock: product.stock,
-      materials: [product.material],
-    }, 1, product.material);
+    addToCart(
+      {
+        id: product.id,
+        name: product.name,
+        designTemplateName: product.designTemplateName,
+        price: product.price,
+        modelSrc: product.modelSrc,
+        sourceType: product.stock > 0 ? 'in_stock' : 'pre_order',
+        stock: product.stock,
+        isAllowPreOrder: product.isAllowPreOrder,
+        materials: [product.material],
+      },
+      product.material,
+      1
+    );
   };
 
   return (
@@ -120,7 +186,9 @@ const ProductCatalog = () => {
             Danh sách sản phẩm in 3D
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-slate-500">
-            {filterLabel || 'Di chuột vào sản phẩm để xem mô hình 3D trực tiếp. Chọn nhanh mẫu in sẵn hoặc đặt in theo yêu cầu.'}
+            {activeConceptTag?.name
+              ? `Danh mục: ${activeConceptTag.name}`
+              : 'Di chuột vào sản phẩm để xem mô hình 3D trực tiếp. Chọn nhanh mẫu in sẵn hoặc đặt in theo yêu cầu.'}
           </p>
         </div>
 
@@ -128,7 +196,7 @@ const ProductCatalog = () => {
           <input
             type="search"
             value={searchKeyword}
-            onChange={(e) => setSearchKeyword(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Tìm sản phẩm..."
             className="rounded-full border border-slate-200 px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-400 w-48"
           />
@@ -138,6 +206,7 @@ const ProductCatalog = () => {
           ].map(({ mode, label }) => (
             <button
               key={mode}
+              type="button"
               onClick={() => setViewMode(mode)}
               className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${viewMode === mode ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-400'}`}
             >
@@ -147,12 +216,35 @@ const ProductCatalog = () => {
         </div>
       </div>
 
+      {conceptTags.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-slate-700 mr-1">Danh mục:</span>
+          <button
+            type="button"
+            onClick={() => handleConceptTagChange('')}
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition-all cursor-pointer ${!conceptTagId ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-400 hover:text-indigo-600'}`}
+          >
+            Tất cả
+          </button>
+          {conceptTags.map((tag) => (
+            <button
+              key={tag.id}
+              type="button"
+              onClick={() => handleConceptTagChange(tag.id)}
+              className={`rounded-full border px-3 py-1 text-xs font-medium transition-all cursor-pointer ${sameId(conceptTagId, tag.id) ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-400 hover:text-indigo-600'}`}
+            >
+              {tag.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-semibold text-slate-700 mr-1">Chất liệu:</span>
         <button
           type="button"
           onClick={() => handleMaterialChange('')}
-          className={`rounded-full border px-3 py-1 text-xs font-medium transition-all cursor-pointer ${selectedMaterialId === '' ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-400 hover:text-indigo-600'}`}
+          className={`rounded-full border px-3 py-1 text-xs font-medium transition-all cursor-pointer ${!selectedMaterialId ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-400 hover:text-indigo-600'}`}
         >
           Tất cả
         </button>
@@ -161,16 +253,49 @@ const ProductCatalog = () => {
             key={material.id}
             type="button"
             onClick={() => handleMaterialChange(material.id)}
-            className={`rounded-full border px-3 py-1 text-xs font-medium transition-all cursor-pointer ${selectedMaterialId === material.id ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-400 hover:text-indigo-600'}`}
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition-all cursor-pointer ${sameId(selectedMaterialId, material.id) ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-400 hover:text-indigo-600'}`}
           >
             {material.name}
           </button>
         ))}
       </div>
 
+      {hasActiveFilters && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-slate-500">Đang lọc:</span>
+          {activeConceptTag && (
+            <span className="rounded-full bg-indigo-50 text-indigo-700 px-2.5 py-0.5 font-medium">
+              {activeConceptTag.name}
+            </span>
+          )}
+          {selectedMaterialId && (
+            <span className="rounded-full bg-indigo-50 text-indigo-700 px-2.5 py-0.5 font-medium">
+              {materials.find((m) => sameId(m.id, selectedMaterialId))?.name || 'Chất liệu'}
+            </span>
+          )}
+          {searchKeyword.trim() && (
+            <span className="rounded-full bg-indigo-50 text-indigo-700 px-2.5 py-0.5 font-medium">
+              &quot;{searchKeyword.trim()}&quot;
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={clearAllFilters}
+            className="text-indigo-600 hover:underline cursor-pointer font-medium"
+          >
+            Xóa bộ lọc
+          </button>
+        </div>
+      )}
+
       <div className="space-y-3">
         <div className="flex items-center justify-between text-[11px] text-slate-500">
-          <span>Tìm thấy <b>{filtered.length}</b> sản phẩm</span>
+          <span>
+            Tìm thấy <b>{filtered.length}</b> sản phẩm
+            {variants.length !== filtered.length && (
+              <span className="text-slate-400"> (trong {variants.length} kết quả lọc)</span>
+            )}
+          </span>
           <span>Giá đã bao gồm chi phí vật liệu in cơ bản</span>
         </div>
 
@@ -198,15 +323,7 @@ const ProductCatalog = () => {
             <button
               type="button"
               className="mt-3 text-sm text-indigo-600 hover:underline cursor-pointer"
-              onClick={() => {
-                setSelectedMaterialId('');
-                setSearchKeyword('');
-                if (conceptTagId || designTemplateId) {
-                  navigate('/products');
-                } else {
-                  fetchVariants(null, null, null);
-                }
-              }}
+              onClick={clearAllFilters}
             >
               Xóa bộ lọc
             </button>

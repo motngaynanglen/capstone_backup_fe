@@ -19,17 +19,19 @@ import {
   CheckCircleOutlined,
   PrinterOutlined,
   SendOutlined,
-  TruckOutlined,
 } from '@ant-design/icons';
 import { getOrderDetailApi, updateOrderStatusApi, updateOrderItemFulfillmentApi } from '../../api/orderApi';
 import { normalizeOrderDetail } from '../../utils/orderNormalize';
 import { formatVnd, formatDateTime, shortId } from '../../utils/formatters';
 import {
   orderStatusMap,
+  shipmentStatusMap,
   fulfillmentStatusMap,
   isCustomManufacturing,
   isInStockItem,
   allOrderItemsReadyForShip,
+  getStaffOrderStatusActions,
+  isTerminalOrderStatus,
   normStatus,
 } from '../../utils/staffOrderConstants';
 import StaffCarrierActions from '../Shipping/StaffCarrierActions';
@@ -120,7 +122,11 @@ export default function StaffOrderDetailModal({ open, orderId, onClose, onUpdate
   };
 
   const os = normStatus(order?.orderStatus);
+  const ss = normStatus(order?.shipment?.shipmentStatus);
   const paid = normStatus(order?.invoice?.paymentStatus) === 'PAID';
+  const isCod = Boolean(order?.invoice?.isCod);
+  const canFulfill = paid || isCod;
+  const isTerminal = isTerminalOrderStatus(os);
   const productionItems = (order?.items || []).filter((it) =>
     isCustomManufacturing(it.sourceType),
   );
@@ -128,14 +134,20 @@ export default function StaffOrderDetailModal({ open, orderId, onClose, onUpdate
     productionItems.length === 0 ||
     productionItems.every((it) => normStatus(it.fulfillmentStatus) === 'FINISHED');
   const allItemsReady = allOrderItemsReadyForShip(order?.items || []);
-  const readyForShip = os === 'PROCESSING' && paid && allItemsReady;
+  const readyForShip = os === 'PROCESSING' && canFulfill && allItemsReady;
   const hasCarrier = Boolean(order?.shipment?.carrierOrderCode);
+  const orderStatusActions = getStaffOrderStatusActions({
+    orderStatus: os,
+    canFulfill,
+    allItemsReady,
+  });
 
   const workflowStep = (() => {
     if (os === 'COMPLETED') return 4;
-    if (hasCarrier || normStatus(order?.shipment?.shipmentStatus) === 'IN_TRANSIT') return 3;
+    if (hasCarrier || ss === 'IN_TRANSIT') return 3;
     if (os === 'FINISHED') return 2;
-    if (os === 'PROCESSING' && paid) return 1;
+    if (os === 'PROCESSING' && canFulfill) return 1;
+    if (os === 'PENDING' && isCod) return 1;
     return 0;
   })();
 
@@ -178,10 +190,14 @@ export default function StaffOrderDetailModal({ open, orderId, onClose, onUpdate
         if (fs === 'FINISHED' || fs === 'CANCELLED') {
           return <Text type="secondary">—</Text>;
         }
-        if (os !== 'PROCESSING' || !paid) {
+        if (isTerminal || os !== 'PROCESSING' || !canFulfill) {
           return (
             <Text type="secondary" style={{ fontSize: 12 }}>
-              Cần đơn PROCESSING + đã TT
+              {isTerminal
+                ? '—'
+                : isCod
+                  ? 'Cần đơn PROCESSING'
+                  : 'Cần đơn PROCESSING + đã TT'}
             </Text>
           );
         }
@@ -270,7 +286,11 @@ export default function StaffOrderDetailModal({ open, orderId, onClose, onUpdate
             size="small"
             current={workflowStep}
             items={[
-              { title: 'Thanh toán', description: paid ? 'Đã TT' : 'Chờ TT' },
+              {
+                title: isCod ? 'COD' : 'Thanh toán',
+                description: paid ? 'Đã TT' : isCod ? 'Thu khi giao' : 'Chờ TT',
+                status: paid || isCod ? 'finish' : undefined,
+              },
               { title: 'Sản xuất', description: allProductionFinished ? 'Xong' : 'Đang in' },
               { title: 'Sẵn sàng giao', description: os === 'FINISHED' ? 'OK' : 'Chờ' },
               { title: 'Vận chuyển', description: hasCarrier ? 'Đã tạo GHN' : 'Chờ GHN' },
@@ -278,8 +298,17 @@ export default function StaffOrderDetailModal({ open, orderId, onClose, onUpdate
             ]}
           />
 
-          {!paid && os === 'PENDING' && (
+          {!canFulfill && os === 'PENDING' && (
             <Alert type="warning" showIcon message="Đơn chưa thanh toán — chưa vào sản xuất." />
+          )}
+
+          {isCod && !paid && os !== 'COMPLETED' && (
+            <Alert
+              type="info"
+              showIcon
+              message="Đơn COD — thu tiền khi giao hàng"
+              description="Có thể tiếp nhận và xử lý đơn mà không cần ghi nhận thanh toán trước."
+            />
           )}
 
           {readyForShip && (
@@ -291,17 +320,15 @@ export default function StaffOrderDetailModal({ open, orderId, onClose, onUpdate
                   ? 'Tất cả sản phẩm đã in xong'
                   : 'Đã soạn / đóng gói xong'
               }
-              description="Chuyển đơn sang «Sẵn sàng giao» để tạo vận đơn GHN."
-              action={
-                <Button
-                  size="small"
-                  type="primary"
-                  loading={busyOrder}
-                  onClick={() => handleOrderStatus('FINISHED', 'READY_FOR_PICKUP')}
-                >
-                  Sẵn sàng giao
-                </Button>
-              }
+              description="Bấm «Sẵn sàng giao» bên dưới để tạo vận đơn GHN."
+            />
+          )}
+
+          {isTerminal && (
+            <Alert
+              type={os === 'CANCELLED' ? 'error' : 'success'}
+              showIcon
+              message={os === 'CANCELLED' ? 'Đơn đã hủy' : 'Đơn đã hoàn thành'}
             />
           )}
 
@@ -310,9 +337,13 @@ export default function StaffOrderDetailModal({ open, orderId, onClose, onUpdate
             <Descriptions.Item label="Trạng thái">{renderOrderStatus(order.orderStatus)}</Descriptions.Item>
             <Descriptions.Item label="Khách hàng">{order.customerName || '—'}</Descriptions.Item>
             <Descriptions.Item label="Thanh toán">
-              <Tag color={paid ? 'success' : 'warning'}>
-                {order.invoice?.paymentStatus || '—'}
-              </Tag>
+              {isCod && !paid ? (
+                <Tag color="blue">COD · thu khi giao</Tag>
+              ) : (
+                <Tag color={paid ? 'success' : 'warning'}>
+                  {order.invoice?.paymentStatus || '—'}
+                </Tag>
+              )}
             </Descriptions.Item>
             <Descriptions.Item label="Tổng tiền">
               <Text strong>{formatVnd(order.totalPrice)}</Text>
@@ -336,53 +367,75 @@ export default function StaffOrderDetailModal({ open, orderId, onClose, onUpdate
             />
           </div>
 
-          <Input.TextArea
-            rows={2}
-            placeholder="Ghi chú nội bộ (tùy chọn) — gắn khi cập nhật trạng thái"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
+          {!isTerminal && (
+            <>
+              <Input.TextArea
+                rows={2}
+                placeholder="Ghi chú nội bộ (tùy chọn) — gắn khi cập nhật trạng thái"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
 
-          <Divider orientation="left">Chuyển trạng thái đơn</Divider>
-          <Space wrap>
-            {os === 'PENDING' && paid && (
-              <Button
-                loading={busyOrder}
-                onClick={() => handleOrderStatus('PROCESSING', 'PREPARING')}
-              >
-                Tiếp nhận → PROCESSING
-              </Button>
-            )}
-            {os === 'PROCESSING' && readyForShip && (
-              <Popconfirm
-                title="Chuyển sang sẵn sàng giao?"
-                onConfirm={() => handleOrderStatus('FINISHED', 'READY_FOR_PICKUP')}
-              >
-                <Button type="primary" icon={<SendOutlined />} loading={busyOrder}>
-                  Sẵn sàng giao (FINISHED)
-                </Button>
-              </Popconfirm>
-            )}
-            {os === 'FINISHED' && hasCarrier && (
-              <Button
-                icon={<TruckOutlined />}
-                loading={busyOrder}
-                onClick={() => handleOrderStatus('FINISHED', 'IN_TRANSIT')}
-              >
-                Đang giao (IN_TRANSIT)
-              </Button>
-            )}
-            {(hasCarrier || normStatus(order?.shipment?.shipmentStatus) === 'IN_TRANSIT') && (
-              <Popconfirm
-                title="Xác nhận khách đã nhận hàng?"
-                onConfirm={() => handleOrderStatus('COMPLETED', 'DELIVERED')}
-              >
-                <Button type="primary" icon={<CheckCircleOutlined />} loading={busyOrder}>
-                  Hoàn thành (COMPLETED)
-                </Button>
-              </Popconfirm>
-            )}
-          </Space>
+              {orderStatusActions.length > 0 ? (
+                <>
+                  <Divider orientation="left">Thao tác tiếp theo</Divider>
+                  <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                    <Space wrap size="middle">
+                      <Text type="secondary">Trạng thái hiện tại:</Text>
+                      {renderOrderStatus(os)}
+                      {ss && shipmentStatusMap[ss] && (
+                        <Tag color={shipmentStatusMap[ss].color}>{shipmentStatusMap[ss].label}</Tag>
+                      )}
+                    </Space>
+                    <Space wrap>
+                      {orderStatusActions.map((action) => {
+                        const btn = (
+                          <Button
+                            key={action.key}
+                            type={action.primary ? 'primary' : 'default'}
+                            icon={action.key === 'ready-for-ship' ? <SendOutlined /> : undefined}
+                            loading={busyOrder}
+                            onClick={
+                              action.confirm
+                                ? undefined
+                                : () => handleOrderStatus(action.orderStatus, action.shipmentStatus)
+                            }
+                          >
+                            {action.label}
+                          </Button>
+                        );
+                        return action.confirm ? (
+                          <Popconfirm
+                            key={action.key}
+                            title={action.confirm}
+                            onConfirm={() =>
+                              handleOrderStatus(action.orderStatus, action.shipmentStatus)
+                            }
+                          >
+                            {btn}
+                          </Popconfirm>
+                        ) : (
+                          btn
+                        );
+                      })}
+                    </Space>
+                    {orderStatusActions[0]?.description && (
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {orderStatusActions[0].description}
+                      </Text>
+                    )}
+                  </Space>
+                </>
+              ) : os === 'FINISHED' || hasCarrier || ss === 'IN_TRANSIT' ? (
+                <Alert
+                  type="info"
+                  showIcon
+                  message="Đơn đang ở bước vận chuyển"
+                  description="Dùng mục «Vận chuyển GHN» bên dưới để tạo vận đơn hoặc cập nhật trạng thái giao hàng."
+                />
+              ) : null}
+            </>
+          )}
 
           <StaffCarrierActions
             orderId={order.id}

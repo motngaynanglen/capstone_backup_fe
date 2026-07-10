@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { Spin, message, Modal, Button } from "antd";
-import { getDesignRequestDetail, assignStaffToRequest, submitQuote, postDesignRequestMessage, cancelDesignRequest, uploadFile } from "../../api/mainflow2Api";
+import { Spin, message, Modal, Button, Select } from "antd";
+import { getDesignRequestDetail, assignStaffToRequest, managerAssignStaff, getMainflow2StaffList, submitQuote, postDesignRequestMessage, cancelDesignRequest, uploadFile, completeDesign, isDirectPrintSourceType } from "../../api/mainflow2Api";
 import { useAuth } from "../../contexts/AuthContext";
 import useMainflow2Realtime from "../../hooks/useMainflow2Realtime";
 import CustomerRequestPanel from "../../components/Mainflow2/CustomerRequestPanel";
 import StaffQuoteModal from "../../components/Mainflow2/StaffQuoteModal";
+import StaffDesignDeliverableModal from "../../components/Mainflow2/StaffDesignDeliverableModal";
 import QuoteMessageCard from "../../components/Mainflow2/QuoteMessageCard";
+import DesignDeliverableCard from "../../components/Mainflow2/DesignDeliverableCard";
 import ChatMessageBubble, { ChatComposer } from "../../components/Mainflow2/ChatMessageBubble";
 import { getMessageAuthorId } from "../../components/Mainflow2/messageMetadataUtils";
 import Model3DPreview from "../../components/Mainflow2/Model3DPreview";
@@ -14,7 +16,7 @@ import Model3DPreview from "../../components/Mainflow2/Model3DPreview";
 const CUSTOM_STATUS_STEPS = [
   { key: 'SUBMITTED', label: 'Gửi yêu cầu' },
   { key: 'ASSIGNED', label: 'Đã phân công' },
-  { key: 'QUOTED', label: 'Đã báo giá' },
+  { key: 'QUOTED', label: 'Báo giá thiết kế + in' },
   { key: 'NEGOTIATING', label: 'Thương lượng' },
   { key: 'APPROVED', label: 'Đã duyệt' },
 ];
@@ -24,7 +26,7 @@ const STATUS_ORDER = CUSTOM_STATUS_STEPS.map(s => s.key);
 const STATUS_LABEL = {
   SUBMITTED: 'Mới gửi',
   ASSIGNED: 'Đã nhận việc',
-  QUOTED: 'Đã báo giá',
+  QUOTED: 'Báo giá thiết kế + in',
   NEGOTIATING: 'Đang thương lượng',
   APPROVED: 'Đã duyệt',
   CANCELLED: 'Đã hủy',
@@ -41,6 +43,9 @@ const statusColor = (status) => {
   if (status === 'APPROVED') return { background: '#ecfdf5', color: '#059669' };
   return { background: '#fef2f2', color: '#dc2626' };
 };
+
+const isDesignDeliverableLog = (logType) =>
+  String(logType || '').toUpperCase().includes('DESIGN_READY');
 
 const StaffCustomOrderDetail = () => {
   const { id } = useParams();
@@ -64,6 +69,23 @@ const StaffCustomOrderDetail = () => {
 
   // Quote panel
   const [quoteModalOpen, setQuoteModalOpen] = useState(false);
+  const [deliverableModalOpen, setDeliverableModalOpen] = useState(false);
+  const [staffList, setStaffList] = useState([]);
+  const [selectedStaffId, setSelectedStaffId] = useState(null);
+
+  const isManager = ['manager', 'admin'].includes(String(user?.role || '').toLowerCase());
+
+  useEffect(() => {
+    if (!isManager) return;
+    (async () => {
+      try {
+        const res = await getMainflow2StaffList();
+        setStaffList(Array.isArray(res?.data) ? res.data : []);
+      } catch {
+        /* manager-only */
+      }
+    })();
+  }, [isManager]);
 
   const fetchDetail = useCallback(async (silent = false) => {
     try {
@@ -99,6 +121,25 @@ const StaffCustomOrderDetail = () => {
         finally { setProcessing(false); }
       }
     });
+  };
+
+  const handleManagerAssign = async () => {
+    if (!selectedStaffId) {
+      message.warning('Chọn nhân viên để giao việc');
+      return;
+    }
+    try {
+      setProcessing(true);
+      const res = await managerAssignStaff(id, selectedStaffId);
+      if (res?.statusCode === 200) {
+        message.success('Đã giao việc cho nhân viên!');
+        fetchDetail();
+      } else message.error(res?.message || 'Giao việc thất bại');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Giao việc thất bại');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const handleSendChat = async ({ content, file }) => {
@@ -147,7 +188,28 @@ const StaffCustomOrderDetail = () => {
     }
   };
 
+  const handleSubmitDesignDeliverable = async ({ deliverableFileUrl, note }) => {
+    try {
+      setProcessing(true);
+      const res = await completeDesign(id, { deliverableFileUrl, note });
+      if (res?.statusCode === 200) {
+        message.success('Đã gửi bảng thiết kế!');
+        setDeliverableModalOpen(false);
+        fetchDetail();
+      } else message.error(res?.message || 'Thất bại');
+    } catch (err) {
+      message.error(err?.response?.data?.message || err?.response?.data?.data || 'Thất bại');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const handleCancel = () => {
+    const designWorkId = order?.id || id;
+    if (!designWorkId) {
+      message.error('Thiếu mã yêu cầu — không thể hủy.');
+      return;
+    }
     Modal.confirm({
       title: 'Hủy yêu cầu',
       content: 'Hành động này không thể hoàn tác.',
@@ -157,7 +219,7 @@ const StaffCustomOrderDetail = () => {
       onOk: async () => {
         try {
           setProcessing(true);
-          const res = await cancelDesignRequest(id);
+          const res = await cancelDesignRequest(designWorkId);
           if (res?.statusCode === 200) { message.success('Đã hủy!'); fetchDetail(); }
           else message.error(res?.message || 'Lỗi khi hủy');
         } catch { message.error('Lỗi khi hủy'); }
@@ -175,6 +237,13 @@ const StaffCustomOrderDetail = () => {
   }
 
   const fileVersions = order?.versions || order?.quoteFileVersions || [];
+  const isDirectPrintFlow = isDirectPrintSourceType(order?.sourceType);
+  const isPaid = order?.linkedPaymentStatus === 'PAID';
+  const isDeposited = order?.linkedPaymentStatus === 'PARTIALLY_PAID';
+  const designReady = Boolean(order?.designReadyForBalance);
+  const showDesigningPhase = !isDirectPrintFlow && isDeposited && !isPaid && !designReady;
+  const showAwaitingBalance = !isDirectPrintFlow && isDeposited && designReady && !isPaid;
+  const showProduction = isPaid;
 
   if (!order) {
     return (
@@ -241,6 +310,7 @@ const StaffCustomOrderDetail = () => {
             {order.messages?.length > 0 ? order.messages.map((msg, i) => {
               const isMe = getMessageAuthorId(msg) === user?.id;
               const isQuote = msg.logType && msg.logType.toUpperCase().includes('QUOTE');
+              const isDesignDeliverable = isDesignDeliverableLog(msg.logType);
 
               if (isQuote) {
                 let meta = null;
@@ -252,6 +322,19 @@ const StaffCustomOrderDetail = () => {
                       staffNote={msg.content}
                       revision={meta?.revision}
                     />
+                    <span style={{ fontSize: 10, color: '#9ca3af', marginTop: 3, display: 'block' }}>
+                      {new Date(msg.created).toLocaleString('vi-VN')} · Nhân viên
+                    </span>
+                  </div>
+                );
+              }
+
+              if (isDesignDeliverable) {
+                let meta = null;
+                try { meta = msg.metadataJson ? JSON.parse(msg.metadataJson) : null; } catch { }
+                return (
+                  <div key={msg.id || i} style={{ width: '100%', marginBottom: 12 }}>
+                    <DesignDeliverableCard meta={meta} staffNote={msg.content} />
                     <span style={{ fontSize: 10, color: '#9ca3af', marginTop: 3, display: 'block' }}>
                       {new Date(msg.created).toLocaleString('vi-VN')} · Nhân viên
                     </span>
@@ -275,13 +358,63 @@ const StaffCustomOrderDetail = () => {
           {/* Composer */}
           {order.status === 'SUBMITTED' ? (
             <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center' }}>
-              <p style={{ margin: '0 0 8px 0', color: '#6b7280', fontSize: 13 }}>Bạn chưa nhận việc. Tiếp nhận để bắt đầu trao đổi.</p>
-              <Button type="primary" style={{ background: '#4f46e5' }} onClick={handleAssign} loading={processing}>Tiếp nhận xử lý</Button>
+              {isManager ? (
+                <>
+                  <p style={{ margin: '0 0 8px 0', color: '#6b7280', fontSize: 13 }}>Manager giao việc cho nhân viên</p>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <Select
+                      placeholder="Chọn nhân viên"
+                      style={{ minWidth: 220, textAlign: 'left' }}
+                      value={selectedStaffId}
+                      onChange={setSelectedStaffId}
+                      options={staffList.map((s) => ({ value: s.staffId, label: s.fullName || s.username }))}
+                    />
+                    <Button type="primary" style={{ background: '#4f46e5' }} onClick={handleManagerAssign} loading={processing}>
+                      Giao việc
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p style={{ margin: '0 0 8px 0', color: '#6b7280', fontSize: 13 }}>Bạn chưa nhận việc. Tiếp nhận để bắt đầu trao đổi.</p>
+                  <Button type="primary" style={{ background: '#4f46e5' }} onClick={handleAssign} loading={processing}>Tiếp nhận xử lý</Button>
+                </>
+              )}
             </div>
           ) : order.status === 'CANCELLED' ? (
             <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#dc2626', fontSize: 13, fontWeight: 500 }}>
               Yêu cầu đã bị hủy.
             </div>
+          ) : order.status === 'APPROVED' && showProduction ? (
+            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#2563eb', fontSize: 13, fontWeight: 600 }}>
+              Khách đã thanh toán đủ — theo dõi sản xuất tại hàng đợi in
+            </div>
+          ) : order.status === 'APPROVED' && showAwaitingBalance ? (
+            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#d97706', fontSize: 13, fontWeight: 600 }}>
+              Đã gửi bảng thiết kế — chờ khách hoàn tất thanh toán
+            </div>
+          ) : order.status === 'APPROVED' && showDesigningPhase ? (
+            <>
+              <div style={{ flexShrink: 0, background: '#faf5ff', borderTop: '1px solid #e9d5ff', padding: '10px 16px', textAlign: 'center', color: '#7c3aed', fontSize: 13, fontWeight: 600 }}>
+                Khách đã cọc 30% — gửi bảng thiết kế (GLB) cho khách duyệt
+              </div>
+              <ChatComposer
+                value={chatMessage}
+                onChange={setChatMessage}
+                onSend={handleSendChat}
+                uploading={uploading}
+                extraLeft={
+                  <Button
+                    type="primary"
+                    loading={processing}
+                    onClick={() => setDeliverableModalOpen(true)}
+                    style={{ flexShrink: 0, background: '#7c3aed', borderColor: '#7c3aed', fontWeight: 600 }}
+                  >
+                    Gửi bảng thiết kế
+                  </Button>
+                }
+              />
+            </>
           ) : order.status === 'APPROVED' ? (
             <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#059669', fontSize: 13, fontWeight: 600 }}>
               🎉 Khách đã duyệt! Giá cuối: {formatPrice(order.latestQuotedPrice)}
@@ -298,7 +431,7 @@ const StaffCustomOrderDetail = () => {
                     onClick={() => setQuoteModalOpen(true)}
                     style={{ flexShrink: 0, background: '#ecfdf5', borderColor: '#6ee7b7', color: '#059669', fontWeight: 600 }}
                   >
-                    💰 Báo giá
+                    💰 Báo giá thiết kế + in
                   </Button>
                 ) : null
               }
@@ -407,6 +540,13 @@ const StaffCustomOrderDetail = () => {
         onSubmit={handleSubmitQuote}
         submitting={processing}
         designWorkTitle={order.title}
+      />
+
+      <StaffDesignDeliverableModal
+        open={deliverableModalOpen}
+        onClose={() => setDeliverableModalOpen(false)}
+        onSubmit={handleSubmitDesignDeliverable}
+        submitting={processing}
       />
     </div>
   );

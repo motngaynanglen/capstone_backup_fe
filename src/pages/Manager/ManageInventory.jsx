@@ -1,74 +1,93 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Table, Button, Input, Select, Modal, Form, InputNumber, Card, Row, Col,
-  Tag, Space, Tooltip, Typography, message, Empty
+  Table, Button, Select, Modal, Form, InputNumber, Card, Row, Col,
+  Tag, Space, Typography, message, Empty, Statistic, Tooltip, Input,
 } from 'antd';
 import {
-  PlusOutlined, SearchOutlined, ReloadOutlined, DatabaseOutlined,
-  ArrowUpOutlined, ArrowDownOutlined, SwapOutlined
+  SearchOutlined, ReloadOutlined,
+  ArrowDownOutlined, ArrowUpOutlined,
 } from '@ant-design/icons';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import inventoryApi from '../../api/inventoryApi';
 import designVariantApi from '../../api/designVariantApi';
+import {
+  INVENTORY_TRANSACTION_TYPES,
+  CREATABLE_TRANSACTION_TYPES,
+  DIRECTION_FILTERS,
+  resolveTransactionType,
+  formatQuantityChange,
+} from '../../constants/inventoryTransactionTypes';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
 
-const TRANSACTION_TYPES = [
-  { value: 'IMPORT', label: 'Nhập kho', color: 'green', icon: <ArrowDownOutlined /> },
-  { value: 'EXPORT', label: 'Xuất kho', color: 'red', icon: <ArrowUpOutlined /> },
-  { value: 'ADJUSTMENT', label: 'Điều chỉnh', color: 'blue', icon: <SwapOutlined /> },
+const TYPE_FILTER_OPTIONS = [
+  { value: '', label: 'Tất cả loại' },
+  ...Object.values(INVENTORY_TRANSACTION_TYPES).map((t) => ({
+    value: t.value,
+    label: t.label,
+  })),
 ];
-
-const typeMap = Object.fromEntries(TRANSACTION_TYPES.map(t => [t.value, t]));
 
 const ManageInventory = () => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filterType, setFilterType] = useState(null);
-  const [filterVariantId, setFilterVariantId] = useState('');
+  const [filterDirection, setFilterDirection] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterVariantId, setFilterVariantId] = useState(null);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
 
-  // Modal tạo giao dịch mới
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form] = Form.useForm();
+  const watchedType = Form.useWatch('type', form);
+  const watchedDirection = Form.useWatch('direction', form);
 
-  // Modal tra cứu theo orderId
-  const [isRefModalOpen, setIsRefModalOpen] = useState(false);
-  const [refOrderId, setRefOrderId] = useState('');
-  const [refResult, setRefResult] = useState([]);
-  const [refLoading, setRefLoading] = useState(false);
-
-  // Danh sách variants cho select
   const [variantList, setVariantList] = useState([]);
   const [variantLoading, setVariantLoading] = useState(false);
 
+  const pageSummary = useMemo(() => {
+    return transactions.reduce(
+      (acc, row) => {
+        const qty = Number(row.quantity) || 0;
+        if (qty > 0) acc.inbound += qty;
+        else if (qty < 0) acc.outbound += Math.abs(qty);
+        return acc;
+      },
+      { inbound: 0, outbound: 0 },
+    );
+  }, [transactions]);
+
   useEffect(() => {
     fetchTransactions(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchTransactions = async (page = 1, type = filterType, variantId = filterVariantId) => {
+  const buildQueryParams = (page, direction = filterDirection, type = filterType, variantId = filterVariantId) => {
+    const params = {
+      pageNumber: page,
+      pageSize: pagination.pageSize,
+    };
+    if (direction) params.direction = direction;
+    if (type) params.type = type;
+    if (variantId) params.designVariantId = variantId;
+    return params;
+  };
+
+  const fetchTransactions = async (page = 1, direction = filterDirection, type = filterType, variantId = filterVariantId) => {
     setLoading(true);
     try {
-      const params = {
-        pageNumber: page,
-        pageSize: pagination.pageSize,
-      };
-      if (type) params.type = type;
-      if (variantId?.trim()) params.designVariantId = variantId.trim();
-
-      const res = await inventoryApi.query(params);
+      const res = await inventoryApi.query(buildQueryParams(page, direction, type, variantId));
       const list = res?.data || [];
       setTransactions(list);
-      setPagination(prev => ({
+      setPagination((prev) => ({
         ...prev,
         current: page,
         total: res?.additionalData?.paging?.totalCount || list.length,
       }));
-    } catch (err) {
+    } catch {
       message.error('Không thể tải lịch sử kho');
     } finally {
       setLoading(false);
@@ -76,9 +95,10 @@ const ManageInventory = () => {
   };
 
   const handleReset = () => {
-    setFilterType(null);
-    setFilterVariantId('');
-    fetchTransactions(1, null, '');
+    setFilterDirection('');
+    setFilterType('');
+    setFilterVariantId(null);
+    fetchTransactions(1, '', '', null);
   };
 
   const fetchVariants = async () => {
@@ -94,8 +114,13 @@ const ManageInventory = () => {
     }
   };
 
-  const openCreateModal = () => {
+  const openCreateModal = (direction = 'IN') => {
     form.resetFields();
+    if (direction === 'OUT') {
+      form.setFieldsValue({ direction: 'OUT', type: 'ADJUSTMENT' });
+    } else {
+      form.setFieldsValue({ direction: 'IN', type: 'PRODUCTION_IN' });
+    }
     fetchVariants();
     setIsCreateModalOpen(true);
   };
@@ -103,8 +128,26 @@ const ManageInventory = () => {
   const handleCreate = async () => {
     try {
       const values = await form.validateFields();
+      const qty = Number(values.quantity);
+      if (!qty || qty <= 0) {
+        message.warning('Số lượng phải lớn hơn 0');
+        return;
+      }
+
+      let signedQuantity = qty;
+      if (values.type === 'ADJUSTMENT') {
+        signedQuantity = values.direction === 'OUT' ? -qty : qty;
+      } else if (values.direction === 'OUT') {
+        signedQuantity = -qty;
+      }
+
       setCreating(true);
-      await inventoryApi.create(values);
+      await inventoryApi.create({
+        designVariantId: values.designVariantId,
+        type: values.type,
+        quantity: signedQuantity,
+        note: values.note?.trim() || undefined,
+      });
       message.success('Tạo giao dịch kho thành công!');
       form.resetFields();
       setIsCreateModalOpen(false);
@@ -117,18 +160,33 @@ const ManageInventory = () => {
     }
   };
 
-  const handleSearchByReference = async () => {
-    if (!refOrderId.trim()) { message.warning('Vui lòng nhập Order ID'); return; }
-    setRefLoading(true);
-    try {
-      const res = await inventoryApi.getByReference(refOrderId.trim());
-      setRefResult(Array.isArray(res?.data) ? res.data : (res ? [res] : []));
-    } catch (err) {
-      message.error('Không tìm thấy lịch sử theo Order ID này');
-      setRefResult([]);
-    } finally {
-      setRefLoading(false);
+  const renderDirectionTag = (record) => {
+    const { direction } = formatQuantityChange(record.quantity);
+    if (direction === 'IN') {
+      return <Tag color="green" icon={<ArrowDownOutlined />}>Nhập</Tag>;
     }
+    if (direction === 'OUT') {
+      return <Tag color="red" icon={<ArrowUpOutlined />}>Xuất</Tag>;
+    }
+    return <Tag>Không đổi</Tag>;
+  };
+
+  const renderTypeTag = (record) => {
+    const meta = resolveTransactionType(record.type, record);
+    const Icon = meta.icon;
+    return (
+      <Tooltip title={meta.description || record.type}>
+        <Tag color={record.typeColor ? undefined : meta.color} style={record.typeColor ? { borderColor: record.typeColor, color: record.typeColor } : undefined}>
+          {Icon ? <Icon style={{ marginRight: 4 }} /> : null}
+          {record.typeLabel || meta.label}
+        </Tag>
+      </Tooltip>
+    );
+  };
+
+  const renderQuantity = (quantity) => {
+    const { text, color } = formatQuantityChange(quantity);
+    return <span style={{ color, fontWeight: 700, fontSize: 15 }}>{text}</span>;
   };
 
   const columns = [
@@ -138,29 +196,49 @@ const ManageInventory = () => {
       render: (_, __, i) => (pagination.current - 1) * pagination.pageSize + i + 1,
     },
     {
-      title: 'Loại',
+      title: 'Hướng',
+      width: 90,
+      render: (_, record) => renderDirectionTag(record),
+    },
+    {
+      title: 'Loại giao dịch',
       dataIndex: 'type',
-      width: 130,
-      render: (type) => {
-        const t = typeMap[type];
-        return t ? <Tag color={t.color} icon={t.icon}>{t.label}</Tag> : <Tag>{type}</Tag>;
-      },
+      width: 150,
+      render: (_, record) => renderTypeTag(record),
     },
     {
-      title: 'Mã biến thể',
-      dataIndex: 'designVariantId',
+      title: 'Sản phẩm',
+      dataIndex: 'variantName',
       ellipsis: true,
-      render: (id) => <Text code className="text-xs">{id}</Text>,
+      render: (name, record) => (
+        <div>
+          <Text strong>{name || '—'}</Text>
+          {record.designVariantId && (
+            <div><Text type="secondary" code className="text-xs">{record.designVariantId.slice(0, 8)}…</Text></div>
+          )}
+        </div>
+      ),
     },
     {
-      title: 'Số lượng',
+      title: 'Thay đổi SL',
       dataIndex: 'quantity',
-      width: 100,
-      align: 'right',
-      render: (qty, record) => {
-        const color = record.type === 'EXPORT' ? '#ef4444' : record.type === 'IMPORT' ? '#10b981' : '#3b82f6';
-        return <span style={{ color, fontWeight: 600 }}>{record.type === 'EXPORT' ? '-' : '+'}{qty}</span>;
-      },
+      width: 110,
+      align: 'center',
+      render: renderQuantity,
+    },
+    {
+      title: 'Người thực hiện',
+      dataIndex: 'staffName',
+      width: 130,
+      ellipsis: true,
+      render: (name) => name || 'Hệ thống',
+    },
+    {
+      title: 'Mã tham chiếu',
+      dataIndex: 'referenceId',
+      width: 120,
+      ellipsis: true,
+      render: (id) => id ? <Text code className="text-xs">{String(id).slice(0, 8)}…</Text> : <Text type="secondary">—</Text>,
     },
     {
       title: 'Ghi chú',
@@ -169,110 +247,160 @@ const ManageInventory = () => {
       render: (note) => note || <Text type="secondary">—</Text>,
     },
     {
-      title: 'Reference',
-      dataIndex: 'referenceId',
-      ellipsis: true,
-      render: (id) => id ? <Text code className="text-xs">{id}</Text> : <Text type="secondary">—</Text>,
-    },
-    {
       title: 'Thời gian',
-      dataIndex: 'createdAt',
-      width: 140,
+      dataIndex: 'created',
+      width: 145,
       render: (date) => date ? format(new Date(date), 'dd/MM/yyyy HH:mm', { locale: vi }) : '—',
     },
   ];
 
-  const refColumns = [
-    { title: 'Loại', dataIndex: 'type', render: (type) => { const t = typeMap[type]; return t ? <Tag color={t.color}>{t.label}</Tag> : <Tag>{type}</Tag>; } },
-    { title: 'Số lượng', dataIndex: 'quantity', align: 'right' },
-    { title: 'Ghi chú', dataIndex: 'note', ellipsis: true },
-    { title: 'Thời gian', dataIndex: 'createdAt', render: (d) => d ? format(new Date(d), 'dd/MM/yyyy HH:mm', { locale: vi }) : '—' },
-  ];
+  const selectedVariant = variantList.find((v) => v.id === filterVariantId);
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
         <div>
           <Title level={3} style={{ margin: 0 }}>Quản lý kho</Title>
-          <Text type="secondary">Lịch sử biến động tồn kho và điều chỉnh</Text>
+          <Text type="secondary">Theo dõi biến động nhập — xuất tồn kho theo từng sản phẩm</Text>
         </div>
-        <Space>
-          <Button icon={<DatabaseOutlined />} onClick={() => { setRefOrderId(''); setRefResult([]); setIsRefModalOpen(true); }}>
-            Tra cứu theo Order
+        <Space wrap>
+          <Button icon={<ArrowDownOutlined />} onClick={() => openCreateModal('IN')}>
+            Nhập kho
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
-            Tạo giao dịch kho
+          <Button danger icon={<ArrowUpOutlined />} onClick={() => openCreateModal('OUT')}>
+            Xuất kho
           </Button>
         </Space>
       </div>
 
-      {/* Filters */}
+      <Row gutter={16} className="mb-4">
+        <Col xs={24} sm={12} md={8}>
+          <Card size="small">
+            <Statistic
+              title="Nhập kho (trang hiện tại)"
+              value={pageSummary.inbound}
+              valueStyle={{ color: '#10b981' }}
+              prefix={<ArrowDownOutlined />}
+              suffix="sp"
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8}>
+          <Card size="small">
+            <Statistic
+              title="Xuất kho (trang hiện tại)"
+              value={pageSummary.outbound}
+              valueStyle={{ color: '#ef4444' }}
+              prefix={<ArrowUpOutlined />}
+              suffix="sp"
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={24} md={8}>
+          <Card size="small">
+            <Statistic
+              title="Tổng giao dịch"
+              value={pagination.total}
+              suffix="bản ghi"
+            />
+          </Card>
+        </Col>
+      </Row>
+
       <Card className="mb-4">
-        <Row gutter={12} align="middle">
-          <Col flex="auto">
-            <Input
-              placeholder="Nhập Design Variant ID để lọc..."
-              value={filterVariantId}
-              onChange={e => setFilterVariantId(e.target.value)}
-              onPressEnter={() => fetchTransactions(1)}
+        <Row gutter={[12, 12]} align="middle">
+          <Col xs={24} md={10}>
+            <Select
+              showSearch
               allowClear
+              placeholder="Lọc theo sản phẩm..."
+              style={{ width: '100%' }}
+              loading={variantLoading}
+              value={filterVariantId}
+              onFocus={() => { if (!variantList.length) fetchVariants(); }}
+              onChange={(v) => {
+                setFilterVariantId(v || null);
+                fetchTransactions(1, filterDirection, filterType, v || null);
+              }}
+              optionFilterProp="label"
+              options={variantList.map((v) => ({
+                value: v.id,
+                label: `${v.name} (${v.code}) — Tồn: ${v.stockQuantity ?? 0}`,
+              }))}
             />
           </Col>
-          <Col>
+          <Col xs={12} md={5}>
+            <Select
+              placeholder="Hướng"
+              style={{ width: '100%' }}
+              value={filterDirection}
+              onChange={(v) => {
+                setFilterDirection(v);
+                fetchTransactions(1, v, filterType, filterVariantId);
+              }}
+              options={DIRECTION_FILTERS}
+            />
+          </Col>
+          <Col xs={12} md={5}>
             <Select
               placeholder="Loại giao dịch"
-              style={{ width: 160 }}
-              allowClear
+              style={{ width: '100%' }}
               value={filterType}
-              onChange={v => { setFilterType(v); fetchTransactions(1, v, filterVariantId); }}
-            >
-              {TRANSACTION_TYPES.map(t => <Option key={t.value} value={t.value}>{t.label}</Option>)}
-            </Select>
+              onChange={(v) => {
+                setFilterType(v);
+                fetchTransactions(1, filterDirection, v, filterVariantId);
+              }}
+              options={TYPE_FILTER_OPTIONS}
+            />
           </Col>
-          <Col>
-            <Button type="primary" icon={<SearchOutlined />} onClick={() => fetchTransactions(1)}>Lọc</Button>
-          </Col>
-          <Col>
-            <Button icon={<ReloadOutlined />} onClick={handleReset}>Làm mới</Button>
+          <Col xs={24} md={4}>
+            <Space>
+              <Button type="primary" icon={<SearchOutlined />} onClick={() => fetchTransactions(1)}>Lọc</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>Làm mới</Button>
+            </Space>
           </Col>
         </Row>
+        {selectedVariant && (
+          <Text type="secondary" className="mt-3 block">
+            Đang xem kho: <Text strong>{selectedVariant.name}</Text> — Tồn hiện tại: <Text strong>{selectedVariant.stockQuantity ?? 0}</Text> sp
+          </Text>
+        )}
       </Card>
 
-      {/* Table */}
       <Card>
         <Table
           rowKey="id"
           columns={columns}
           dataSource={transactions}
           loading={loading}
-          scroll={{ x: 900 }}
+          scroll={{ x: 1100 }}
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,
             total: pagination.total,
             showSizeChanger: false,
-            showTotal: t => `Tổng ${t} giao dịch`,
-            onChange: page => fetchTransactions(page),
+            showTotal: (t) => `Tổng ${t} giao dịch`,
+            onChange: (page) => fetchTransactions(page),
           }}
           locale={{ emptyText: <Empty description="Không có giao dịch nào" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
         />
       </Card>
 
-      {/* Modal tạo giao dịch */}
       <Modal
-        title="Tạo giao dịch kho"
+        title={watchedDirection === 'OUT' ? 'Xuất kho' : 'Nhập kho'}
         open={isCreateModalOpen}
         onOk={handleCreate}
         onCancel={() => setIsCreateModalOpen(false)}
-        okText="Tạo"
+        okText={watchedDirection === 'OUT' ? 'Xác nhận xuất kho' : 'Xác nhận nhập kho'}
         cancelText="Hủy"
         confirmLoading={creating}
         destroyOnClose
+        width={520}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
             name="designVariantId"
-            label="Sản phẩm (Design Variant)"
+            label="Sản phẩm"
             rules={[{ required: true, message: 'Vui lòng chọn sản phẩm' }]}
           >
             <Select
@@ -280,74 +408,68 @@ const ManageInventory = () => {
               placeholder="Tìm và chọn sản phẩm..."
               loading={variantLoading}
               optionFilterProp="label"
-              filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-              }
-              options={variantList.map(v => ({
+              options={variantList.map((v) => ({
                 value: v.id,
-                label: `${v.name} (${v.code})`,
+                label: `${v.name} (${v.code}) — Tồn: ${v.stockQuantity ?? 0}`,
               }))}
             />
           </Form.Item>
-          <Form.Item
-            name="type"
-            label="Loại giao dịch"
-            rules={[{ required: true, message: 'Vui lòng chọn loại' }]}
-          >
-            <Select placeholder="Chọn loại">
-              {TRANSACTION_TYPES.map(t => (
-                <Option key={t.value} value={t.value}>
-                  <Tag color={t.color}>{t.label}</Tag>
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
+
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item
+                name="direction"
+                label="Hướng"
+                rules={[{ required: true, message: 'Chọn hướng nhập/xuất' }]}
+              >
+                <Select
+                  options={[
+                    { value: 'IN', label: 'Nhập kho (+)' },
+                    { value: 'OUT', label: 'Xuất kho (−)' },
+                  ]}
+                  disabled={watchedType && watchedType !== 'ADJUSTMENT' && INVENTORY_TRANSACTION_TYPES[watchedType]?.direction === 'IN'}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="type"
+                label="Loại giao dịch"
+                rules={[{ required: true, message: 'Vui lòng chọn loại' }]}
+              >
+                <Select
+                  placeholder="Chọn loại"
+                  onChange={(type) => {
+                    const meta = INVENTORY_TRANSACTION_TYPES[type];
+                    if (meta?.direction === 'IN') form.setFieldValue('direction', 'IN');
+                    if (meta?.direction === 'OUT') form.setFieldValue('direction', 'OUT');
+                  }}
+                >
+                  {CREATABLE_TRANSACTION_TYPES.map((t) => (
+                    <Option key={t.value} value={t.value}>{t.label}</Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
           <Form.Item
             name="quantity"
             label="Số lượng"
             rules={[{ required: true, message: 'Vui lòng nhập số lượng' }]}
+            extra={
+              watchedDirection === 'OUT'
+                ? 'Số lượng sẽ được trừ khỏi tồn kho'
+                : 'Số lượng sẽ được cộng vào tồn kho'
+            }
           >
-            <InputNumber min={1} style={{ width: '100%' }} placeholder="0" />
+            <InputNumber min={1} style={{ width: '100%' }} placeholder="VD: 10" />
           </Form.Item>
+
           <Form.Item name="note" label="Ghi chú">
             <TextArea rows={3} placeholder="Lý do nhập/xuất/điều chỉnh..." />
           </Form.Item>
         </Form>
-      </Modal>
-
-      {/* Modal tra cứu theo Order ID */}
-      <Modal
-        title="Tra cứu kho theo Order ID"
-        open={isRefModalOpen}
-        onCancel={() => setIsRefModalOpen(false)}
-        footer={[<Button key="close" onClick={() => setIsRefModalOpen(false)}>Đóng</Button>]}
-        width={700}
-        destroyOnClose
-      >
-        <Row gutter={8} className="mb-4" style={{ marginTop: 16 }}>
-          <Col flex="auto">
-            <Input
-              placeholder="Nhập Order ID (GUID)..."
-              value={refOrderId}
-              onChange={e => setRefOrderId(e.target.value)}
-              onPressEnter={handleSearchByReference}
-            />
-          </Col>
-          <Col>
-            <Button type="primary" icon={<SearchOutlined />} loading={refLoading} onClick={handleSearchByReference}>
-              Tìm
-            </Button>
-          </Col>
-        </Row>
-        <Table
-          rowKey="id"
-          columns={refColumns}
-          dataSource={refResult}
-          loading={refLoading}
-          pagination={false}
-          size="small"
-          locale={{ emptyText: <Empty description="Nhập Order ID và bấm Tìm" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
-        />
       </Modal>
     </div>
   );

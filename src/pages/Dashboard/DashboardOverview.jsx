@@ -1,6 +1,6 @@
 import React from 'react';
-import OpsDashboardView from '../../components/Dashboard/OpsDashboardView';
+import ManagerAdminDashboard from '../../components/Dashboard/ManagerAdminDashboard';
 
-const DashboardOverview = () => <OpsDashboardView role="admin" />;
+const DashboardOverview = () => <ManagerAdminDashboard role="admin" />;
 
 export default DashboardOverview;

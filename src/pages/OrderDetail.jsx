@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Breadcrumb, Spin, notification, Modal } from 'antd';
-import { getOrderDetailApi } from '../api/orderApi';
+import { getOrderDetailApi, cancelOrderApi } from '../api/orderApi';
 import { getShipmentByOrderApi } from '../api/shipmentApi';
 import transactionApi from '../api/transactionApi';
-import { buildCustomerTrackingSteps, resolveCustomerOrderDisplayStatus } from '../utils/orderNormalize';
+import { isCustomPrintSourceType, isDirectPrintSourceType } from '../api/mainflow2Api';
+import { buildCustomerTrackingSteps, resolveCustomerOrderDisplayStatus, normalizeOrderDetail, resolveOrderIsCod } from '../utils/orderNormalize';
+import { saveVnPayCheckoutPending } from '../utils/vnpayCheckoutSession';
+import { resolveMainflow2ChatPath } from '../utils/mainflow2ReturnPath';
+import OrderFeedbackSection from '../components/Orders/OrderFeedbackSection';
 
 // ... (keep previous icons and configs)
 
@@ -85,6 +89,7 @@ const FULFILLMENT_CONFIG = {
 
 // ─── ORDER STATUS BADGES (cấp Order) — đồng bộ BE: PENDING / PROCESSING / FINISHED / COMPLETED
 const ORDER_STATUS_CONFIG = {
+  COD: { label: 'COD · thu khi giao', className: 'bg-sky-50 text-sky-700 ring-1 ring-sky-200' },
   PENDING: { label: 'Chờ thanh toán', className: 'bg-gray-100 text-gray-600 ring-1 ring-gray-200' },
   CREATED: { label: 'Chờ thanh toán', className: 'bg-gray-100 text-gray-600 ring-1 ring-gray-200' },
   PAID: { label: 'Đã thanh toán', className: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
@@ -149,22 +154,28 @@ const formatDate = (dateStr) => {
 
 const OrderDetail = () => {
   const { id } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [transaction, setTransaction] = useState(null);
   const [shipment, setShipment] = useState(null);
   const [payingNow, setPayingNow] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  const reloadOrder = async () => {
+    const response = await getOrderDetailApi(id);
+    const orderData = response?.data || response;
+    setOrder(normalizeOrderDetail(orderData) || orderData);
+  };
 
   useEffect(() => {
     const fetchOrder = async () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await getOrderDetailApi(id);
-        console.log('Order detail response:', response);
-        const orderData = response?.data || response;
-        setOrder(orderData);
+        await reloadOrder();
       } catch (err) {
         console.error('Failed to fetch order detail:', err);
         setError(err?.response?.data?.message || err?.response?.data?.title || 'Không thể tải thông tin đơn hàng.');
@@ -173,6 +184,7 @@ const OrderDetail = () => {
       }
     };
     fetchOrder();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   // Fetch transaction & shipment info
@@ -193,30 +205,66 @@ const OrderDetail = () => {
   }, [id]);
 
   // Thanh toán ngay (cho đơn chưa thanh toán)
-  const handlePayNow = async (method = 'PAYOS') => {
+  const handlePayNow = async (method = 'VNPAY') => {
+    const customItems = (order?.items || order?.orderItems || []).filter((i) =>
+      isCustomPrintSourceType(i.sourceType),
+    );
+    const isDirectPrintOnly = customItems.length > 0
+      && customItems.every((i) => isDirectPrintSourceType(i.sourceType));
+    const isCustomMf2 = customItems.length > 0 && !isDirectPrintOnly;
+    const payStatus = (order?.invoice?.paymentStatus || '').toUpperCase();
+    const paymentPhase = isDirectPrintOnly
+      ? 'FULL'
+      : isCustomMf2
+        ? (payStatus === 'PARTIALLY_PAID' ? 'BALANCE' : 'DEPOSIT')
+        : 'FULL';
+    const chatPath = location.state?.returnTo || resolveMainflow2ChatPath(order);
+
     try {
       setPayingNow(true);
       const res = await transactionApi.performTransaction({
         orderId: id,
         paymentMethod: method,
+        paymentPhase,
       });
       console.log('Perform transaction response:', res);
       const txData = res?.data || res;
 
-      // Nếu PAYOS → redirect đến URL thanh toán
-      const paymentUrl = txData?.checkoutUrl || txData?.paymentUrl;
-      if (method === 'PAYOS' && paymentUrl) {
+      const paymentUrl = txData?.checkoutUrl || txData?.paymentUrl || txData?.paymentLink;
+      if (method === 'VNPAY' && paymentUrl) {
+        const items = order?.items || order?.orderItems || [];
+        saveVnPayCheckoutPending({
+          cartItems: items.map((it) => ({
+            designWorkId: it.designWorkId,
+            sourceType: it.sourceType,
+            name: it.itemName || it.name,
+            price: it.unitPrice || it.price || 0,
+            quantity: it.quantityOrdered ?? it.quantity ?? 1,
+          })),
+          orderId: id,
+          orderCode: order?.code || order?.orderCode,
+          paymentMethod: 'VNPAY',
+          paymentPhase,
+          returnTo: chatPath,
+          savedAt: Date.now(),
+        });
         window.location.href = paymentUrl;
         return;
       }
 
-      // CASH → reload trang
+      // CASH / COD → quay lại chat MF2 hoặc reload
       notification.success({
-        message: 'Thanh toán thành công',
-        description: 'Đơn hàng đã được xác nhận thanh toán.',
+        message: method === 'CASH' ? 'Đã chọn COD' : 'Thanh toán thành công',
+        description: method === 'CASH'
+          ? 'Đơn COD — thanh toán khi nhận hàng.'
+          : 'Đơn hàng đã được xác nhận thanh toán.',
         placement: 'topRight',
       });
-      window.location.reload();
+      if (chatPath) {
+        navigate(chatPath, { replace: true });
+      } else {
+        window.location.reload();
+      }
     } catch (err) {
       console.error('Payment error:', err);
       notification.error({
@@ -227,6 +275,43 @@ const OrderDetail = () => {
     } finally {
       setPayingNow(false);
     }
+  };
+
+  const handleCancelOrder = () => {
+    Modal.confirm({
+      title: 'Hủy đơn hàng',
+      content: 'Đơn chưa thanh toán sẽ bị hủy. Bạn có chắc chắn không?',
+      okText: 'Hủy đơn',
+      okType: 'danger',
+      cancelText: 'Giữ đơn',
+      onOk: async () => {
+        try {
+          setCancelling(true);
+          const res = await cancelOrderApi(id, 'Khách hủy đơn');
+          if (res?.statusCode === 200) {
+            notification.success({
+              message: 'Đã hủy đơn hàng',
+              placement: 'topRight',
+            });
+            window.location.reload();
+          } else {
+            notification.error({
+              message: 'Không thể hủy đơn',
+              description: res?.message || 'Vui lòng thử lại.',
+              placement: 'topRight',
+            });
+          }
+        } catch (err) {
+          notification.error({
+            message: 'Không thể hủy đơn',
+            description: err?.response?.data?.message || err?.message || 'Vui lòng thử lại.',
+            placement: 'topRight',
+          });
+        } finally {
+          setCancelling(false);
+        }
+      },
+    });
   };
 
   const formatPrice = (price) => {
@@ -271,6 +356,12 @@ const OrderDetail = () => {
   );
   const invoice = order.invoice || null;
   const isInvoicePaid = (invoice?.paymentStatus || '').toUpperCase() === 'PAID';
+  const isPartiallyPaid = (invoice?.paymentStatus || '').toUpperCase() === 'PARTIALLY_PAID';
+  const isDirectPrintOnlyOrder = orderItems.length > 0
+    && orderItems.every((i) => isDirectPrintSourceType(i.sourceType));
+  const isCustomMf2Order = orderItems.some((i) => isCustomPrintSourceType(i.sourceType))
+    && !isDirectPrintOnlyOrder;
+  const isCod = resolveOrderIsCod(invoice, transaction);
   const totalAmount = order.totalPrice ?? order.totalAmount ?? order.total ?? invoice?.totalAmount ?? 0;
   const shippingFee = orderShipment.shippingFee ?? order.shippingFee ?? 0;
   const subTotal = order.subTotal ?? order.subtotal ?? Math.max(0, totalAmount - shippingFee);
@@ -281,11 +372,21 @@ const OrderDetail = () => {
   const hasPreOrder = sourceType.toUpperCase() === 'PRE_ORDER' || orderItems.some(i => (i.sourceType || '').toUpperCase() === 'PRE_ORDER');
   const hasCustom = orderItems.some(i => (i.sourceType || '').toUpperCase().includes('SERVICE'));
   const isFailed = orderStatus.toUpperCase() === 'FAILED' || orderStatus.toUpperCase() === 'CANCELLED';
-  const displayStatus = resolveCustomerOrderDisplayStatus(orderStatus, shipmentStatus, isInvoicePaid, orderItems);
-  const trackingSteps = buildCustomerTrackingSteps(orderStatus, shipmentStatus, isInvoicePaid, orderItems);
+  const canCancelOrder = !isInvoicePaid
+    && orderStatus.toUpperCase() === 'PENDING'
+    && orderStatus.toUpperCase() !== 'CANCELLED';
+  const displayStatus = resolveCustomerOrderDisplayStatus(
+    orderStatus, shipmentStatus, isInvoicePaid, orderItems, isCod,
+  );
+  const trackingSteps = buildCustomerTrackingSteps(
+    orderStatus, shipmentStatus, isInvoicePaid, orderItems, isCod,
+  );
   const txStatus = (transaction?.transactionStatus || transaction?.status || '').toUpperCase();
   const txMethod = transaction?.paymentMethod || transaction?.method || '';
   const txAmount = transaction?.amount ?? transaction?.totalAmount ?? invoice?.totalAmount ?? totalAmount;
+  const chatPath = location.state?.returnTo || resolveMainflow2ChatPath(order);
+  const customDepositAmount = invoice?.customDepositAmount ?? invoice?.CustomDepositAmount;
+  const remainingBalance = invoice?.remainingBalance ?? invoice?.RemainingBalance;
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
@@ -366,10 +467,10 @@ const OrderDetail = () => {
             ) : (
               <div className="space-y-4">
                 {orderItems.map((item, idx) => {
-                  const itemName = item.name || item.designVariantName || item.variantName || `Sản phẩm #${idx + 1}`;
+                  const itemName = item.itemName || item.name || item.designVariantName || item.variantName || `Sản phẩm #${idx + 1}`;
                   const itemPrice = item.unitPrice || item.price || 0;
                   const itemQty = item.quantityOrdered ?? item.quantity ?? 1;
-                  const itemImg = item.image || item.thumbnailUrl || item.imageUrl || null;
+                  const itemImg = item.thumbnailUrl || item.image || item.imageUrl || null;
                   const itemSourceType = item.sourceType || sourceType || 'IN_STOCK';
                   const itemFulfillment = item.fulfillmentStatus || item.status || 'PENDING';
                   const itemMaterial = item.materialName || item.material || '';
@@ -408,12 +509,29 @@ const OrderDetail = () => {
             )}
           </div>
 
+          <OrderFeedbackSection
+            orderItems={orderItems}
+            orderStatus={orderStatus}
+            shipmentStatus={shipmentStatus}
+            completedAt={order.completedAt}
+            onRefresh={reloadOrder}
+          />
+
           {/* Order Lifecycle Tracking */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <div className="flex items-center gap-2 mb-5">
               <div className="w-1 h-6 bg-indigo-600 rounded-full" />
               <h2 className="text-lg font-bold text-gray-900">Theo dõi đơn hàng</h2>
             </div>
+            {isCod && !isInvoicePaid && (
+              <div className="flex items-start gap-3 p-3 mb-4 bg-sky-50 rounded-xl border border-sky-200 text-sm text-sky-800">
+                <ExclamationIcon />
+                <p>
+                  Đơn <strong>COD</strong> — bạn thanh toán tiền mặt khi nhận hàng.
+                  Trạng thái &quot;Đã thanh toán&quot; chỉ hiện sau khi giao hàng thành công.
+                </p>
+              </div>
+            )}
             <div className="space-y-0">
               {trackingSteps.map((step, idx) => {
                 const stepComplete = step.done && !step.isCurrent;
@@ -605,7 +723,8 @@ const OrderDetail = () => {
                     <div className="flex justify-between">
                       <span className="text-gray-500">Phương thức</span>
                       <span className="font-medium text-gray-800">
-                        {txMethod.toUpperCase() === 'PAYOS' ? 'PayOS'
+                        {isCod ? 'Tiền mặt (COD)'
+                          : txMethod.toUpperCase() === 'PAYOS' ? 'Thanh toán online'
                           : txMethod.toUpperCase() === 'VNPAY' ? 'VNPay'
                           : txMethod.toUpperCase() === 'CASH' ? 'Tiền mặt (COD)'
                           : txMethod || '—'}
@@ -617,6 +736,8 @@ const OrderDetail = () => {
                     <span className={`font-medium text-xs px-2 py-0.5 rounded-full ${
                       isInvoicePaid || txStatus === 'PAID' || txStatus === 'SUCCESS'
                         ? 'bg-emerald-50 text-emerald-700'
+                        : isCod
+                        ? 'bg-sky-50 text-sky-700'
                         : txStatus === 'PENDING' || (invoice && !isInvoicePaid)
                         ? 'bg-amber-50 text-amber-700'
                         : txStatus === 'CANCELLED' || txStatus === 'FAILED'
@@ -624,6 +745,7 @@ const OrderDetail = () => {
                         : 'bg-gray-100 text-gray-600'
                     }`}>
                       {isInvoicePaid || txStatus === 'PAID' || txStatus === 'SUCCESS' ? 'Đã thanh toán'
+                        : isCod ? 'COD · thu khi giao'
                         : txStatus === 'PENDING' || (invoice && !isInvoicePaid) ? 'Chờ thanh toán'
                         : txStatus === 'CANCELLED' ? 'Đã hủy'
                         : txStatus === 'FAILED' ? 'Thất bại'
@@ -634,6 +756,18 @@ const OrderDetail = () => {
                     <div className="flex justify-between">
                       <span className="text-gray-500">Số tiền</span>
                       <span className="font-medium text-gray-800">{formatPrice(txAmount)}</span>
+                    </div>
+                  )}
+                  {isCustomMf2Order && customDepositAmount > 0 && !isInvoicePaid && !isPartiallyPaid && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Cọc 30% (dự kiến)</span>
+                      <span className="font-medium text-indigo-700">{formatPrice(customDepositAmount)}</span>
+                    </div>
+                  )}
+                  {isPartiallyPaid && remainingBalance != null && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Còn lại</span>
+                      <span className="font-medium text-amber-700">{formatPrice(remainingBalance)}</span>
                     </div>
                   )}
                   {transaction?.paidAt && (
@@ -665,30 +799,26 @@ const OrderDetail = () => {
             )}
 
             {/* Thanh toán ngay — chỉ hiện khi chưa thanh toán */}
-            {!isInvoicePaid && orderStatus.toUpperCase() === 'PENDING' && (
+            {chatPath && (
+              <div className="pt-4 border-t border-gray-100">
+                <Link
+                  to={chatPath}
+                  className="block w-full py-2.5 text-center text-sm font-semibold text-indigo-600 hover:text-indigo-800"
+                >
+                  ← Quay lại chat đơn custom
+                </Link>
+              </div>
+            )}
+            {!isInvoicePaid && !isCod && (orderStatus.toUpperCase() === 'PENDING' || (isPartiallyPaid && isCustomMf2Order)) && (
               <div className="pt-4 border-t border-gray-100 space-y-2">
                 <button
-                  onClick={() => handlePayNow('PAYOS')}
+                  onClick={() => handlePayNow('VNPAY')}
                   disabled={payingNow}
                   className="w-full py-3 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {payingNow ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Đang xử lý...
-                    </>
-                  ) : (
-                    <>
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
-                      </svg>
-                      Thanh toán qua PayOS
-                    </>
-                  )}
+                  {payingNow ? 'Đang xử lý...' : isPartiallyPaid ? 'Thanh toán phần còn lại (VNPay)' : isDirectPrintOnlyOrder ? 'Thanh toán toàn bộ (VNPay)' : isCustomMf2Order ? 'Đặt cọc qua VNPay' : 'Thanh toán qua VNPay'}
                 </button>
+                {(!isCustomMf2Order || isDirectPrintOnlyOrder) && (
                 <button
                   onClick={() => handlePayNow('CASH')}
                   disabled={payingNow}
@@ -696,18 +826,28 @@ const OrderDetail = () => {
                 >
                   Thanh toán tiền mặt (COD)
                 </button>
+                )}
+                {isPartiallyPaid && isCustomMf2Order && (
+                <button
+                  onClick={() => handlePayNow('CASH')}
+                  disabled={payingNow}
+                  className="w-full py-3 bg-white text-gray-700 rounded-xl font-semibold text-sm border border-gray-200 hover:bg-gray-50 transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Xác nhận trả phần còn lại khi nhận hàng (COD)
+                </button>
+                )}
+                {canCancelOrder && (
+                  <button
+                    onClick={handleCancelOrder}
+                    disabled={cancelling || payingNow}
+                    className="w-full py-3 bg-red-50 text-red-700 rounded-xl font-semibold text-sm border border-red-200 hover:bg-red-100 transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {cancelling ? 'Đang hủy...' : 'Hủy đơn hàng'}
+                  </button>
+                )}
               </div>
             )}
 
-            {/* Feedback only when completed */}
-            {orderStatus.toUpperCase() === 'COMPLETED' && (
-              <Link
-                to={`/feedback/${id}`}
-                className="block w-full py-3 text-center bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors duration-200 cursor-pointer"
-              >
-                Gửi đánh giá
-              </Link>
-            )}
           </div>
         </div>
       </div>

@@ -27,7 +27,23 @@ export const CartProvider = ({ children }) => {
       const raw = localStorage.getItem(CART_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) setItems(parsed);
+        if (Array.isArray(parsed)) {
+          setItems(
+            parsed.map((item) => {
+              const qty = Number(item.quantity);
+              return {
+                ...item,
+                quantity: Number.isFinite(qty) && qty > 0 ? qty : 1,
+                product: item.product
+                  ? {
+                      ...item.product,
+                      price: Number(item.product.price) || 0,
+                    }
+                  : item.product,
+              };
+            })
+          );
+        }
       }
     } catch (error) {
       console.error('Không đọc được giỏ hàng từ localStorage:', error);
@@ -92,11 +108,11 @@ export const CartProvider = ({ children }) => {
 
   const subtotal = useMemo(
     () =>
-      items.reduce(
-        (sum, i) =>
-          sum + Number(i.product?.price || 0) * Number(i.quantity || 1),
-        0
-      ),
+      items.reduce((sum, i) => {
+        const price = Number(i.product?.price) || 0;
+        const qty = Number(i.quantity);
+        return sum + price * (Number.isFinite(qty) && qty > 0 ? qty : 1);
+      }, 0),
     [items]
   );
 

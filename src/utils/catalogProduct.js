@@ -29,6 +29,41 @@ export const FALLBACK_GLBS = [
 export const formatPrice = (v) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(v || 0);
 
+const LOW_STOCK_THRESHOLD = 5;
+
+export const formatStockLabel = (stock) => {
+  const qty = Number(stock) || 0;
+  if (qty <= LOW_STOCK_THRESHOLD) {
+    return `Chỉ còn sẵn ${qty} sản phẩm`;
+  }
+  return `Còn sẵn ${qty} sản phẩm`;
+};
+
+/** Số lượng vượt tồn kho cần in thêm (0 nếu đủ kho). */
+export const getPreOrderQuantity = (quantity, stock) => {
+  const qty = Number(quantity) || 0;
+  const available = Math.max(0, Number(stock) || 0);
+  return Math.max(0, qty - available);
+};
+
+export const needsAdditionalPrinting = (quantity, stock, isAllowPreOrder) =>
+  Boolean(isAllowPreOrder) && getPreOrderQuantity(quantity, stock) > 0;
+
+/** Loại hàng trên giỏ: pre_order khi số lượng mua > tồn kho. */
+export const resolveCartItemSourceType = (item) => {
+  const staticType = item?.product?.sourceType;
+  if (staticType === 'custom') return 'custom';
+
+  const stock = item?.product?.stock;
+  if (stock == null) {
+    return staticType === 'pre_order' ? 'pre_order' : 'in_stock';
+  }
+
+  const quantity = Number(item?.quantity) || 0;
+  const available = Math.max(0, Number(stock) || 0);
+  return quantity > available ? 'pre_order' : 'in_stock';
+};
+
 export const pickFallbackGlb = (id) => {
   if (!id) return FALLBACK_GLBS[0];
   let hash = 0;
@@ -36,27 +71,55 @@ export const pickFallbackGlb = (id) => {
   return FALLBACK_GLBS[Math.abs(hash) % FALLBACK_GLBS.length];
 };
 
+const readField = (obj, ...keys) => {
+  for (const key of keys) {
+    const value = obj?.[key];
+    if (value != null && String(value).trim() !== '') return String(value).trim();
+  }
+  return null;
+};
+
 export const normalizeVariant = (v) => {
-  const rawPreview =
-    v?.previewModelUrl || v?.designTemplateThumbnailUrl || v?.thumbnailUrl || null;
-  const previewModelUrl = rawPreview ? resolvePublicMediaUrl(rawPreview) : null;
+  const id = v?.id != null ? String(v.id) : v?.Id != null ? String(v.Id) : undefined;
+  const effectiveModel = readField(
+    v,
+    'effectivePreviewModelUrl',
+    'EffectivePreviewModelUrl',
+    'previewModelUrl',
+    'PreviewModelUrl',
+    'designTemplateFileUrl',
+    'DesignTemplateFileUrl',
+  );
+  const effectiveThumb = readField(
+    v,
+    'effectiveThumbnailUrl',
+    'EffectiveThumbnailUrl',
+    'previewImageUrl',
+    'PreviewImageUrl',
+    'designTemplateThumbnailUrl',
+    'DesignTemplateThumbnailUrl',
+    'thumbnailUrl',
+    'ThumbnailUrl',
+  );
+  const previewModelUrl = effectiveModel ? resolvePublicMediaUrl(effectiveModel) : null;
+  const hasOwnPreview = Boolean(readField(v, 'previewModelUrl', 'PreviewModelUrl'));
+  const hasOwnImage = Boolean(readField(v, 'previewImageUrl', 'PreviewImageUrl'));
 
   return {
-    id: v?.id != null ? String(v.id) : v?.id,
-    code: v?.code,
-    name: v?.name || v?.designTemplateName || 'Sản phẩm',
-    description: v?.description,
-    price: Number(v?.price ?? 0),
-    stock: Number(v?.stockQuantity ?? 0),
-    material: v?.materialName || 'PLA',
-    materialId: v?.materialId,
-    designTemplateId: v?.designTemplateId,
-    designTemplateName: v?.designTemplateName,
-    thumbnailUrl: v?.designTemplateThumbnailUrl
-      ? resolvePublicMediaUrl(v.designTemplateThumbnailUrl)
-      : null,
-    modelSrc: previewModelUrl || pickFallbackGlb(v?.id),
-    isAllowPreOrder: !!v?.isAllowPreOrder,
+    id,
+    code: v?.code ?? v?.Code,
+    name: v?.name || v?.Name || v?.designTemplateName || v?.DesignTemplateName || 'Sản phẩm',
+    description: v?.description ?? v?.Description,
+    price: Number(v?.price ?? v?.Price ?? 0),
+    stock: Number(v?.stockQuantity ?? v?.StockQuantity ?? 0),
+    material: v?.materialName || v?.MaterialName || 'PLA',
+    materialId: v?.materialId != null ? String(v.materialId) : v?.MaterialId != null ? String(v.MaterialId) : v?.materialId,
+    designTemplateId: v?.designTemplateId ?? v?.DesignTemplateId,
+    designTemplateName: v?.designTemplateName ?? v?.DesignTemplateName,
+    thumbnailUrl: effectiveThumb ? resolvePublicMediaUrl(effectiveThumb) : null,
+    modelSrc: previewModelUrl || pickFallbackGlb(id),
+    isAllowPreOrder: !!(v?.isAllowPreOrder ?? v?.IsAllowPreOrder),
+    usesTemplateMedia: (v?.usesTemplateMedia ?? v?.UsesTemplateMedia) !== false && !hasOwnPreview && !hasOwnImage,
   };
 };
 

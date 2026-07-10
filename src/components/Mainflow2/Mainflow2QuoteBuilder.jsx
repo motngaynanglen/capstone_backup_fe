@@ -2,17 +2,18 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Input, InputNumber, Select, Table, Typography, message } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import materialApi from '../../api/materialApi';
+import { createId } from '../../utils/createId';
 
 const { Text } = Typography;
 
 const formatVnd = (n) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(n) || 0);
 
-const newMaterialRow = () => ({ key: crypto.randomUUID(), materialId: null, grams: 50 });
+const newMaterialRow = () => ({ key: createId(), materialId: null, grams: 50 });
 
-const newComponent = (index = 0) => ({
-  key: crypto.randomUUID(),
-  name: `Thành phần ${index + 1}`,
+const newComponent = () => ({
+  key: createId(),
+  name: 'Sản phẩm in',
   quantity: 1,
   materials: [newMaterialRow()],
 });
@@ -48,12 +49,12 @@ const calcPreview = (components, materialsById, laborCost) => {
 };
 
 /**
- * Form báo giá chi tiết Mainflow2: thành phần → vật liệu → gram → tiền công.
+ * Form báo giá chi tiết Mainflow2: thành phần → vật liệu → gram → tiền thiết kế (không kèm file).
  */
 const Mainflow2QuoteBuilder = ({ onSubmit, submitting, onCancel }) => {
   const [materials, setMaterials] = useState([]);
   const [loadingMaterials, setLoadingMaterials] = useState(true);
-  const [components, setComponents] = useState([newComponent(0)]);
+  const [components, setComponents] = useState([newComponent()]);
   const [laborCost, setLaborCost] = useState(0);
   const [staffNote, setStaffNote] = useState('');
 
@@ -92,12 +93,6 @@ const Mainflow2QuoteBuilder = ({ onSubmit, submitting, onCancel }) => {
     setComponents((list) => list.map((c) => (c.key === key ? { ...c, ...patch } : c)));
   };
 
-  const addComponent = () => setComponents((list) => [...list, newComponent(list.length)]);
-
-  const removeComponent = (key) => {
-    setComponents((list) => (list.length <= 1 ? list : list.filter((c) => c.key !== key)));
-  };
-
   const updateMaterialRow = (compKey, rowKey, patch) => {
     setComponents((list) =>
       list.map((c) => {
@@ -134,7 +129,7 @@ const Mainflow2QuoteBuilder = ({ onSubmit, submitting, onCancel }) => {
     laborCost: Number(laborCost) || 0,
     staffNote: staffNote.trim(),
     components: components.map((c) => ({
-      name: c.name.trim() || 'Thành phần',
+      name: c.name.trim() || 'Sản phẩm in',
       quantity: Math.max(1, Number(c.quantity) || 1),
       materials: (c.materials || [])
         .filter((r) => r.materialId && r.grams > 0)
@@ -145,7 +140,7 @@ const Mainflow2QuoteBuilder = ({ onSubmit, submitting, onCancel }) => {
   const handleSubmit = () => {
     const payload = buildPayload();
     if (!payload.components.length || payload.components.some((c) => !c.materials.length)) {
-      return { error: 'Mỗi thành phần cần ít nhất một vật liệu và định lượng (gram).' };
+      return { error: 'Cần chọn ít nhất một vật liệu và định lượng (gram).' };
     }
     if (preview.total <= 0) {
       return { error: 'Tổng báo giá phải lớn hơn 0.' };
@@ -158,7 +153,7 @@ const Mainflow2QuoteBuilder = ({ onSubmit, submitting, onCancel }) => {
   };
 
   const previewColumns = [
-    { title: 'Thành phần', dataIndex: 'component', key: 'component' },
+    { title: 'Sản phẩm', dataIndex: 'component', key: 'component' },
     { title: 'Vật liệu', dataIndex: 'material', key: 'material' },
     {
       title: 'Định lượng',
@@ -177,21 +172,21 @@ const Mainflow2QuoteBuilder = ({ onSubmit, submitting, onCancel }) => {
   return (
     <div className="space-y-4">
       <Text type="secondary" className="text-xs block">
-        Một sản phẩm gồm nhiều <strong>thành phần</strong>. Mỗi thành phần chọn một hoặc nhiều{' '}
-        <strong>vật liệu</strong> kèm <strong>định lượng (gram/sp)</strong>, sau đó cộng{' '}
-        <strong>tiền công</strong> để ra báo giá chi tiết.
+        Chọn <strong>vật liệu</strong> kèm <strong>định lượng (gram/sp)</strong>, sau đó cộng{' '}
+        <strong>tiền thiết kế</strong> để ra báo giá chi tiết. Khách cọc 30% trên tiền thiết kế;
+        bảng thiết kế (GLB) gửi sau khi khách cọc.
       </Text>
 
-      {components.map((comp, ci) => (
+      {components.map((comp) => (
         <div
           key={comp.key}
           className="p-4 rounded-xl border border-slate-200 bg-white space-y-3"
         >
-          <div className="flex flex-wrap items-center gap-2 justify-between">
+          <div className="flex flex-wrap items-center gap-2">
             <Input
               value={comp.name}
               onChange={(e) => updateComponent(comp.key, { name: e.target.value })}
-              placeholder="Tên thành phần (vd: Thân, Đế, Phụ kiện...)"
+              placeholder="Tên sản phẩm (vd: Mô hình móc khóa)"
               style={{ flex: 1, minWidth: 160, fontWeight: 600 }}
             />
             <div className="flex items-center gap-2">
@@ -201,13 +196,6 @@ const Mainflow2QuoteBuilder = ({ onSubmit, submitting, onCancel }) => {
                 value={comp.quantity}
                 onChange={(v) => updateComponent(comp.key, { quantity: v })}
                 style={{ width: 72 }}
-              />
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-                disabled={components.length <= 1}
-                onClick={() => removeComponent(comp.key)}
               />
             </div>
           </div>
@@ -242,18 +230,14 @@ const Mainflow2QuoteBuilder = ({ onSubmit, submitting, onCancel }) => {
             </div>
           ))}
           <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => addMaterialRow(comp.key)}>
-            Thêm vật liệu cho {comp.name || `thành phần ${ci + 1}`}
+            Thêm vật liệu
           </Button>
         </div>
       ))}
 
-      <Button type="dashed" block icon={<PlusOutlined />} onClick={addComponent}>
-        Thêm thành phần
-      </Button>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="text-xs font-semibold text-gray-700 block mb-1">Tiền công / gia công (VND)</label>
+          <label className="text-xs font-semibold text-gray-700 block mb-1">Tiền thiết kế (VND)</label>
           <InputNumber
             className="w-full"
             min={0}
@@ -270,7 +254,7 @@ const Mainflow2QuoteBuilder = ({ onSubmit, submitting, onCancel }) => {
             <span>{formatVnd(preview.materialSubtotal)}</span>
           </div>
           <div className="flex justify-between text-gray-600 mt-1">
-            <span>Tiền công</span>
+            <span>Tiền thiết kế</span>
             <span>{formatVnd(preview.labor)}</span>
           </div>
           <div className="flex justify-between font-bold text-emerald-800 text-base mt-2 pt-2 border-t border-emerald-200">
@@ -310,7 +294,7 @@ const Mainflow2QuoteBuilder = ({ onSubmit, submitting, onCancel }) => {
             if (err) message.warning(err);
           }}
         >
-          Gửi báo giá {formatVnd(preview.total)}
+          Gửi báo giá thiết kế + in {formatVnd(preview.total)}
         </Button>
       </div>
     </div>

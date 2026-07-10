@@ -31,12 +31,12 @@ axiosInstance.interceptors.response.use(
   (error) => {
     // 1. Kiểm tra xem API đang gọi có phải là API Login không?
     // Dùng tùy chọn an toàn (?.) để tránh lỗi crash web nếu config rỗng
-    const isLoginApi = error.config?.url?.includes("/login");
+    const isAuthApi = /\/auth\/(login|system-login)/.test(error.config?.url || '');
 
     // 2. Bắt lỗi 401: Unauthorized
     if (error.response && error.response.status === 401) {
       // CHỐT CHẶN: Chỉ đá về trang đăng nhập nếu KHÔNG PHẢI đang gọi API Login
-      if (!isLoginApi) {
+      if (!isAuthApi) {
         console.warn(
           "Token hết hạn hoặc không hợp lệ, vui lòng đăng nhập lại!"
         );

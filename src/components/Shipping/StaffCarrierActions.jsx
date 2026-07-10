@@ -16,7 +16,7 @@ import {
 import { ReloadOutlined, TruckOutlined, LinkOutlined } from '@ant-design/icons';
 import { getShipmentByOrderApi, createCarrierShipmentApi } from '../../api/shipmentApi';
 import { updateOrderStatusApi } from '../../api/orderApi';
-import { shipmentStatusMap, normStatus } from '../../utils/staffOrderConstants';
+import { shipmentStatusMap, normStatus, getStaffShipmentStatusActions, isTerminalOrderStatus } from '../../utils/staffOrderConstants';
 import GhnLocationPicker from './GhnLocationPicker';
 
 const { Text } = Typography;
@@ -112,7 +112,13 @@ export default function StaffCarrierActions({
     ?? pick(summary, 'carrierOrderCode', 'CarrierOrderCode');
   const labelUrl = pick(shipment, 'carrierLabelUrl', 'CarrierLabelUrl');
   const os = normStatus(orderStatus);
-  const canCreateGhn = os === 'FINISHED' && !carrierOrderCode;
+  const isTerminal = isTerminalOrderStatus(os);
+  const canCreateGhn = os === 'FINISHED' && !carrierOrderCode && !isTerminal;
+  const shipmentActions = getStaffShipmentStatusActions({
+    orderStatus: os,
+    shipmentStatus: status,
+    hasCarrier: Boolean(carrierOrderCode),
+  });
 
   const handleCreateGhn = async () => {
     setCreating(true);
@@ -241,9 +247,6 @@ export default function StaffCarrierActions({
       {!loading && !error && (
         <Space direction="vertical" style={{ width: '100%' }} size="middle">
           <Descriptions column={1} size="small" bordered>
-            <Descriptions.Item label="Trạng thái đơn">
-              <Tag>{os || '—'}</Tag>
-            </Descriptions.Item>
             <Descriptions.Item label="Đơn vị VC">{carrier || '—'}</Descriptions.Item>
             <Descriptions.Item label="Trạng thái VC">
               {statusTag ? (
@@ -280,27 +283,43 @@ export default function StaffCarrierActions({
             />
           )}
 
-          {carrierOrderCode && status === 'READY_FOR_PICKUP' && (
-            <Button
-              loading={creating}
-              onClick={() => handleShipmentStatus('IN_TRANSIT', os)}
-            >
-              Xác nhận đã bàn giao ship → IN_TRANSIT
-            </Button>
+          {isTerminal && (
+            <Alert
+              type={os === 'CANCELLED' ? 'warning' : 'success'}
+              showIcon
+              message={os === 'CANCELLED' ? 'Đơn đã hủy — không cập nhật vận chuyển.' : 'Đơn đã hoàn thành.'}
+            />
           )}
 
-          {status === 'IN_TRANSIT' && (
-            <Popconfirm
-              title="Xác nhận giao thành công?"
-              onConfirm={() => handleShipmentStatus('DELIVERED', 'COMPLETED')}
-            >
-              <Button type="primary" loading={creating}>
-                Giao thành công → DELIVERED
+          {!isTerminal && shipmentActions.map((action) => {
+            const btn = (
+              <Button
+                key={action.key}
+                type={action.primary ? 'primary' : 'default'}
+                loading={creating}
+                onClick={
+                  action.confirm
+                    ? undefined
+                    : () => handleShipmentStatus(action.shipmentStatus, action.orderStatus)
+                }
+              >
+                {action.label}
               </Button>
-            </Popconfirm>
-          )}
+            );
+            return action.confirm ? (
+              <Popconfirm
+                key={action.key}
+                title={action.confirm}
+                onConfirm={() => handleShipmentStatus(action.shipmentStatus, action.orderStatus)}
+              >
+                {btn}
+              </Popconfirm>
+            ) : (
+              btn
+            );
+          })}
 
-          {os !== 'FINISHED' && !carrierOrderCode && shipment && (
+          {!isTerminal && os !== 'FINISHED' && !carrierOrderCode && shipment && (
             <Text type="secondary" style={{ fontSize: 12 }}>
               Hoàn tất sản xuất và chuyển đơn sang FINISHED trước khi tạo GHN.
             </Text>

@@ -2,11 +2,12 @@ import axiosInstance from './axiosInstance';
 
 const transactionApi = {
   // Gửi yêu cầu thanh toán đơn hàng
-  // paymentMethod: 'PAYOS' | 'CASH'
-  performTransaction: async ({ orderId, paymentMethod }) => {
+  // paymentMethod: 'VNPAY' | 'CASH'
+  performTransaction: async ({ orderId, paymentMethod, paymentPhase = 'FULL' }) => {
     const response = await axiosInstance.post('/api/transaction/perform-transaction', {
       orderId,
       paymentMethod,
+      paymentPhase,
     });
     return response.data;
   },

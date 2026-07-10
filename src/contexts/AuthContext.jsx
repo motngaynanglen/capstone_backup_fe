@@ -1,6 +1,8 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 // Import thêm systemLoginApi
 import { loginApi, registerApi, systemLoginApi } from '../api/authApi';
+import { getApiErrorMessage, parseApiFieldErrors } from '../utils/apiErrorMessage';
+import { REGISTER_API_FIELD_MAP } from '../utils/registerValidation';
 
 const AuthContext = createContext();
 
@@ -58,24 +60,47 @@ export const AuthProvider = ({ children }) => {
     return userFromApi;
   };
 
-  // 1. Đăng nhập Khách hàng (Thường)
+  // 1. Đăng nhập (Customer trước, fallback system-login cho Admin/Manager/Staff)
   const login = async (username, password) => {
+    const normalizedUsername = username?.trim();
+    if (!normalizedUsername || !password) {
+      return { success: false, message: 'Vui lòng nhập đầy đủ tài khoản và mật khẩu' };
+    }
+
     try {
-      const res = await loginApi({ username, password });
+      const res = await loginApi({ username: normalizedUsername, password });
 
       if (res?.statusCode !== 200 || res?.code !== 'SUCCESS') {
-        return { success: false, message: res?.message || 'Tài khoản hoặc mật khẩu không chính xác' };
+        return trySystemLogin(normalizedUsername, password, res?.message);
       }
 
       const userObj = handleAuthSuccess(res.data);
       return { success: true, user: userObj };
     } catch (error) {
-      const message = error.response?.data?.message || 'Lỗi kết nối máy chủ. Vui lòng thử lại sau.';
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        return trySystemLogin(normalizedUsername, password);
+      }
+
+      const message = getApiErrorMessage(error, {
+        401: 'Tài khoản hoặc mật khẩu không chính xác',
+        422: 'Dữ liệu đăng nhập không hợp lệ',
+        default: 'Không thể đăng nhập. Vui lòng thử lại sau.',
+      });
       return { success: false, message };
     }
   };
 
-  // 2. Đăng nhập Hệ thống (Admin / Manager / Staff)
+  const trySystemLogin = async (username, password, fallbackMessage) => {
+    const systemResult = await systemLogin(username, password);
+    if (systemResult.success) return systemResult;
+    return {
+      success: false,
+      message: fallbackMessage || systemResult.message || 'Tài khoản hoặc mật khẩu không chính xác',
+    };
+  };
+
+  // 2. Đăng nhập Hệ thống (Admin / Manager / Staff) — gọi trực tiếp khi cần
   const systemLogin = async (username, password) => {
     try {
       const res = await systemLoginApi({ username, password });
@@ -88,7 +113,12 @@ export const AuthProvider = ({ children }) => {
       const userObj = handleAuthSuccess(res.data);
       return { success: true, user: userObj };
     } catch (error) {
-      const message = error.response?.data?.message || 'Lỗi đăng nhập hệ thống quản trị.';
+      const message = getApiErrorMessage(error, {
+        401: 'Thông tin quản trị không chính xác',
+        403: 'Bạn không có quyền truy cập khu vực quản trị',
+        422: 'Dữ liệu đăng nhập không hợp lệ',
+        default: 'Không thể đăng nhập hệ thống quản trị',
+      });
       return { success: false, message };
     }
   };
@@ -99,17 +129,35 @@ export const AuthProvider = ({ children }) => {
       const res = await registerApi({ username, password, fullName, email, contactPhone });
 
       if (res?.statusCode !== 200 || res?.code !== 'SUCCESS' || !res?.data) {
-        return { success: false, message: res?.message || 'Đăng ký thất bại, dữ liệu không hợp lệ.' };
+        return {
+          success: false,
+          message: res?.message || 'Đăng ký thất bại, dữ liệu không hợp lệ.',
+          fieldErrors: {},
+        };
       }
 
       return { success: true };
     } catch (error) {
-      const message = error.response?.data?.message || 'Lỗi kết nối máy chủ. Vui lòng thử lại sau.';
-      return { success: false, message };
+      const fieldErrors = parseApiFieldErrors(error, REGISTER_API_FIELD_MAP);
+      const message = getApiErrorMessage(error, {
+        422: 'Dữ liệu đăng ký không hợp lệ',
+        default: 'Không thể đăng ký. Vui lòng thử lại sau.',
+      });
+      return { success: false, message, fieldErrors };
     }
   };
 
-  // 4. Đăng xuất
+  // 4. Cập nhật thông tin user trong phiên đăng nhập (đồng bộ header, sidebar, ...)
+  const updateUser = (updates) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...updates };
+      localStorage.setItem('user', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // 5. Đăng xuất
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
@@ -129,6 +177,7 @@ export const AuthProvider = ({ children }) => {
     systemLogin, // Đưa systemLogin vào value để AdminLogin.jsx có thể gọi
     register,
     logout,
+    updateUser,
     forgotPassword,
     loading,
     isAuthenticated: !!user,

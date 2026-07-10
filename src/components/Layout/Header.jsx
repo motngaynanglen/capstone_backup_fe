@@ -1,24 +1,29 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Badge, Button, Grid, Input, Layout, Menu, Space, Typography, Dropdown, Avatar } from 'antd';
-import { ShoppingCartOutlined, SearchOutlined, UserOutlined, DownOutlined, UnorderedListOutlined, FileTextOutlined, LogoutOutlined } from '@ant-design/icons';
+import { ShoppingCartOutlined, SearchOutlined, UserOutlined, DownOutlined, UnorderedListOutlined, FileTextOutlined, LogoutOutlined, DashboardOutlined } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAuthModal } from '../../contexts/AuthModalContext';
 
 import { useCart } from '../../contexts/CartContext';
 
 const Header = () => {
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, isAdmin, isManager, isEmployee, isCustomer } = useAuth();
   const { openModal } = useAuthModal();
   const { totalItems } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
   const screens = Grid.useBreakpoint();
   const [q, setQ] = useState('');
-// ... (skip lines to reach badge)
-// Thay vì dùng `0`, dùng `totalItems`
-// Tôi sẽ tìm function header ở StartLine 8 và render ở dưới
 
+  useEffect(() => {
+    if (location.pathname.startsWith('/products')) {
+      const params = new URLSearchParams(location.search);
+      setQ(params.get('q') || '');
+    } else {
+      setQ('');
+    }
+  }, [location.pathname, location.search]);
 
   const handleLogout = () => {
     logout();
@@ -37,39 +42,82 @@ const Header = () => {
   const onSearch = (value) => {
     const term = (value ?? '').trim();
     setQ(term);
-    navigate(`/products${term ? `?q=${encodeURIComponent(term)}` : ''}`);
+    const params = new URLSearchParams(
+      location.pathname.startsWith('/products') ? location.search : ''
+    );
+    if (term) params.set('q', term);
+    else params.delete('q');
+    const qs = params.toString();
+    navigate(`/products${qs ? `?${qs}` : ''}`);
   };
 
-  const menuItems = [
-    {
-      key: 'profile',
-      icon: <UserOutlined />,
-      label: <Link to="/profile">Thông tin tài khoản</Link>,
-    },
-    {
-      type: 'divider',
-    },
-    {
-      key: 'orders',
-      icon: <UnorderedListOutlined />,
-      label: <Link to="/my-orders">Đơn hàng của tôi</Link>,
-    },
-    {
-      key: 'custom-orders',
-      icon: <FileTextOutlined />,
-      label: <Link to="/my-custom-orders">Đơn hàng Custom</Link>,
-    },
-    {
-      type: 'divider',
-    },
-    {
-      key: 'logout',
-      icon: <LogoutOutlined />,
-      label: 'Đăng xuất',
-      danger: true,
-      onClick: handleLogout,
-    },
-  ];
+  const dashboardNavItem = useMemo(() => {
+    if (isAdmin) {
+      return {
+        key: 'admin-dashboard',
+        icon: <DashboardOutlined />,
+        label: <Link to="/admin">Trang quản trị Admin</Link>,
+      };
+    }
+    if (isManager) {
+      return {
+        key: 'manager-dashboard',
+        icon: <DashboardOutlined />,
+        label: <Link to="/manager/dashboard">Bảng điều khiển Quản lý</Link>,
+      };
+    }
+    if (isEmployee) {
+      return {
+        key: 'staff-dashboard',
+        icon: <DashboardOutlined />,
+        label: <Link to="/staff/dashboard">Bảng điều khiển Nhân viên</Link>,
+      };
+    }
+    return null;
+  }, [isAdmin, isManager, isEmployee]);
+
+  const menuItems = useMemo(() => {
+    const items = [
+      {
+        key: 'profile',
+        icon: <UserOutlined />,
+        label: <Link to="/profile">Thông tin tài khoản</Link>,
+      },
+    ];
+
+    if (isCustomer) {
+      items.push(
+        { type: 'divider' },
+        {
+          key: 'orders',
+          icon: <UnorderedListOutlined />,
+          label: <Link to="/my-orders">Đơn hàng của tôi</Link>,
+        },
+        {
+          key: 'custom-orders',
+          icon: <FileTextOutlined />,
+          label: <Link to="/my-custom-orders">Đơn hàng Custom</Link>,
+        }
+      );
+    }
+
+    if (dashboardNavItem) {
+      items.push({ type: 'divider' }, dashboardNavItem);
+    }
+
+    items.push(
+      { type: 'divider' },
+      {
+        key: 'logout',
+        icon: <LogoutOutlined />,
+        label: 'Đăng xuất',
+        danger: true,
+        onClick: handleLogout,
+      }
+    );
+
+    return items;
+  }, [dashboardNavItem, handleLogout, isCustomer]);
 
   return (
     <Layout.Header style={{ padding: 0, height: 'auto', lineHeight: 'normal' }}>

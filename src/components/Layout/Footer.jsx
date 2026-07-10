@@ -27,7 +27,7 @@ const Footer = () => {
             <Link className="block text-slate-300 no-underline hover:text-white" to="/custom-order">
               Đặt in theo yêu cầu
             </Link>
-            <Link className="block text-slate-300 no-underline hover:text-white" to="/preview/1">
+            <Link className="block text-slate-300 no-underline hover:text-white" to="/products">
               Xem trước mô hình 3D
             </Link>
           </div>

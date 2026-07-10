@@ -35,8 +35,9 @@ const designVariantApi = {
   // Update variant
   update: async (data) => {
     try {
-      // Cập nhật biến thể - takes full data payload
-      const response = await axiosInstance.put(DESIGN_VARIANT_ENDPOINTS.UPDATE, data);
+      const id = data?.id;
+      if (!id) throw new Error('Thiếu id biến thể');
+      const response = await axiosInstance.put(`${DESIGN_VARIANT_ENDPOINTS.UPDATE}/${id}/update`, data);
       return response.data;
     } catch (error) {
       throw error;
@@ -46,15 +47,25 @@ const designVariantApi = {
   // Add stock quantity
   addQuantity: async (data) => {
     try {
-      // payload { id, additionalQuantity }
-      const response = await axiosInstance.put(DESIGN_VARIANT_ENDPOINTS.UPDATE_QUANTITY, data);
+      const id = data?.id;
+      if (!id) throw new Error('Thiếu id biến thể');
+      const response = await axiosInstance.put(`${DESIGN_VARIANT_ENDPOINTS.UPDATE_QUANTITY}/${id}/quantity`, data);
       return response.data;
     } catch (error) {
       throw error;
     }
   },
 
-  // Delete variant
+  toggleActive: async (id) => {
+    try {
+      const response = await axiosInstance.delete(`${DESIGN_VARIANT_ENDPOINTS.TOGGLE_ACTIVE}/${id}/toggle-active`, { data: {} });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Backward-compatible alias
   delete: async (id) => {
     try {
       const response = await axiosInstance.delete(`${DESIGN_VARIANT_ENDPOINTS.DELETE}/${id}/delete`, { data: {} });

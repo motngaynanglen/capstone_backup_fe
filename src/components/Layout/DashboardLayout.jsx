@@ -21,18 +21,13 @@ const DashboardLayout = () => {
   const menuItems = [
     {
       path: '/admin',
-      label: 'Tổng quan',
+      label: 'Dashboard',
       icon: '📊'
     },
     {
       path: '/admin/users',
       label: 'Quản lý Tài khoản',
       icon: '👥'
-    },
-    {
-      path: '/admin/orders',
-      label: 'Quản lý Đơn hàng',
-      icon: '📦'
     },
     {
       path: '/admin/products',
@@ -43,11 +38,6 @@ const DashboardLayout = () => {
       path: '/admin/materials',
       label: 'Quản lý Vật liệu',
       icon: '🧱'
-    },
-    {
-      path: '/admin/design-templates',
-      label: 'Mẫu thiết kế',
-      icon: '🎨'
     },
     {
       path: '/admin/shipments',
@@ -66,7 +56,7 @@ const DashboardLayout = () => {
     },
     {
       path: '/admin/feedback',
-      label: 'Phản hồi',
+      label: 'Quản lý phản hồi',
       icon: '💬'
     },
     {

@@ -4,79 +4,133 @@ export const MAINFLOW2_ENDPOINTS = {
   BASE: '/api/mainflow-2/design-requests',
 };
 
+export const CUSTOM_PRINT_SOURCE_TYPES = new Set([
+  'CUSTOM_FILE_PRINT_MF2',
+  'CUSTOM_QUOTE_MF2',
+  'AI_GENERATED',
+  'PRINT_FROM_DESIGN_MF2',
+  'REPRINT_MF2',
+]);
+
+export const isCustomPrintSourceType = (sourceType) =>
+  CUSTOM_PRINT_SOURCE_TYPES.has(String(sourceType || '').toUpperCase());
+
+export const isReprintSourceType = (sourceType) =>
+  String(sourceType || '').toUpperCase() === 'REPRINT_MF2';
+
+/** Flow 2 in sẵn/in lại + Flow 3 AI — thanh toán FULL sau báo giá, không cọc/thiết kế. */
+export const DIRECT_PRINT_SOURCE_TYPES = new Set([
+  'REPRINT_MF2',
+  'PRINT_FROM_DESIGN_MF2',
+  'AI_GENERATED',
+]);
+
+export const isDirectPrintSourceType = (sourceType) =>
+  DIRECT_PRINT_SOURCE_TYPES.has(String(sourceType || '').toUpperCase());
+
 // Customer: Create a new design request (mô tả + ảnh ý tưởng)
 export const createDesignRequest = async (payload) => {
-  // payload: { title, requirementBrief, initialIdeaImageUrls: [] }
   const response = await axiosInstance.post(MAINFLOW2_ENDPOINTS.BASE, payload);
   return response.data;
 };
 
-// Luồng 2: Khách upload STL/OBJ → KTV báo giá
+// TH1: Khách upload STL/OBJ/GLB → KTV báo giá
 export const createCustomFilePrintRequest = async (payload) => {
-  // payload: { title, customerFileUrl, materialId?, technicalRequirements?, note? }
   const response = await axiosInstance.post('/api/mainflow-2/print-requests', payload);
   return response.data;
 };
 
-// Luồng 3: Khách gửi GLB từ AI → KTV báo giá
+// AI: Khách gửi GLB từ AI → KTV báo giá
 export const createAiPrintRequest = async (payload) => {
-  // payload: { title?, modelFileUrl, sourceImageUrl?, prompt? }
   const response = await axiosInstance.post('/api/mainflow-2/ai-print-requests', payload);
   return response.data;
 };
 
-// Customer / Staff / Manager: Fetch list of requests with paging & filtering
+// TH2: In từ thiết kế đã thanh toán trên hệ thống
+export const createPrintFromDesign = async (payload) => {
+  const response = await axiosInstance.post('/api/mainflow-2/print-from-design', payload);
+  return response.data;
+};
+
+// TH3: In lại đơn custom đã có báo giá
+export const createReprintRequest = async (payload) => {
+  const response = await axiosInstance.post('/api/mainflow-2/reprint-requests', payload);
+  return response.data;
+};
+
+export const getPrintableDesigns = async () => {
+  const response = await axiosInstance.get('/api/mainflow-2/printable-designs');
+  return response.data;
+};
+
+export const getReprintableOrders = async () => {
+  const response = await axiosInstance.get('/api/mainflow-2/reprintable-orders');
+  return response.data;
+};
+
+export const getMainflow2StaffList = async () => {
+  const response = await axiosInstance.get('/api/mainflow-2/staff-list');
+  return response.data;
+};
+
 export const getDesignRequests = async (params) => {
-  // params: { pageNumber, pageSize, status }
   const response = await axiosInstance.get(MAINFLOW2_ENDPOINTS.BASE, { params });
   return response.data;
 };
 
-// Customer / Staff / Manager: Fetch design request details
 export const getDesignRequestDetail = async (id) => {
   const response = await axiosInstance.get(`${MAINFLOW2_ENDPOINTS.BASE}/${id}`);
   return response.data;
 };
 
-// Staff: Assign oneself to a request
 export const assignStaffToRequest = async (id) => {
   const response = await axiosInstance.post(`${MAINFLOW2_ENDPOINTS.BASE}/${id}/staff/assign`, {});
   return response.data;
 };
 
-// Staff: Provide a detailed quote (material + grams + labor) or flat price
+export const managerAssignStaff = async (id, staffId) => {
+  const response = await axiosInstance.post(`${MAINFLOW2_ENDPOINTS.BASE}/${id}/manager/assign`, { staffId });
+  return response.data;
+};
+
 export const submitQuote = async (id, payload) => {
-  // payload: { quotedPrice, currency, staffNote, laborCost?, components?, designFileUrls? }
   const response = await axiosInstance.post(`${MAINFLOW2_ENDPOINTS.BASE}/${id}/staff/quote`, payload);
   return response.data;
 };
 
-// Customer: Approve the quote
 export const approveQuote = async (id) => {
   const response = await axiosInstance.post(`${MAINFLOW2_ENDPOINTS.BASE}/${id}/approve`, {});
   return response.data;
 };
 
-// Customer / Staff / Manager: Cancel the request
-export const cancelDesignRequest = async (id) => {
-  const response = await axiosInstance.post(`${MAINFLOW2_ENDPOINTS.BASE}/${id}/cancel`, {});
+export const completeDesign = async (id, { deliverableFileUrl, note } = {}) => {
+  const response = await axiosInstance.post(`${MAINFLOW2_ENDPOINTS.BASE}/${id}/staff/complete-design`, {
+    deliverableFileUrl,
+    note,
+  });
   return response.data;
 };
 
-// Post a message in the thread
+export const cancelDesignRequest = async (designWorkId) => {
+  if (!designWorkId) {
+    throw new Error('Thiếu DesignWorkId — không thể hủy yêu cầu.');
+  }
+  const response = await axiosInstance.post(`${MAINFLOW2_ENDPOINTS.BASE}/${designWorkId}/cancel`, {});
+  return response.data;
+};
+
 export const postDesignRequestMessage = async (id, payload) => {
-  // payload: { content, attachmentUrls: [] }
   const response = await axiosInstance.post(`${MAINFLOW2_ENDPOINTS.BASE}/${id}/messages`, payload);
   return response.data;
 };
 
-// Upload a file (images, GLB, OBJ, STL, etc.)
-// Returns: { url, publicUrl }
 export const uploadFile = async (file) => {
   const formData = new FormData();
   formData.append('file', file);
   const response = await axiosInstance.post('/api/files/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    maxContentLength: Infinity,
+    maxBodyLength: Infinity,
   });
   return response.data;
 };

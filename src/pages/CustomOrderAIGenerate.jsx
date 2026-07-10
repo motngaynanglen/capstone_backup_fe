@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import '@google/model-viewer';
 import { notification } from 'antd';
+import GlbPreview from '../components/Mainflow2/GlbPreview';
 import { generateAndUploadGlbFromImage } from '../api/modelApi';
 import { uploadFile, createAiPrintRequest } from '../api/mainflow2Api';
 
@@ -163,16 +163,7 @@ const CustomOrderAIGenerate = () => {
       {step === 'preview' && glbUrl && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 space-y-6">
           <h2 className="text-xl font-bold text-gray-800">Preview mô hình AI</h2>
-          <div className="rounded-xl border border-violet-100 bg-slate-50 overflow-hidden" style={{ height: 360 }}>
-            <model-viewer
-              src={glbUrl}
-              camera-controls
-              auto-rotate
-              shadow-intensity="1"
-              environment-image="neutral"
-              style={{ width: '100%', height: '100%' }}
-            />
-          </div>
+          <GlbPreview src={glbUrl} height={360} style={{ borderRadius: 12 }} />
           <p className="text-xs text-gray-500 break-all">
             GLB: <a href={glbUrl} target="_blank" rel="noreferrer" className="text-violet-600">{glbUrl}</a>
           </p>
@@ -213,7 +204,7 @@ const CustomOrderAIGenerate = () => {
         <ol className="list-decimal pl-5 space-y-1">
           <li>AI tạo GLB từ ảnh bạn upload.</li>
           <li>KTV tiếp nhận, báo giá từ file GLB (chat nếu cần).</li>
-          <li>Bạn duyệt giá → thanh toán PayOS.</li>
+          <li>Bạn duyệt giá → thanh toán online (VNPay hoặc COD).</li>
           <li>In 3D → giao hàng GHN (theo dõi như flow 2).</li>
         </ol>
       </div>

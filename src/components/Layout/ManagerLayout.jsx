@@ -19,13 +19,8 @@ const ManagerLayout = ({ children }) => {
   const menuItems = [
     {
       path: '/manager/dashboard',
-      label: 'Trang Quản Lý',
+      label: 'Dashboard',
       icon: '📊'
-    },
-    {
-      path: '/manager/orders',
-      label: 'Quản lý đơn hàng',
-      icon: '🛒'
     },
     {
       path: '/manager/products',
@@ -38,34 +33,19 @@ const ManagerLayout = ({ children }) => {
       icon: '🧱'
     },
     {
-      path: '/manager/design-templates',
-      label: 'Quản lý Design Template',
-      icon: '🎨'
-    },
-    {
       path: '/manager/staff',
       label: 'Quản lý nhân viên',
       icon: '👥'
     },
     {
       path: '/manager/feedback',
-      label: 'Phản hồi',
+      label: 'Quản lý phản hồi',
       icon: '💬'
     },
     {
       path: '/manager/inventory',
       label: 'Quản lý kho',
       icon: '🏭'
-    },
-    {
-      path: '/manager/invoices',
-      label: 'Quản lý Hóa Đơn',
-      icon: '🧾'
-    },
-    {
-      path: '/manager/transactions',
-      label: 'Quản lý Giao Dịch',
-      icon: '💰'
     }
   ];
 
@@ -94,7 +74,9 @@ const ManagerLayout = ({ children }) => {
           <div className="flex-1 overflow-y-auto">
             <nav className="p-4">
           {menuItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive = item.path === '/manager/dashboard'
+              ? location.pathname === '/manager/dashboard'
+              : location.pathname.startsWith(item.path);
             return (
               <Link
                 key={item.path}

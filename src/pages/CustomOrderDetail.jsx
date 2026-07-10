@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Spin, message, Modal, Button } from 'antd';
-import { getDesignRequestDetail, approveQuote, cancelDesignRequest, postDesignRequestMessage, uploadFile } from '../api/mainflow2Api';
+import { getDesignRequestDetail, approveQuote, cancelDesignRequest, postDesignRequestMessage, uploadFile, isDirectPrintSourceType } from '../api/mainflow2Api';
+import { cancelOrderApi } from '../api/orderApi';
 import { useAuth } from '../contexts/AuthContext';
 import useMainflow2Realtime from '../hooks/useMainflow2Realtime';
 import QuoteMessageCard from '../components/Mainflow2/QuoteMessageCard';
+import DesignDeliverableCard from '../components/Mainflow2/DesignDeliverableCard';
 import ChatMessageBubble, { ChatComposer } from '../components/Mainflow2/ChatMessageBubble';
 import { getMessageAuthorId } from '../components/Mainflow2/messageMetadataUtils';
 import Model3DPreview from '../components/Mainflow2/Model3DPreview';
@@ -12,7 +14,7 @@ import Model3DPreview from '../components/Mainflow2/Model3DPreview';
 const CUSTOM_STATUS_STEPS = [
   { key: 'SUBMITTED', label: 'Gửi yêu cầu' },
   { key: 'ASSIGNED', label: 'NV đã nhận' },
-  { key: 'QUOTED', label: 'Có báo giá' },
+  { key: 'QUOTED', label: 'Báo giá thiết kế + in' },
   { key: 'NEGOTIATING', label: 'Thương lượng' },
   { key: 'APPROVED', label: 'Đã duyệt' },
 ];
@@ -22,7 +24,7 @@ const STATUS_ORDER = CUSTOM_STATUS_STEPS.map(s => s.key);
 const STATUS_LABEL = {
   SUBMITTED: 'Mới gửi',
   ASSIGNED: 'NV đã nhận',
-  QUOTED: 'Có báo giá',
+  QUOTED: 'Báo giá thiết kế + in',
   NEGOTIATING: 'Đang thương lượng',
   APPROVED: 'Đã duyệt',
   CANCELLED: 'Đã hủy',
@@ -44,17 +46,35 @@ const SHIPMENT_STATUS_LABEL = {
   DELIVERED: 'Đã giao',
 };
 
+const directPrintPayHint = (sourceType) => {
+  const t = String(sourceType || '').toUpperCase();
+  if (t === 'AI_GENERATED') return 'Thanh toán một lần — AI đã tạo mẫu, vào sản xuất ngay sau thanh toán.';
+  if (t === 'REPRINT_MF2') return 'Thanh toán một lần — vào sản xuất ngay, không cần chat.';
+  return 'Thanh toán một lần — file thiết kế đã có, vào sản xuất ngay sau thanh toán.';
+};
+
+const checkoutNamePrefix = (sourceType) => {
+  const t = String(sourceType || '').toUpperCase();
+  if (t === 'AI_GENERATED') return 'In AI';
+  if (t === 'PRINT_FROM_DESIGN_MF2') return 'In';
+  if (t === 'REPRINT_MF2') return 'In lại';
+  return 'In';
+};
+
 const goToDesignCheckout = (navigate, order) => {
-  const versions = order.versions || order.quoteFileVersions || [];
-  navigate('/checkout', {
-    state: {
-      designWorkId: order.id,
-      designWorkSourceType: order.sourceType || 'CUSTOM_QUOTE_MF2',
-      designWorkName: order.title ? `Thiết kế: ${order.title}` : 'Thiết kế theo yêu cầu',
-      designWorkPrice: order.latestQuotedPrice,
-      returnTo: `/custom-orders/${order.id}`,
-    },
-  });
+  const isDirectPrint = isDirectPrintSourceType(order?.sourceType);
+  const prefix = checkoutNamePrefix(order?.sourceType);
+  const state = {
+    designWorkId: order.id,
+    designWorkSourceType: order.sourceType || 'CUSTOM_QUOTE_MF2',
+    designWorkName: order.title
+      ? (isDirectPrint ? `${prefix}: ${order.title}` : `Thiết kế: ${order.title}`)
+      : (isDirectPrint ? 'In sản phẩm' : 'Thiết kế theo yêu cầu'),
+    designWorkPrice: order.latestQuotedPrice,
+    designWorkDesignFee: isDirectPrint ? 0 : (order.latestQuoteDesignFee ?? 0),
+    returnTo: `/custom-orders/${order.id}`,
+  };
+  navigate('/checkout', { state });
 };
 
 const formatPrice = (price) =>
@@ -68,6 +88,9 @@ const statusColor = (status) => {
   if (status === 'APPROVED') return { background: '#ecfdf5', color: '#059669' };
   return { background: '#fef2f2', color: '#dc2626' };
 };
+
+const isDesignDeliverableLog = (logType) =>
+  String(logType || '').toUpperCase().includes('DESIGN_READY');
 
 const CustomOrderDetail = () => {
   const { id } = useParams();
@@ -104,6 +127,14 @@ const CustomOrderDetail = () => {
   useEffect(() => {
     fetchDetail();
   }, [id]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchDetail(true);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [fetchDetail]);
 
   useMainflow2Realtime(id, () => fetchDetail(true));
 
@@ -155,20 +186,50 @@ const CustomOrderDetail = () => {
   };
 
   const handleCancel = () => {
+    const designWorkId = order?.id || id;
+    const linkedId = order?.orderId;
+    const awaitingPayment = Boolean(linkedId) && order?.linkedPaymentStatus !== 'PAID';
+    const cancelLinkedOrder = awaitingPayment && linkedId;
+
     Modal.confirm({
-      title: 'Hủy yêu cầu',
-      content: 'Bạn có chắc chắn muốn hủy yêu cầu thiết kế này không?',
-      okText: 'Hủy yêu cầu',
+      title: cancelLinkedOrder ? 'Hủy đơn hàng' : 'Hủy yêu cầu',
+      content: cancelLinkedOrder
+        ? 'Đơn hàng chưa thanh toán sẽ bị hủy. Bạn vẫn có thể đặt lại sau khi duyệt báo giá.'
+        : 'Bạn có chắc chắn muốn hủy yêu cầu thiết kế này không?',
+      okText: cancelLinkedOrder ? 'Hủy đơn hàng' : 'Hủy yêu cầu',
       okType: 'danger',
       cancelText: 'Bỏ qua',
       onOk: async () => {
         try {
           setProcessing(true);
-          const res = await cancelDesignRequest(id);
-          if (res?.statusCode === 200) { message.success('Đã hủy yêu cầu!'); fetchDetail(); }
-          else message.error(res?.message || 'Lỗi khi hủy');
-        } catch { message.error('Lỗi khi hủy yêu cầu'); }
-        finally { setProcessing(false); }
+          if (cancelLinkedOrder) {
+            const res = await cancelOrderApi(linkedId, 'Khách hủy đơn custom');
+            if (res?.statusCode === 200) {
+              message.success('Đã hủy đơn hàng!');
+              fetchDetail();
+            } else {
+              message.error(res?.message || 'Lỗi khi hủy đơn');
+            }
+            return;
+          }
+
+          if (!designWorkId) {
+            message.error('Thiếu mã yêu cầu — không thể hủy.');
+            return;
+          }
+
+          const res = await cancelDesignRequest(designWorkId);
+          if (res?.statusCode === 200) {
+            message.success('Đã hủy yêu cầu!');
+            fetchDetail();
+          } else {
+            message.error(res?.message || 'Lỗi khi hủy');
+          }
+        } catch (err) {
+          message.error(err?.response?.data?.message || err?.message || 'Lỗi khi hủy');
+        } finally {
+          setProcessing(false);
+        }
       }
     });
   };
@@ -182,10 +243,15 @@ const CustomOrderDetail = () => {
   }
 
   const linkedOrderId = order?.orderId;
+  const isDirectPrintFlow = isDirectPrintSourceType(order?.sourceType);
   const isPaid = order?.linkedPaymentStatus === 'PAID';
+  const isDeposited = order?.linkedPaymentStatus === 'PARTIALLY_PAID';
+  const designReady = Boolean(order?.designReadyForBalance);
   const hasLinkedOrder = Boolean(linkedOrderId);
   const showPayButtons = order?.status === 'APPROVED' && !hasLinkedOrder;
-  const showAwaitingPayment = hasLinkedOrder && !isPaid;
+  const showAwaitingPayment = hasLinkedOrder && !isPaid && !isDeposited;
+  const showDesigningPhase = !isDirectPrintFlow && isDeposited && !isPaid && !designReady;
+  const showPayBalance = !isDirectPrintFlow && isDeposited && designReady && !isPaid;
   const showProduction = hasLinkedOrder && isPaid;
   const fileVersions = order?.versions || order?.quoteFileVersions || [];
   const timelineSteps = order?.timeline?.length > 0 ? order.timeline : null;
@@ -200,10 +266,18 @@ const CustomOrderDetail = () => {
           : SHIPMENT_STATUS_LABEL[order.linkedShipmentStatus]
             || LINKED_ORDER_STATUS_LABEL[order.linkedOrderStatus]
             || 'Đang xử lý đơn')
+    : showPayBalance
+      ? 'Chờ hoàn tất thanh toán'
+      : showDesigningPhase
+        ? 'Chờ bảng thiết kế'
     : (STATUS_LABEL[order?.status] || order?.status);
 
   const headerStatusStyle = showProduction
     ? { background: '#eff6ff', color: '#2563eb' }
+    : showPayBalance
+      ? { background: '#fffbeb', color: '#d97706' }
+      : showDesigningPhase
+        ? { background: '#f5f3ff', color: '#7c3aed' }
     : statusColor(order?.status);
 
   if (!order) {
@@ -239,10 +313,18 @@ const CustomOrderDetail = () => {
             Xem đơn {order.linkedOrderCode ? `#${order.linkedOrderCode}` : ''}
           </Link>
         )}
-        {order.status !== 'CANCELLED' && order.status !== 'APPROVED' && (
+        {(showPayBalance || showDesigningPhase) && linkedOrderId && (
+          <Link
+            to={`/orders/${linkedOrderId}`}
+            style={{ fontSize: 12, color: '#6b7280', fontWeight: 600, textDecoration: 'none' }}
+          >
+            Đơn {order.linkedOrderCode ? `#${order.linkedOrderCode}` : ''}
+          </Link>
+        )}
+        {order.status !== 'CANCELLED' && !showProduction && (
           <button onClick={handleCancel} disabled={processing}
             style={{ padding: '4px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
-            Hủy yêu cầu
+            {showAwaitingPayment ? 'Hủy đơn hàng' : 'Hủy yêu cầu'}
           </button>
         )}
       </div>
@@ -261,6 +343,7 @@ const CustomOrderDetail = () => {
             {order.messages?.length > 0 ? order.messages.map((msg, i) => {
               const isMe = getMessageAuthorId(msg) === user?.id;
               const isQuote = msg.logType && msg.logType.toUpperCase().includes('QUOTE');
+              const isDesignDeliverable = isDesignDeliverableLog(msg.logType);
 
               if (isQuote) {
                 let meta = null;
@@ -278,6 +361,19 @@ const CustomOrderDetail = () => {
                       onApprove={handleApprove}
                       approveLoading={processing}
                     />
+                    <span style={{ fontSize: 10, color: '#9ca3af', marginTop: 3, display: 'block' }}>
+                      {new Date(msg.created).toLocaleString('vi-VN')} · Nhân viên
+                    </span>
+                  </div>
+                );
+              }
+
+              if (isDesignDeliverable) {
+                let meta = null;
+                try { meta = msg.metadataJson ? JSON.parse(msg.metadataJson) : null; } catch {}
+                return (
+                  <div key={msg.id || i} style={{ width: '100%', marginBottom: 12 }}>
+                    <DesignDeliverableCard meta={meta} staffNote={msg.content} />
                     <span style={{ fontSize: 10, color: '#9ca3af', marginTop: 3, display: 'block' }}>
                       {new Date(msg.created).toLocaleString('vi-VN')} · Nhân viên
                     </span>
@@ -308,7 +404,7 @@ const CustomOrderDetail = () => {
           ) : showProduction ? (
             <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center' }}>
               <p style={{ margin: '0 0 6px', color: '#2563eb', fontSize: 14, fontWeight: 700 }}>
-                Đơn đã thanh toán — đang theo dõi tiến độ sản xuất & giao hàng
+                Đã thanh toán đủ — đang theo dõi tiến độ sản xuất & giao hàng
               </p>
               <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>
                 {order.linkedTrackingNumber
@@ -316,24 +412,59 @@ const CustomOrderDetail = () => {
                   : 'Shop sẽ cập nhật trạng thái khi bắt đầu in và giao hàng.'}
               </p>
             </div>
+          ) : showPayBalance ? (
+            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <div style={{ color: '#d97706', fontSize: 14, fontWeight: 600 }}>
+                Bảng thiết kế đã sẵn sàng — hoàn tất thanh toán để bắt đầu sản xuất
+              </div>
+              {order.remainingBalance != null && (
+                <p style={{ margin: 0, fontSize: 13, color: '#374151' }}>
+                  Số tiền còn lại: <strong>{formatPrice(order.remainingBalance)}</strong>
+                </p>
+              )}
+              <Button
+                type="primary"
+                size="large"
+                style={{ background: '#4f46e5', borderColor: '#4f46e5', height: 44, borderRadius: 12, fontWeight: 700 }}
+                onClick={() => navigate(`/orders/${linkedOrderId}`, { state: { returnTo: `/custom-orders/${order.id}` } })}
+              >
+                Hoàn tất thanh toán
+              </Button>
+            </div>
+          ) : showDesigningPhase ? (
+            <>
+              <div style={{ flexShrink: 0, background: '#faf5ff', borderTop: '1px solid #e9d5ff', padding: '10px 16px', textAlign: 'center', color: '#7c3aed', fontSize: 13, fontWeight: 600 }}>
+                Đã đặt cọc 30% — chờ nhân viên gửi bảng thiết kế trong chat
+              </div>
+              <ChatComposer
+                value={chatMessage}
+                onChange={setChatMessage}
+                onSend={handleSendChat}
+                uploading={uploading}
+              />
+            </>
           ) : showAwaitingPayment ? (
             <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
               <div style={{ color: '#d97706', fontSize: 14, fontWeight: 600 }}>
-                Đơn hàng đã tạo — vui lòng hoàn tất thanh toán để bắt đầu sản xuất
+                {isDirectPrintFlow
+                  ? 'Chờ thanh toán toàn bộ để bắt đầu in'
+                  : 'Đã duyệt báo giá — vui lòng đặt cọc 30% để bắt đầu'}
               </div>
               <Button
                 type="primary"
                 size="large"
                 style={{ background: '#4f46e5', borderColor: '#4f46e5', height: 44, borderRadius: 12, fontWeight: 700 }}
-                onClick={() => navigate(`/orders/${linkedOrderId}`)}
+                onClick={() => navigate(`/orders/${linkedOrderId}`, { state: { returnTo: `/custom-orders/${order.id}` } })}
               >
-                Thanh toán đơn {order.linkedOrderCode ? `#${order.linkedOrderCode}` : ''}
+                {isDirectPrintFlow ? 'Thanh toán & in ngay' : 'Đặt cọc 30%'}
               </Button>
             </div>
           ) : showPayButtons ? (
             <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
               <div style={{ color: '#059669', fontSize: 14, fontWeight: 600 }}>
-                🎉 Chúc mừng! Thiết kế đã được duyệt với giá {formatPrice(order.latestQuotedPrice)}
+                {isDirectPrintFlow
+                  ? 'Đã duyệt báo giá — thanh toán toàn bộ để in ngay'
+                  : `🎉 Đã duyệt báo giá thiết kế + in: ${formatPrice(order.latestQuotedPrice)}`}
               </div>
               <Button
                 type="primary"
@@ -341,9 +472,15 @@ const CustomOrderDetail = () => {
                 style={{ background: '#4f46e5', borderColor: '#4f46e5', height: 48, borderRadius: 12, padding: '0 32px', fontWeight: 700, fontSize: 16 }}
                 onClick={() => goToDesignCheckout(navigate, order)}
               >
-                🚀 Thanh toán & Đặt hàng ngay
+                {isDirectPrintFlow ? 'Thanh toán & in ngay' : 'Đặt cọc 30%'}
               </Button>
-              <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Bấm để thanh toán — shop sẽ bắt đầu sản xuất và gửi hàng cho bạn.</p>
+              <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>
+                {isDirectPrintFlow
+                  ? directPrintPayHint(order?.sourceType)
+                  : (order.latestQuoteDesignFee > 0
+                    ? `Cọc ${formatPrice(Math.round(order.latestQuoteDesignFee * 0.3))} (30% tiền thiết kế) — sau bảng thiết kế hoàn tất phần còn lại tổng đơn.`
+                    : 'Cọc 30% tiền thiết kế — sau bảng thiết kế hoàn tất phần còn lại tổng đơn.')}
+              </p>
             </div>
           ) : order.status === 'APPROVED' ? (
             <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#6b7280', fontSize: 13 }}>
@@ -430,7 +567,7 @@ const CustomOrderDetail = () => {
                   style={{ background: '#4f46e5', borderColor: '#4f46e5', width: '100%', fontWeight: 700 }}
                   onClick={() => goToDesignCheckout(navigate, order)}
                 >
-                  🚀 Thanh toán ngay
+                  {isDirectPrintFlow ? 'Thanh toán & in ngay' : '🚀 Thanh toán ngay'}
                 </Button>
               )}
               {showAwaitingPayment && (
@@ -439,7 +576,7 @@ const CustomOrderDetail = () => {
                   style={{ background: '#d97706', borderColor: '#d97706', width: '100%', fontWeight: 700 }}
                   onClick={() => navigate(`/orders/${linkedOrderId}`)}
                 >
-                  Hoàn tất thanh toán
+                  {isDirectPrintFlow ? 'Thanh toán & in ngay' : 'Hoàn tất thanh toán'}
                 </Button>
               )}
               {showProduction && (

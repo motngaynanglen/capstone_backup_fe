@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Spin } from 'antd';
 import { getShippingQuotesApi } from '../../api/shipmentApi';
 
@@ -26,14 +26,28 @@ const ShippingCarrierSelect = ({
   const [quotes, setQuotes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const requestSeq = useRef(0);
+  const onChangeRef = useRef(onChange);
+  const selectedCarrierRef = useRef(selectedCarrier);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    selectedCarrierRef.current = selectedCarrier;
+  }, [selectedCarrier]);
 
   const loadQuotes = useCallback(async () => {
     if (!canQuote) {
       setQuotes([]);
       return;
     }
+
+    const seq = ++requestSeq.current;
     setLoading(true);
     setError(null);
+
     try {
       const payload = {
         weightGrams,
@@ -45,18 +59,30 @@ const ShippingCarrierSelect = ({
         payload.ghnToDistrictId = ghnToDistrictId;
         payload.ghnToWardCode = String(ghnToWardCode).trim();
       }
+
       const res = await getShippingQuotesApi(payload);
-      const rows = res?.data || [];
-      setQuotes(Array.isArray(rows) ? rows : []);
-      if (rows.length > 0 && !selectedCarrier) {
-        const first = rows[0];
-        onChange?.(first.carrier, first.fee);
+      if (seq !== requestSeq.current) return;
+
+      const list = Array.isArray(res?.data) ? res.data : [];
+      setQuotes(list);
+
+      if (list.length > 0) {
+        const picked = list.find((q) => q.carrier === selectedCarrierRef.current) || list[0];
+        onChangeRef.current?.(picked.carrier, picked.fee);
+      } else if (!selectedCarrierRef.current) {
+        onChangeRef.current?.('', 0);
       }
     } catch (e) {
+      if (seq !== requestSeq.current) return;
       setError(e?.response?.data?.message || e?.message || 'Không tính được phí vận chuyển');
       setQuotes([]);
+      if (!selectedCarrierRef.current) {
+        onChangeRef.current?.('', 0);
+      }
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) {
+        setLoading(false);
+      }
     }
   }, [
     canQuote,
@@ -66,8 +92,6 @@ const ShippingCarrierSelect = ({
     weightGrams,
     orderValue,
     collectOnDelivery,
-    selectedCarrier,
-    onChange,
   ]);
 
   useEffect(() => {
@@ -96,10 +120,14 @@ const ShippingCarrierSelect = ({
         </button>
       </div>
 
-      {loading && quotes.length === 0 && (
+      {loading && quotes.length === 0 && !selectedCarrier && (
         <div className="flex items-center gap-2 py-4 text-gray-500 text-sm">
           <Spin size="small" /> Đang lấy báo giá GHN…
         </div>
+      )}
+
+      {loading && selectedCarrier && (
+        <p className="text-xs text-slate-500 mb-2">Đang cập nhật phí ship…</p>
       )}
 
       {error && (
@@ -107,13 +135,19 @@ const ShippingCarrierSelect = ({
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {quotes.map((q) => {
+        {(quotes.length > 0 ? quotes : selectedCarrier ? [{
+          carrier: selectedCarrier,
+          carrierName: 'Giao Hàng Nhanh (GHN)',
+          fee: selectedFee,
+          leadDays: 3,
+          isEstimated: false,
+        }] : []).map((q) => {
           const active = selectedCarrier === q.carrier;
           return (
             <button
               key={q.carrier}
               type="button"
-              onClick={() => onChange?.(q.carrier, q.fee)}
+              onClick={() => onChangeRef.current?.(q.carrier, q.fee)}
               className={`text-left p-4 rounded-xl border-2 transition-all ${
                 active
                   ? 'border-indigo-500 bg-indigo-50'
@@ -139,9 +173,9 @@ const ShippingCarrierSelect = ({
       {selectedCarrier && (
         <p className="text-xs text-green-700 mt-3 font-medium">
           Đã chọn {selectedCarrier} — phí ship {formatPrice(selectedFee)}
-          {Number(selectedFee) === 0 && (
-            <span className="block text-amber-700 mt-1 font-normal">
-              GHN trả 0đ — thường do gửi cùng quận/phường mặc định (địa chỉ chưa có mã GHN). Tổng đơn sẽ không cộng phí ship.
+          {collectOnDelivery && (
+            <span className="block text-slate-600 mt-1 font-normal">
+              COD: thu tiền hàng + phí ship khi giao — không thanh toán trước online.
             </span>
           )}
         </p>

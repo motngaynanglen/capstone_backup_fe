@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
+import { resolveCartItemSourceType } from '../utils/catalogProduct';
+
+const getItemKey = (item) => `${item.product?.id}::${item.material}`;
 
 // SVG Icons
 const TrashIcon = () => (
@@ -46,7 +49,7 @@ const SOURCE_TYPE_CONFIG = {
     icon: <PackageIcon />,
   },
   pre_order: {
-    label: 'Pre-Order • +3 ngày',
+    label: 'Pre-order',
     className: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
     icon: <ClockIcon />,
   },
@@ -67,17 +70,89 @@ const StatusBadge = ({ sourceType }) => {
   );
 };
 
+const CartCheckbox = ({ checked, indeterminate, onChange, label }) => (
+  <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+    <input
+      type="checkbox"
+      checked={checked}
+      ref={(el) => {
+        if (el) el.indeterminate = Boolean(indeterminate);
+      }}
+      onChange={onChange}
+      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+      aria-label={label}
+    />
+    {label ? <span className="text-sm text-gray-700">{label}</span> : null}
+  </label>
+);
+
 const ShoppingCart = () => {
   const navigate = useNavigate();
-  const { items, updateQuantity, removeFromCart, subtotal } = useCart();
+  const { items, updateQuantity, removeFromCart } = useCart();
+  const [selectedKeys, setSelectedKeys] = useState(() => new Set());
+  const knownKeysRef = useRef(new Set());
 
-  const hasPreOrder = items.some(i => i.product.sourceType === 'pre_order');
-  const hasCustom = items.some(i => i.product.sourceType === 'custom');
+  useEffect(() => {
+    const currentKeys = items.map(getItemKey);
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      for (const key of currentKeys) {
+        if (!knownKeysRef.current.has(key)) {
+          next.add(key);
+          knownKeysRef.current.add(key);
+        }
+      }
+      for (const key of [...next]) {
+        if (!currentKeys.includes(key)) {
+          next.delete(key);
+          knownKeysRef.current.delete(key);
+        }
+      }
+      return next;
+    });
+  }, [items]);
+
+  const selectedItems = useMemo(
+    () => items.filter((item) => selectedKeys.has(getItemKey(item))),
+    [items, selectedKeys]
+  );
+
+  const allSelected = items.length > 0 && selectedItems.length === items.length;
+  const someSelected = selectedItems.length > 0 && !allSelected;
+
+  const toggleItem = (key) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelectedKeys(new Set());
+    } else {
+      setSelectedKeys(new Set(items.map(getItemKey)));
+    }
+  };
+
+  const selectedSubtotal = useMemo(
+    () =>
+      selectedItems.reduce((sum, i) => {
+        const price = Number(i.product?.price) || 0;
+        const qty = Number(i.quantity);
+        return sum + price * (Number.isFinite(qty) && qty > 0 ? qty : 1);
+      }, 0),
+    [selectedItems]
+  );
+
+  const hasPreOrder = selectedItems.some((i) => resolveCartItemSourceType(i) === 'pre_order');
+  const hasCustom = selectedItems.some((i) => resolveCartItemSourceType(i) === 'custom');
   const showDeliveryWarning = hasPreOrder || hasCustom;
 
-  // Fix 30k shipping by default if cart has items
-  const shipping = items.length > 0 ? 30000 : 0;
-  const total = subtotal + shipping;
+  const shipping = selectedItems.length > 0 ? 30000 : 0;
+  const total = selectedSubtotal + shipping;
 
   const formatPrice = (price) =>
     new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
@@ -106,17 +181,45 @@ const ShoppingCart = () => {
     <div className="max-w-7xl mx-auto px-6 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Giỏ hàng</h1>
-        <p className="text-gray-500 mt-1">{items.length} sản phẩm trong giỏ</p>
+        <p className="text-gray-500 mt-1">
+          {items.length} sản phẩm trong giỏ
+          {selectedItems.length < items.length && (
+            <span> · Đã chọn {selectedItems.length}</span>
+          )}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Cart Items */}
         <div className="lg:col-span-2 space-y-4">
-          {items.map((item, idx) => (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-3 flex items-center justify-between">
+            <CartCheckbox
+              checked={allSelected}
+              indeterminate={someSelected}
+              onChange={toggleAll}
+              label="Chọn tất cả"
+            />
+            <span className="text-xs text-gray-500">
+              {selectedItems.length}/{items.length} sản phẩm
+            </span>
+          </div>
+
+          {items.map((item, idx) => {
+            const itemKey = getItemKey(item);
+            const isSelected = selectedKeys.has(itemKey);
+
+            return (
             <div
               key={`${item.product.id}-${item.material}-${idx}`}
-              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-start gap-4 hover:shadow-md transition-shadow duration-200"
+              className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-start gap-4 hover:shadow-md transition-all duration-200 ${
+                isSelected ? '' : 'opacity-60'
+              }`}
             >
+              <CartCheckbox
+                checked={isSelected}
+                onChange={() => toggleItem(itemKey)}
+                label=""
+              />
               <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-50 flex-shrink-0 relative">
                 {/* Dùng model-viewer hoặc image tĩnh tuỳ data, nếu có modelSrc dùng model-viewer (camera-controls false để ko bị nhiễu) */}
                 {item.product.modelSrc ? (
@@ -151,7 +254,7 @@ const ShoppingCart = () => {
                   </button>
                 </div>
                 <div className="mb-3">
-                  <StatusBadge sourceType={item.product.sourceType} />
+                  <StatusBadge sourceType={resolveCartItemSourceType(item)} />
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
@@ -179,7 +282,8 @@ const ShoppingCart = () => {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Order Summary */}
@@ -189,25 +293,29 @@ const ShoppingCart = () => {
 
             {/* Item type legend */}
             <div className="space-y-2 pb-4 border-b border-gray-100">
-              {items.map((item, idx) => (
-                <div key={`${item.product.id}-${item.material}-${idx}`} className="flex justify-between items-center text-sm">
-                  <div className="flex items-center gap-2 min-w-0 max-w-[65%]">
-                    <span className="truncate text-gray-700">{item.product.name}</span>
-                    <div className="scale-75 origin-left hidden xl:block">
-                      <StatusBadge sourceType={item.product.sourceType} />
+              {selectedItems.length === 0 ? (
+                <p className="text-sm text-gray-400 m-0">Chưa chọn sản phẩm nào</p>
+              ) : (
+                selectedItems.map((item, idx) => (
+                  <div key={`${item.product.id}-${item.material}-${idx}`} className="flex justify-between items-center text-sm">
+                    <div className="flex items-center gap-2 min-w-0 max-w-[65%]">
+                      <span className="truncate text-gray-700">{item.product.name}</span>
+                      <div className="scale-75 origin-left hidden xl:block">
+                        <StatusBadge sourceType={resolveCartItemSourceType(item)} />
+                      </div>
                     </div>
+                    <span className="font-medium text-gray-900 flex-shrink-0 ml-2">
+                      {formatPrice(item.product.price * item.quantity)}
+                    </span>
                   </div>
-                  <span className="font-medium text-gray-900 flex-shrink-0 ml-2">
-                    {formatPrice(item.product.price * item.quantity)}
-                  </span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Tạm tính</span>
-                <span className="font-medium text-gray-900">{formatPrice(subtotal)}</span>
+                <span className="font-medium text-gray-900">{formatPrice(selectedSubtotal)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Phí vận chuyển</span>
@@ -233,21 +341,27 @@ const ShoppingCart = () => {
 
             <button
               onClick={() => {
-                const cartItems = items.map((item) => ({
-                  variantId: item.product.id != null ? String(item.product.id) : undefined,
-                  name: item.product.name,
-                  designTemplateName: item.product.designTemplateName,
-                  price: item.product.price,
-                  quantity: item.quantity,
-                  material: item.material,
-                  modelSrc: item.product.modelSrc,
-                  sourceType: item.product.sourceType === 'pre_order' ? 'PRE_ORDER' : 'IN_STOCK',
-                }));
+                const cartItems = selectedItems.map((item) => {
+                  const sourceType = resolveCartItemSourceType(item);
+                  return {
+                    variantId: item.product.id != null ? String(item.product.id) : undefined,
+                    name: item.product.name,
+                    designTemplateName: item.product.designTemplateName,
+                    price: item.product.price,
+                    quantity: item.quantity,
+                    material: item.material,
+                    modelSrc: item.product.modelSrc,
+                    stock: item.product.stock,
+                    isAllowPreOrder: item.product.isAllowPreOrder,
+                    sourceType: sourceType === 'pre_order' ? 'PRE_ORDER' : 'IN_STOCK',
+                  };
+                });
                 navigate('/checkout', { state: { cartItems } });
               }}
-              className="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 active:bg-indigo-800 transition-colors duration-200 cursor-pointer"
+              disabled={selectedItems.length === 0}
+              className="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 active:bg-indigo-800 transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600"
             >
-              Tiến hành thanh toán
+              Tiến hành thanh toán{selectedItems.length > 0 ? ` (${selectedItems.length})` : ''}
             </button>
             <Link
               to="/products"

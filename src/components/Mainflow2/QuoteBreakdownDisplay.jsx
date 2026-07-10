@@ -5,7 +5,7 @@ import { formatVnd } from './quoteBreakdownUtils';
 const { Text } = Typography;
 
 /**
- * Hiển thị bảng báo giá chi tiết: thành phần → vật liệu → gram × đơn giá + tiền công.
+ * Hiển thị bảng báo giá chi tiết: thành phần → vật liệu → gram × đơn giá + tiền thiết kế.
  */
 export default function QuoteBreakdownDisplay({ breakdown, compact = false }) {
   const data = breakdown?.quoteBreakdown ?? breakdown;
@@ -110,7 +110,7 @@ export default function QuoteBreakdownDisplay({ breakdown, compact = false }) {
           <span>{formatVnd(materialSubtotal)}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4b5563', marginTop: 4 }}>
-          <span>Tiền công / gia công</span>
+          <span>Tiền thiết kế</span>
           <span>{formatVnd(laborCost)}</span>
         </div>
         <div

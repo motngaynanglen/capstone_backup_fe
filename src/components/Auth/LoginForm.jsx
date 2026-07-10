@@ -33,7 +33,7 @@ const LoginForm = ({ onSuccess }) => {
                 setError(result.message || "Tên đăng nhập hoặc mật khẩu không đúng");
             }
         } catch (err) {
-            setError("Lỗi kết nối server. Vui lòng kiểm tra lại đường truyền.");
+            setError(err?.message || "Không thể đăng nhập. Vui lòng thử lại sau.");
         } finally {
             setLoading(false);
         }

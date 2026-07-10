@@ -13,6 +13,10 @@ export const MATERIAL_ENDPOINTS = {
   TOGGLE_ACTIVE: "/api/material", // appending /{id}/toggle-active
 };
 
+export const MATERIAL_INVENTORY_ENDPOINTS = {
+  CREATE: "/api/material-inventory-transaction/create",
+};
+
 export const CONCEP_TAG_ENDPOINTS = {
   GET_ALL: "/api/concept-tag/all",
   QUERY: "/api/concept-tag/query",
@@ -23,9 +27,11 @@ export const CONCEP_TAG_ENDPOINTS = {
 
 export const DESIGN_TEMPLATE_ENDPOINTS = {
   QUERY: "/api/design-template/query",
+  MANAGE_CATALOG: "/api/design-template/manage-catalog",
   DETAIL: "/api/design-template", // appending /{id}/detail in service
   ADD: "/api/design-template/add",
   UPDATE: "/api/design-template", // appending /{id}/update in service
+  TOGGLE_ACTIVE: "/api/design-template", // appending /{id}/toggle-active in service
   DELETE: "/api/design-template", // appending /{id}/delete in service
 };
 
@@ -41,7 +47,8 @@ export const DESIGN_VARIANT_ENDPOINTS = {
   SEARCH: "/api/design-variant/",
   DETAIL: "/api/design-variant",
   ADD: "/api/design-variant/add",
-  UPDATE: "/api/design-variant/update",
-  UPDATE_QUANTITY: "/api/design-variant/quantity",
-  DELETE: "/api/design-variant", // appending /{id}/delete
+  UPDATE: "/api/design-variant", // appending /{id}/update in service
+  UPDATE_QUANTITY: "/api/design-variant", // appending /{id}/quantity in service
+  DELETE: "/api/design-variant", // appending /{id}/delete (alias)
+  TOGGLE_ACTIVE: "/api/design-variant", // appending /{id}/toggle-active
 };
