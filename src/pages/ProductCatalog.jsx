@@ -71,7 +71,7 @@ const ProductCatalog = () => {
     (async () => {
       try {
         const [matRes, tagRes] = await Promise.all([
-          materialApi.getAll(),
+          materialApi.getActive(),
           conceptTagApi.getAll(),
         ]);
         if (cancelled) return;

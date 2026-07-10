@@ -2,9 +2,20 @@ import axiosInstance from './axiosInstance';
 import { MATERIAL_ENDPOINTS } from './endpoints';
 
 const materialApi = {
+  // Danh sách đầy đủ — BE yêu cầu quyền Staff/Manager
   getAll: async () => {
     try {
       const response = await axiosInstance.get(MATERIAL_ENDPOINTS.GET_ALL);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Danh sách vật liệu đang hoạt động — public, dùng cho trang khách hàng
+  getActive: async () => {
+    try {
+      const response = await axiosInstance.get('/api/material/active');
       return response.data;
     } catch (error) {
       throw error;

@@ -36,7 +36,7 @@ const CustomOrderUpload = () => {
   useEffect(() => {
     (async () => {
       try {
-        const res = await materialApi.getAll();
+        const res = await materialApi.getActive();
         const list = res?.data || [];
         setMaterials(list);
         if (list.length > 0) setFormData((f) => ({ ...f, materialId: list[0].id }));
