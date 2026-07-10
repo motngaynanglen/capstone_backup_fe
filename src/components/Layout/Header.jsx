@@ -8,7 +8,7 @@ import { useAuthModal } from '../../contexts/AuthModalContext';
 import { useCart } from '../../contexts/CartContext';
 
 const Header = () => {
-  const { user, logout, isAuthenticated, isAdmin, isManager, isEmployee } = useAuth();
+  const { user, logout, isAuthenticated, isAdmin, isManager, isEmployee, isCustomer } = useAuth();
   const { openModal } = useAuthModal();
   const { totalItems } = useCart();
   const navigate = useNavigate();
@@ -83,23 +83,28 @@ const Header = () => {
         icon: <UserOutlined />,
         label: <Link to="/profile">Thông tin tài khoản</Link>,
       },
-      { type: 'divider' },
-      {
-        key: 'orders',
-        icon: <UnorderedListOutlined />,
-        label: <Link to="/my-orders">Đơn hàng của tôi</Link>,
-      },
-      {
-        key: 'custom-orders',
-        icon: <FileTextOutlined />,
-        label: <Link to="/my-custom-orders">Đơn hàng Custom</Link>,
-      },
-      {
-        key: 'my-designs',
-        icon: <FileTextOutlined />,
-        label: <Link to="/my-designs">Kho đồ thiết kế</Link>,
-      },
     ];
+
+    if (isCustomer) {
+      items.push(
+        { type: 'divider' },
+        {
+          key: 'orders',
+          icon: <UnorderedListOutlined />,
+          label: <Link to="/my-orders">Đơn hàng của tôi</Link>,
+        },
+        {
+          key: 'custom-orders',
+          icon: <FileTextOutlined />,
+          label: <Link to="/my-custom-orders">Đơn hàng Custom</Link>,
+        },
+        {
+          key: 'my-designs',
+          icon: <FileTextOutlined />,
+          label: <Link to="/my-designs">Kho đồ thiết kế</Link>,
+        }
+      );
+    }
 
     if (dashboardNavItem) {
       items.push({ type: 'divider' }, dashboardNavItem);
@@ -117,7 +122,7 @@ const Header = () => {
     );
 
     return items;
-  }, [dashboardNavItem, handleLogout]);
+  }, [dashboardNavItem, handleLogout, isCustomer]);
 
   return (
     <Layout.Header style={{ padding: 0, height: 'auto', lineHeight: 'normal' }}>

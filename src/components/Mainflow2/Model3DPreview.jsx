@@ -1,6 +1,7 @@
 import React from 'react';
 import GlbPreview from './GlbPreview';
 import { getModel3dKind, isImageUrl } from '../../utils/model3d';
+import { resolvePublicMediaUrl } from '../../utils/mediaUrl';
 
 /**
  * Preview 3D model or image attachment inline in chat.
@@ -8,16 +9,17 @@ import { getModel3dKind, isImageUrl } from '../../utils/model3d';
 export default function Model3DPreview({ fileUrl, height = 220 }) {
   if (!fileUrl) return null;
 
-  const kind = getModel3dKind(fileUrl);
+  const resolvedUrl = resolvePublicMediaUrl(fileUrl);
+  const kind = getModel3dKind(resolvedUrl);
 
   if (kind === 'gltf') {
-    return <GlbPreview src={fileUrl} height={height} />;
+    return <GlbPreview src={resolvedUrl} height={height} />;
   }
 
-  if (isImageUrl(fileUrl)) {
+  if (isImageUrl(resolvedUrl)) {
     return (
       <img
-        src={fileUrl}
+        src={resolvedUrl}
         alt="Đính kèm"
         style={{
           maxWidth: '100%',
@@ -33,7 +35,7 @@ export default function Model3DPreview({ fileUrl, height = 220 }) {
   const label = kind === 'stl' ? 'STL' : kind === 'obj' ? 'OBJ' : 'File 3D';
   return (
     <a
-      href={fileUrl}
+      href={resolvedUrl}
       target="_blank"
       rel="noreferrer"
       style={{

@@ -105,6 +105,17 @@ const designTemplateApi = {
       throw error;
     }
   },
+
+  // BE stable không có /toggle-active cho template (trạng thái publish nằm ở variant).
+  // Chiều "tắt" map sang soft-delete; chiều "bật lại" không được BE hỗ trợ.
+  toggleActive: async (id, nextActive) => {
+    if (nextActive) {
+      throw new Error('Backend chưa hỗ trợ kích hoạt lại mẫu — hãy publish biến thể của mẫu thay thế.');
+    }
+    const url = `${DESIGN_TEMPLATE_ENDPOINTS.DELETE}/${id}/delete`;
+    const response = await axiosInstance.delete(url, { data: {} });
+    return response.data;
+  },
 };
 
 export default designTemplateApi;

@@ -1,15 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Tabs, Form, Input, Button, App, Spin } from 'antd';
-import { UserOutlined, PhoneOutlined, LockOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
+import { Card, Tabs, Form, Input, Button, App, Spin, Popconfirm, Empty, Tag } from 'antd';
+import { UserOutlined, PhoneOutlined, LockOutlined, SafetyCertificateOutlined, EnvironmentOutlined, DeleteOutlined } from '@ant-design/icons';
 import { getMyProfileApi, updateMyProfileApi, changePasswordApi } from '../../api/accountApi';
+import shippingAddressApi from '../../api/shippingAddressApi';
+import { useAuth } from '../../contexts/AuthContext';
 
 const UserProfilePage = () => {
     const { message } = App.useApp();
+    const { updateUser } = useAuth();
 
     // Quản lý trạng thái loading riêng biệt cho từng hành động
     const [initLoading, setInitLoading] = useState(true);
     const [updateLoading, setUpdateLoading] = useState(false);
     const [passwordLoading, setPasswordLoading] = useState(false);
+    const [addresses, setAddresses] = useState([]);
+    const [addressesLoading, setAddressesLoading] = useState(false);
+    const [deletingAddressId, setDeletingAddressId] = useState(null);
+    const [activeTab, setActiveTab] = useState('1');
 
     // Khởi tạo 2 form riêng biệt cho 2 Tab
     const [profileForm] = Form.useForm();
@@ -39,7 +46,42 @@ const UserProfilePage = () => {
         }
     };
 
-    // 2. Xử lý khi bấm Lưu Thông Tin
+    useEffect(() => {
+        if (activeTab === '2') {
+            fetchMyAddresses();
+        }
+    }, [activeTab]);
+
+    const fetchMyAddresses = async () => {
+        setAddressesLoading(true);
+        try {
+            const result = await shippingAddressApi.getMyAddresses();
+            const list = result?.data || result || [];
+            setAddresses(Array.isArray(list) ? list : []);
+        } catch {
+            message.error('Không thể tải danh sách địa chỉ.');
+        } finally {
+            setAddressesLoading(false);
+        }
+    };
+
+    const handleDeleteAddress = async (addressId) => {
+        setDeletingAddressId(addressId);
+        try {
+            const result = await shippingAddressApi.remove(addressId);
+            if (result?.statusCode === 200 || result?.code === 'SUCCESS') {
+                message.success('Đã xóa địa chỉ giao hàng.');
+                setAddresses((prev) => prev.filter((a) => a.id !== addressId));
+            } else {
+                message.error(result?.message || 'Không thể xóa địa chỉ.');
+            }
+        } catch (error) {
+            message.error(error.response?.data?.message || 'Có lỗi xảy ra khi xóa địa chỉ.');
+        } finally {
+            setDeletingAddressId(null);
+        }
+    };
+
     const onUpdateProfile = async (values) => {
         setUpdateLoading(true);
         try {
@@ -50,6 +92,7 @@ const UserProfilePage = () => {
 
             if (result.statusCode === 200 || result.code === 'SUCCESS') {
                 message.success('Cập nhật thông tin cá nhân thành công!');
+                updateUser({ fullName: values.fullname });
                 fetchMyProfile(); // Tải lại dữ liệu cho chắc ăn
             } else {
                 message.error(result.message || 'Cập nhật thất bại.');
@@ -123,6 +166,68 @@ const UserProfilePage = () => {
         </Form>
     );
 
+    const renderAddressTab = () => {
+        if (addressesLoading) {
+            return (
+                <div className="flex justify-center items-center h-40">
+                    <Spin tip="Đang tải địa chỉ..." />
+                </div>
+            );
+        }
+
+        if (addresses.length === 0) {
+            return (
+                <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description="Bạn chưa có địa chỉ giao hàng nào được lưu."
+                />
+            );
+        }
+
+        return (
+            <div className="space-y-3">
+                {addresses.map((addr) => (
+                    <div
+                        key={addr.id}
+                        className="flex items-start justify-between gap-4 p-4 rounded-xl border border-gray-200 bg-gray-50"
+                    >
+                        <div className="flex items-start gap-3 min-w-0">
+                            <EnvironmentOutlined className="text-indigo-500 text-lg mt-0.5" />
+                            <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2 mb-1">
+                                    <span className="font-semibold text-gray-900">{addr.receiverName}</span>
+                                    <span className="text-gray-400">|</span>
+                                    <span className="text-gray-600">{addr.phone}</span>
+                                    {addr.isDefault && <Tag color="blue">Mặc định</Tag>}
+                                </div>
+                                <p className="text-sm text-gray-500 m-0">
+                                    {[addr.addressLine, addr.ward, addr.district, addr.city, addr.province].filter(Boolean).join(', ')}
+                                </p>
+                            </div>
+                        </div>
+                        <Popconfirm
+                            title="Xóa địa chỉ này?"
+                            description="Hành động này không thể hoàn tác."
+                            okText="Xóa"
+                            cancelText="Hủy"
+                            okButtonProps={{ danger: true, loading: deletingAddressId === addr.id }}
+                            onConfirm={() => handleDeleteAddress(addr.id)}
+                        >
+                            <Button
+                                type="text"
+                                danger
+                                icon={<DeleteOutlined />}
+                                loading={deletingAddressId === addr.id}
+                            >
+                                Xóa
+                            </Button>
+                        </Popconfirm>
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
     // ==========================================
     // COMPONENT: TAB ĐỔI MẬT KHẨU
     // ==========================================
@@ -188,11 +293,13 @@ const UserProfilePage = () => {
                     </div>
                 ) : (
                     <Tabs
-                        defaultActiveKey="1"
+                        activeKey={activeTab}
+                        onChange={setActiveTab}
                         size="large"
                         items={[
                             { key: '1', label: 'Hồ sơ cá nhân', children: <ProfileTab /> },
-                            { key: '2', label: 'Bảo mật & Mật khẩu', children: <PasswordTab /> },
+                            { key: '2', label: 'Địa chỉ giao hàng', children: renderAddressTab() },
+                            { key: '3', label: 'Bảo mật & Mật khẩu', children: <PasswordTab /> },
                         ]}
                     />
                 )}

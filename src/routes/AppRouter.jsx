@@ -33,6 +33,8 @@ import CustomOrderDetail from "../pages/CustomOrderDetail";
 import Preview3D from "../pages/Preview3D";
 import FeedbackForm from "../pages/FeedbackForm";
 import Design3DCustomizer from "../pages/Design3DCustomizer";
+import FaqPage from "../pages/info/FaqPage";
+import ContactPage from "../pages/info/ContactPage";
 
 // Dashboard Pages
 import DashboardOverview from "../pages/Dashboard/DashboardOverview";
@@ -42,11 +44,10 @@ import StaffDashboard from "../pages/Staff/StaffDashboard";
 import StaffCustomOrdersList from "../pages/Staff/StaffCustomOrdersList";
 import StaffCustomOrderDetail from "../pages/Staff/StaffCustomOrderDetail";
 import DesignFileUpload from "../pages/Staff/DesignFileUpload";
-import StaffDesignReviewDetail from "../pages/Staff/StaffDesignReviewDetail";
-import StaffDesignReviewsList from "../pages/Staff/StaffDesignReviewsList";
 import StaffCustomItemPrinting from "../pages/Staff/StaffCustomItemPrinting";
 import StaffTemplateManagement from "../pages/Staff/StaffTemplateManagement";
 import StaffTemplateDetail from "../pages/Staff/StaffTemplateDetail";
+import StaffTemplateEdit from "../pages/Staff/StaffTemplateEdit";
 import StaffCreateProductionJob from "../pages/Staff/StaffCreateProductionJob";
 import StaffProductionQueue from "../pages/Staff/StaffProductionQueue";
 import StaffShopOrders from "../pages/Staff/StaffShopOrders";
@@ -178,7 +179,17 @@ const AppRouter = () => {
           element={
             <PrivateRoute requiredRole={['manager', 'admin']}>
               <ManagerLayout>
-                <ManageProducts />
+                <ManageProducts basePath="/manager/products" />
+              </ManagerLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/manager/products/:id"
+          element={
+            <PrivateRoute requiredRole={['manager', 'admin']}>
+              <ManagerLayout>
+                <StaffTemplateDetail basePath="/manager/products" />
               </ManagerLayout>
             </PrivateRoute>
           }
@@ -219,26 +230,6 @@ const AppRouter = () => {
             <PrivateRoute requiredRole={['manager', 'admin']}>
               <ManagerLayout>
                 <FeedbackList />
-              </ManagerLayout>
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/manager/invoices"
-          element={
-            <PrivateRoute requiredRole={['manager', 'admin']}>
-              <ManagerLayout>
-                <ManagerInvoices />
-              </ManagerLayout>
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/manager/invoices/:id"
-          element={
-            <PrivateRoute requiredRole={['manager', 'admin']}>
-              <ManagerLayout>
-                <ManagerInvoiceDetail />
               </ManagerLayout>
             </PrivateRoute>
           }
@@ -316,10 +307,12 @@ const AppRouter = () => {
           element={<Navigate to="/staff/shop-orders" replace />}
         />
         <Route path="/staff/production-jobs/new" element={<StaffRoute><StaffCreateProductionJob /></StaffRoute>} />
-        <Route path="/staff/design-reviews" element={<StaffRoute><StaffDesignReviewsList /></StaffRoute>} />
-        <Route path="/staff/design-reviews/:id" element={<StaffRoute><StaffDesignReviewDetail /></StaffRoute>} />
+        <Route path="/staff/design-reviews" element={<Navigate to="/staff/dashboard" replace />} />
+        <Route path="/staff/design-reviews/:id" element={<Navigate to="/staff/dashboard" replace />} />
         <Route path="/staff/upload-design/:orderId" element={<StaffRoute><DesignFileUpload /></StaffRoute>} />
         <Route path="/staff/templates" element={<StaffRoute><StaffTemplateManagement /></StaffRoute>} />
+        <Route path="/staff/templates/create" element={<StaffRoute><StaffTemplateEdit /></StaffRoute>} />
+        <Route path="/staff/templates/:id/edit" element={<StaffRoute><StaffTemplateEdit /></StaffRoute>} />
         <Route path="/staff/templates/:id" element={<StaffRoute><StaffTemplateDetail /></StaffRoute>} />
 
         {/* ========================================== */}
@@ -394,6 +387,22 @@ const AppRouter = () => {
           }
         />
         <Route path="/shipping" element={<Navigate to="/policies/shipping" replace />} />
+        <Route
+          path="/faq"
+          element={
+            <Layout>
+              <FaqPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/contact"
+          element={
+            <Layout>
+              <ContactPage />
+            </Layout>
+          }
+        />
 
         {/* ===== ĐÃ THÊM ROUTE PROFILE VÀO ĐÂY ===== */}
         <Route
@@ -498,6 +507,9 @@ const AppRouter = () => {
             </Layout>
           }
         />
+        <Route path="/custom-order/ready-print" element={<Navigate to="/my-designs" replace />} />
+        <Route path="/custom-order/print-from-design" element={<Navigate to="/my-designs" replace />} />
+        <Route path="/custom-order/reprint" element={<Navigate to="/my-designs" replace />} />
         <Route
           path="/my-custom-orders"
           element={

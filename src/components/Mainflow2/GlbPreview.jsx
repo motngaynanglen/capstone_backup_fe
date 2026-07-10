@@ -2,6 +2,8 @@ import React from 'react';
 import '@google/model-viewer';
 import { resolvePublicMediaUrl } from '../../utils/mediaUrl';
 
+const GLB_VIEWER_BG = '#0f172a';
+
 /**
  * Inline GLB/GLTF preview via @google/model-viewer.
  */
@@ -16,8 +18,8 @@ export default function GlbPreview({ src, height = 240, style = {} }) {
         height,
         borderRadius: 10,
         overflow: 'hidden',
-        background: '#f1f5f9',
-        border: '1px solid #e2e8f0',
+        background: GLB_VIEWER_BG,
+        border: '1px solid #334155',
         ...style,
       }}
     >
@@ -27,7 +29,9 @@ export default function GlbPreview({ src, height = 240, style = {} }) {
         auto-rotate
         shadow-intensity="1"
         environment-image="neutral"
-        style={{ width: '100%', height: '100%' }}
+        exposure="1.2"
+        interaction-prompt="none"
+        style={{ width: '100%', height: '100%', backgroundColor: GLB_VIEWER_BG }}
       />
     </div>
   );

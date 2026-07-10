@@ -28,7 +28,7 @@ export default function QuoteMessageCard({
       }}
       title={
         <span style={{ fontWeight: 700, color: "#3730a3" }}>
-          Báo giá {revision != null ? `(rev. ${revision})` : ""}
+          Báo giá thiết kế + in {revision != null ? `(rev. ${revision})` : ""}
         </span>
       }
     >

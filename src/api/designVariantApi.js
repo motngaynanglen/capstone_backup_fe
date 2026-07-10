@@ -41,6 +41,20 @@ const designVariantApi = {
     }
   },
 
+  // Bật/tắt trạng thái Active — BE stable không có /toggle-active,
+  // dùng PATCH /{id}/update với IsActive (BE tự đồng bộ CatalogStatus)
+  toggleActive: async (id, nextActive) => {
+    try {
+      const response = await axiosInstance.patch(`${DESIGN_VARIANT_ENDPOINTS.UPDATE}/${id}/update`, {
+        id,
+        isActive: !!nextActive,
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   // Delete variant — BE: DELETE /api/design-variant/{id}/delete
   delete: async (id) => {
     try {

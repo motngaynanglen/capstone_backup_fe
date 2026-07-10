@@ -29,7 +29,9 @@ axiosInstance.interceptors.response.use(
   (error) => {
     const url = error.config?.url || "";
     const status = error.response?.status;
-    const isLoginApi = url.includes("/login");
+    // Nhận diện cả /auth/login và /auth/system-login để không đá người dùng
+    // về trang đăng nhập khi chính request đăng nhập bị 401
+    const isLoginApi = /\/auth\/(login|system-login)/.test(url);
 
     if (status === 401) {
       if (!isLoginApi) {

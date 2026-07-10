@@ -12,17 +12,10 @@ export const createInventoryTransactionApi = async (payload) => {
   return response.data;
 };
 
-// 3. Truy vết lịch sử kho theo ReferenceId (OrderId)
-export const getInventoryByOrderApi = async (orderId) => {
-  const response = await axiosInstance.get(`/api/inventory-transaction/reference/${orderId}`);
-  return response.data;
-};
-
 // Default export object for backward compatibility
 const inventoryApi = {
   query: queryInventoryTransactionsApi,
   create: createInventoryTransactionApi,
-  getByReference: getInventoryByOrderApi,
 };
 
 export default inventoryApi;

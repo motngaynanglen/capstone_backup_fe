@@ -1,122 +1,126 @@
-import React, { useRef, useEffect } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
-import * as THREE from 'three';
-import { Breadcrumb } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Breadcrumb, Button, Spin, Result } from 'antd';
+import { ArrowLeftOutlined } from '@ant-design/icons';
+import designVariantApi from '../api/designVariantApi';
+import { normalizeVariant } from '../utils/catalogProduct';
+import ProductModelViewer from '../components/catalog/ProductModelViewer';
 
 const Preview3D = () => {
   const { id } = useParams();
   const location = useLocation();
-  const mountRef = useRef(null);
-  
-  // Get breadcrumb data from navigation state, fallback to default
-  const rawBreadcrumb = location.state?.breadcrumb || [
-    { title: 'Trang chủ', path: '/' },
-    { title: 'Đơn hàng của tôi', path: '/my-custom-orders' },
-    { title: 'Xem mô hình 3D', path: null }
-  ];
+  const navigate = useNavigate();
 
-  const breadcrumbItems = rawBreadcrumb.map((item) => ({
-    title: item.path ? <Link to={item.path}>{item.title}</Link> : item.title
-  }));
+  const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  const modelSrcFromState = location.state?.modelSrc;
 
   useEffect(() => {
-    // ... (ThreeJS setup code - giữ nguyên phần tạo scene) ...
-    if (!mountRef.current) return;
+    let cancelled = false;
 
-    // Scene setup
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf0f0f0);
-
-    // Camera
-    const camera = new THREE.PerspectiveCamera(
-      75,
-      mountRef.current.clientWidth / mountRef.current.clientHeight,
-      0.1,
-      1000
-    );
-    camera.position.z = 5;
-
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
-    mountRef.current.appendChild(renderer.domElement);
-
-    // Add a simple geometry for demo
-    const geometry = new THREE.BoxGeometry(2, 2, 2);
-    const material = new THREE.MeshStandardMaterial({ color: 0x667eea });
-    const cube = new THREE.Mesh(geometry, material);
-    scene.add(cube);
-
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(5, 5, 5);
-    scene.add(directionalLight);
-
-    // Controls (simple rotation)
-    let mouseX = 0;
-    let mouseY = 0;
-    const handleMouseMove = (e) => {
-      mouseX = (e.clientX / window.innerWidth) * 2 - 1;
-      mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-
-    // Animation
-    let animationId;
-    const animate = () => {
-      animationId = requestAnimationFrame(animate);
-      cube.rotation.y += 0.01;
-      cube.rotation.x += 0.005;
-      renderer.render(scene, camera);
-    };
-    animate();
-
-    // Handle resize
-    const handleResize = () => {
-      if (!mountRef.current) return;
-      camera.aspect = mountRef.current.clientWidth / mountRef.current.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
-    };
-    window.addEventListener('resize', handleResize);
-
-    // Cleanup
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(animationId);
-      
-      if (mountRef.current && renderer.domElement) {
-        // Check if renderer.domElement is still a child of mountRef.current
-        if (mountRef.current.contains(renderer.domElement)) {
-          mountRef.current.removeChild(renderer.domElement);
+    const load = async () => {
+      setLoading(true);
+      setNotFound(false);
+      try {
+        const res = await designVariantApi.getDetail(id);
+        const raw = res?.data;
+        if (!raw) {
+          if (!cancelled) setNotFound(true);
+          return;
         }
+        if (!cancelled) setProduct(normalizeVariant(raw));
+      } catch (err) {
+        console.error('Preview3D load error:', err);
+        if (!cancelled) setNotFound(true);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      renderer.dispose();
-      // Dispose geometry and material
-      geometry.dispose();
-      material.dispose();
+    };
+
+    if (id) load();
+    return () => {
+      cancelled = true;
     };
   }, [id]);
 
+  const displayName = product
+    ? product.designTemplateName
+      ? `${product.designTemplateName} — ${product.name}`
+      : product.name
+    : location.state?.productName || 'Sản phẩm';
+
+  const modelSrc = product?.modelSrc || modelSrcFromState;
+
+  const rawBreadcrumb = location.state?.breadcrumb || [
+    { title: 'Trang chủ', path: '/' },
+    { title: 'Sản phẩm', path: '/products' },
+    { title: displayName, path: `/products/${id}` },
+    { title: 'Xem mô hình 3D', path: null },
+  ];
+
+  const breadcrumbItems = rawBreadcrumb.map((item) => ({
+    title: item.path ? <Link to={item.path}>{item.title}</Link> : item.title,
+  }));
+
+  if (loading && !modelSrcFromState) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <Spin size="large" tip="Đang tải mô hình 3D..." />
+      </div>
+    );
+  }
+
+  if (notFound && !modelSrcFromState) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center p-6">
+        <Result
+          status="404"
+          title="Không tìm thấy mô hình 3D"
+          subTitle="Sản phẩm có thể đã ngừng bán hoặc liên kết không hợp lệ."
+          extra={
+            <Button type="primary" onClick={() => navigate('/products')}>
+              Về danh sách sản phẩm
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-7xl mx-auto px-8 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-6">
+        <Button
+          type="text"
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate(`/products/${id}`)}
+          className="mb-2"
+        >
+          Quay lại sản phẩm
+        </Button>
         <Breadcrumb items={breadcrumbItems} />
       </div>
 
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">3D Preview</h1>
-      <div className="bg-white rounded-lg shadow-lg p-4">
-        <div
-          ref={mountRef}
-          className="w-full h-[600px] rounded-lg"
-          style={{ minHeight: '600px' }}
-        />
-        <div className="mt-4 text-center text-gray-600">
-          <p>Use mouse to rotate the view</p>
-          <p className="text-sm mt-2">Note: This is a demo preview. In production, load actual STL/OBJ files here.</p>
+      <h1 className="text-3xl font-bold mb-2 text-gray-800">{displayName}</h1>
+      <p className="text-gray-500 mb-6">Xem toàn màn hình · Kéo để xoay · Cuộn để phóng to</p>
+
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+        <div className="relative w-full" style={{ height: 'min(75vh, 720px)' }}>
+          {modelSrc ? (
+            <ProductModelViewer
+              className="h-full"
+              style={{ height: '100%' }}
+              src={modelSrc}
+              fallbackId={id}
+              poster={product?.thumbnailUrl}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <Spin size="large" tip="Đang tải mô hình..." />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -124,4 +128,3 @@ const Preview3D = () => {
 };
 
 export default Preview3D;
-
