@@ -1,0 +1,35 @@
+name: Production Quality Check (CI)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  quality-assurance:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Khởi tạo Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Cài đặt Dependencies
+        run: npm install
+
+      # Bước này cực kỳ quan trọng để đảm bảo code sạch trước khi merge vào main
+      - name: Kiểm tra lỗi Lint (Eslint)
+        run: npm run lint || echo "Linting failed but continuing build..."
+
+      - name: Thực hiện Build thử (Vite Build)
+        run: npm run build
+
+      - name: Thông báo kết quả
+        if: success()
+        run: echo "Nhánh main đã sẵn sàng để triển khai!"

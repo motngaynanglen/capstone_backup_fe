@@ -1,0 +1,32 @@
+export const designReviews = [
+  {
+    id: 'DR001',
+    customerName: 'Nguyen Van A',
+    fileName: 'phone-stand-v1.stl',
+    createdAt: '2026-01-10T10:30:00Z',
+    status: 'pending',
+    material: 'PLA',
+    size: '12cm x 6cm x 4cm',
+    previewUrl: '',
+  },
+  {
+    id: 'DR002',
+    customerName: 'Tran Thi B',
+    fileName: 'figurine-cat.obj',
+    createdAt: '2026-01-11T14:15:00Z',
+    status: 'revision',
+    material: 'Resin',
+    size: '8cm x 5cm x 5cm',
+    previewUrl: '',
+  },
+  {
+    id: 'DR003',
+    customerName: 'Le Minh C',
+    fileName: 'key-holder.stl',
+    createdAt: '2026-01-12T09:00:00Z',
+    status: 'approved',
+    material: 'ABS',
+    size: '10cm x 3cm x 2cm',
+    previewUrl: '',
+  },
+];

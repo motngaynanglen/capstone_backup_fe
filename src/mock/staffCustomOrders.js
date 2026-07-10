@@ -1,0 +1,32 @@
+export const staffCustomOrders = [
+  {
+    id: 'CUST001',
+    customerName: 'Nguyen Van A',
+    productName: 'Custom Phone Stand',
+    material: 'PLA',
+    quantity: 2,
+    totalPrice: 150000,
+    status: 'pending',
+    createdAt: '2026-01-10T10:00:00Z',
+  },
+  {
+    id: 'CUST002',
+    customerName: 'Tran Thi B',
+    productName: 'Custom Key Holder',
+    material: 'ABS',
+    quantity: 1,
+    totalPrice: 90000,
+    status: 'printing',
+    createdAt: '2026-01-11T14:30:00Z',
+  },
+  {
+    id: 'CUST003',
+    customerName: 'Le Minh C',
+    productName: 'Custom Figurine',
+    material: 'Resin',
+    quantity: 1,
+    totalPrice: 300000,
+    status: 'completed',
+    createdAt: '2026-01-12T09:20:00Z',
+  },
+];
