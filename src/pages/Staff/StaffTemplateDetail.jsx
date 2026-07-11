@@ -48,15 +48,18 @@ const StaffTemplateDetail = ({ basePath = "/staff/templates" }) => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [detailRes, tagsRes, variantsRes] = await Promise.all([
+      // BE query mặc định chỉ trả variant đang active — phải hỏi thêm nhóm
+      // inactive để staff còn thấy và bật lại được biến thể đã tắt
+      const [detailRes, tagsRes, activeRes, inactiveRes] = await Promise.all([
         designTemplateApi.getDetail(id),
         designTagApi.getTags(id),
-        designVariantApi.getAll({ designTemplateId: id }),
+        designVariantApi.getAll({ designTemplateId: id, isActive: true }),
+        designVariantApi.getAll({ designTemplateId: id, isActive: false }),
       ]);
 
       setTemplate(detailRes.data);
       setTags(tagsRes.data || []);
-      setVariants(variantsRes.data || []);
+      setVariants([...(activeRes.data || []), ...(inactiveRes.data || [])]);
     } catch (error) {
       message.error("Không thể tải chi tiết mẫu thiết kế");
       navigate(basePath);
@@ -90,7 +93,7 @@ const StaffTemplateDetail = ({ basePath = "/staff/templates" }) => {
     try {
       setTogglingVariantId(variant.id);
       const response = await designVariantApi.toggleActive(variant.id, !(variant.isActive ?? variant.IsActive));
-      if (response.code === "SUCCESS") {
+      if (response.statusCode === 200 || ["SUCCESS", "UPDATED"].includes(response.code)) {
         message.success(response.message || "Đã thay đổi trạng thái biến thể");
         fetchData();
       } else {

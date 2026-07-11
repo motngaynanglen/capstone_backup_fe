@@ -137,12 +137,18 @@ const TemplateFormModal = ({ open, templateId, onClose, onSuccess }) => {
       let resultId = templateId;
       if (isEditMode) {
         const response = await designTemplateApi.update(templateId, payload);
-        if (response.code !== "SUCCESS") throw new Error(response.message);
+        // BE stable trả code UPDATED cho update (SUCCESS chỉ dùng cho GET)
+        if (response.statusCode !== 200 && !["SUCCESS", "UPDATED"].includes(response.code)) {
+          throw new Error(response.message);
+        }
         message.success("Cập nhật mẫu thiết kế thành công");
         resultId = response.data?.id || templateId;
       } else {
         const response = await designTemplateApi.add(payload);
-        if (response.code !== "SUCCESS") throw new Error(response.message);
+        // BE stable trả code CREATED cho add
+        if (response.statusCode !== 200 && !["SUCCESS", "CREATED"].includes(response.code)) {
+          throw new Error(response.message);
+        }
         message.success("Tạo mẫu thành công — trạng thái Draft");
         resultId = response.data?.id;
       }

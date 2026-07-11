@@ -177,7 +177,8 @@ const VariantFormModal = ({ open, templateId, variant, onClose, onSuccess }) => 
           clearPreviewImageOverride: !previewImageUrl?.trim(),
         };
         const response = await designVariantApi.update(payload.id, payload);
-        if (response.code && response.code !== "SUCCESS") {
+        // BE stable trả code UPDATED cho update
+        if (response.statusCode !== 200 && response.code && !["SUCCESS", "UPDATED"].includes(response.code)) {
           throw new Error(response.message);
         }
 
@@ -214,7 +215,8 @@ const VariantFormModal = ({ open, templateId, variant, onClose, onSuccess }) => 
           ...mediaFields,
         };
         const response = await designVariantApi.add(payload);
-        if (response.code && response.code !== "SUCCESS") {
+        // BE stable trả code CREATED cho add
+        if (response.statusCode !== 200 && response.code && !["SUCCESS", "CREATED"].includes(response.code)) {
           throw new Error(response.message);
         }
         message.success("Thêm biến thể và nhập kho ban đầu thành công");
