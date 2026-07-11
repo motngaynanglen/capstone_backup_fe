@@ -57,16 +57,9 @@ const ManagerLayout = ({ children }) => {
       label: 'Quản lý Dịch vụ',
       icon: '⚙️'
     },
-    {
-      path: '/manager/invoices',
-      label: 'Quản lý Hóa Đơn',
-      icon: '🧾'
-    },
-    {
-      path: '/manager/transactions',
-      label: 'Quản lý Giao Dịch',
-      icon: '💰'
-    }
+    // Ẩn "Quản lý Hóa Đơn" & "Quản lý Giao Dịch": trang còn dữ liệu mock,
+    // BE stable chưa có endpoint list hóa đơn/giao dịch để gắn thật.
+    // (route /manager/invoices cũng chưa tồn tại — chỉ có /manager/transactions)
   ];
 
   return (
